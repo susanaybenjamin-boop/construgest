@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import { randomUUID } from 'crypto'
 import { authMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })

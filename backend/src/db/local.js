@@ -13,6 +13,7 @@
 // NO soportado aún (lanza error claro): selects anidados "tabla(...)", .rpc(), .storage
 // ============================================================================
 import pool from './mariadb.js'
+import storage from './storage.js'
 
 const qi = (id) => '`' + String(id).replace(/`/g, '') + '`'
 
@@ -34,6 +35,21 @@ function normVal(v) {
 }
 
 const OP_MAP = { eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=', like: 'LIKE', ilike: 'LIKE' }
+
+// Entrecomilla la lista de columnas de un SELECT plano (sin anidados). Necesario
+// porque hay columnas con nombre reservado (key, value, order, read, date...).
+// Soporta "*", "a, b", y el renombrado de Supabase "nuevo:original".
+function selectCols(cols) {
+  if (!cols || cols.trim() === '*') return '*'
+  return cols.split(',').map((c) => {
+    c = c.trim()
+    if (c === '*' || c === '') return c
+    const m = c.match(/^(\w+):(\w+)$/)          // renombrado nuevo:original
+    if (m) return `${qi(m[2])} AS ${qi(m[1])}`
+    if (/^\w+$/.test(c)) return qi(c)
+    return c                                     // expresión rara: dejar tal cual
+  }).filter(Boolean).join(', ')
+}
 
 // ---- Selects anidados estilo Supabase: "*, alias:tabla(cols, nested:tabla2(...))" ----
 // Convención: el embed `alias:tabla(...)` se resuelve por la FK local `alias_id`
@@ -93,6 +109,8 @@ class Builder {
     this.onConflict = null
     this.orders = []
     this.lim = null
+    this.rangeFrom = null
+    this.rangeTo = null
     this.single_ = false
     this.maybe = false
     this.returning = false
@@ -144,6 +162,7 @@ class Builder {
 
   order(c, opts = {}) { this.orders.push([c, opts.ascending === false ? 'DESC' : 'ASC']); return this }
   limit(n) { this.lim = n; return this }
+  range(from, to) { this.rangeFrom = from; this.rangeTo = to; return this } // Supabase inclusivo
   single() { this.single_ = true; return this }
   maybeSingle() { this.single_ = true; this.maybe = true; return this }
 
@@ -166,7 +185,10 @@ class Builder {
 
   _selectTail(sql) {
     if (this.orders.length) sql += ' ORDER BY ' + this.orders.map(([c, d]) => `${qi(c)} ${d}`).join(', ')
-    if (this.lim != null) sql += ` LIMIT ${Number(this.lim)}`
+    if (this.rangeFrom != null) {
+      const count = Math.max(0, this.rangeTo - this.rangeFrom + 1)
+      sql += ` LIMIT ${count} OFFSET ${Math.max(0, this.rangeFrom)}`
+    } else if (this.lim != null) sql += ` LIMIT ${Number(this.lim)}`
     else if (this.single_) sql += ' LIMIT 2'
     return sql
   }
@@ -178,7 +200,7 @@ class Builder {
     const params = []
     let sql
     if (this.op === 'select') {
-      sql = this._selectTail(`SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params))
+      sql = this._selectTail(`SELECT ${selectCols(this.cols)} FROM ${qi(this.table)}` + this._where(params))
     } else if (this.op === 'insert' || this.op === 'upsert') {
       const rows = Array.isArray(this.values) ? this.values : [this.values]
       const keys = Object.keys(rows[0])
@@ -188,7 +210,7 @@ class Builder {
       if (this.op === 'upsert') {
         sql += ' ON DUPLICATE KEY UPDATE ' + keys.map((k) => `${qi(k)} = VALUES(${qi(k)})`).join(', ')
       } else if (this.returning) {
-        sql += ` RETURNING ${this.cols}`
+        sql += ` RETURNING ${selectCols(this.cols)}`
       }
     } else if (this.op === 'update') {
       const keys = Object.keys(this.values)
@@ -198,7 +220,7 @@ class Builder {
       // MariaDB no soporta UPDATE...RETURNING -> el .select() se resuelve en exec() con un SELECT.
     } else if (this.op === 'delete') {
       sql = `DELETE FROM ${qi(this.table)}` + this._where(params)
-      if (this.returning) sql += ` RETURNING ${this.cols}`
+      if (this.returning) sql += ` RETURNING ${selectCols(this.cols)}`
     }
     return { sql, params }
   }
@@ -213,9 +235,9 @@ class Builder {
         ? this.onConflict.split(',').map((s) => s.trim())
         : (obj && obj.id !== undefined ? ['id'] : [])
       const where = keyCols.map((k) => { params.push(normVal(obj[k])); return `${qi(k)} = ?` }).join(' AND ')
-      return { sql: `SELECT ${this.cols} FROM ${qi(this.table)}` + (where ? ` WHERE ${where}` : '') + ' LIMIT 2', params }
+      return { sql: `SELECT ${selectCols(this.cols)} FROM ${qi(this.table)}` + (where ? ` WHERE ${where}` : '') + ' LIMIT 2', params }
     }
-    return { sql: this._selectTail(`SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params)), params }
+    return { sql: this._selectTail(`SELECT ${selectCols(this.cols)} FROM ${qi(this.table)}` + this._where(params)), params }
   }
 
   async _execNested() {
@@ -262,6 +284,7 @@ class Builder {
 const local = {
   from(table) { return new Builder(table) },
   rpc() { return Promise.resolve({ data: null, error: { message: 'shim: rpc() no implementado aún' } }) },
+  storage,
 }
 
 export default local

@@ -5,7 +5,7 @@ import { readdir, stat, readFile, writeFile, unlink } from 'fs/promises'
 import { join, resolve, dirname, relative } from 'path'
 import { fileURLToPath } from 'url'
 import { authMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 
 const router = Router()
 
