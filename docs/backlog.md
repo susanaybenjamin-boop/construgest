@@ -184,8 +184,16 @@ el catálogo propio. Mejora con el uso, local y sin internet.
       responde: []" (el 3B la sobre-activa y devuelve `[]`); (b) usar **ejemplos realistas** en el
       prompt, no placeholders tipo "REF001"/"Descripción clara" (provocan alucinaciones, incl. texto
       en chino); (c) sacar los **códigos por regex** (Capa 1), no pedirlos al modelo.
-- `[ ]` **AI-2:** afinar los prompts de las skills para el 3B (receta de AI-1) + bajar cálculos/
-  comparaciones/códigos a código determinista (Capa 1) + structured-outputs por esquema si hace falta.
+- `[~]` **AI-2 EN CURSO.**
+  · `[x]` **Extracción (`extract-materials`)** HECHA y verificada (ver `services/extraction.js`):
+    parser determinista Capa 1 (code/precio/unidad por regex, normaliza nº ES, no pierde filas) +
+    LLM de refuerzo fusionado por precio. 5/5 consistente. Robusto a caída del LLM.
+  · `[ ]` **Skills de ANÁLISIS de presupuestos** (16). HALLAZGO verificado: el 3B **parrotea los
+    placeholders del ejemplo y ALUCINA números** (analyze-expenses devolvió `budget_total:200000`
+    copiado del ejemplo; varianza mal). Las de array (suggest-optimizations…) devuelven `[]` por la
+    frase de fallback. → **No basta afinar prompts: hay que CALCULAR en código (Capa 1)** (varianzas,
+    totales, duplicados, outliers de precio) y dejar al LLM solo el texto narrativo. Rediseño por
+    skill = el grueso del trabajo restante.
 - `[ ]` **AI-3:** OCR local (Tesseract) para PDFs escaneados; mantener pdfjs + BC3/PZH.
 - `[ ]` **AI-4:** bucle de correcciones (tabla local + few-shot + fuzzy-match de catálogo).
 - `[ ]` **AI-5:** eliminar maquinaria de coste/cuotas (mcp-ai-tracker, cons_ai_pricing,
