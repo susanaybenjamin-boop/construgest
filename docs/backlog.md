@@ -2,20 +2,22 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-07-13
 >
-> **Fase 0 HECHA** + entorno Docker (DB-1) + **esquema MariaDB creado y verificado (DB-2/DB-3).**
-> - Repo NUEVO independiente. Ramas: trabajo en **`feat/benjamin`** → merge `--no-ff` a
->   `develop` al probar. Secretos verificados como ignorados (incl. clave Google).
+> **FASE 0 y FASE 1 COMPLETAS y verificadas.** Entorno local Docker + MariaDB con esquema y seed.
+> - Repo GitHub **privado** `susanaybenjamin-boop/construgest`. Ramas: trabajo en
+>   **`feat/benjamin`** → merge `--no-ff` a `develop` al probar. **Los `git push` los hace
+>   Benjamin** (el guardarraíl de Claude Code los bloquea por señal de visibilidad cacheada).
 > - `docker-compose.yml`: **MariaDB 11.4 puerto 3308** + **backend Node puerto 5000**.
-> - **`database/init/01_schema.sql`: 59 tablas** (67 FKs, 39 CHECKs, 128 índices), traducidas
->   de Postgres. Aplicado y verificado en ejecución; autocarga desde cero probada.
-> - Falta que Benjamin lo mire en **DBeaver** (localhost:3308, construgest/construgest).
+> - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
+>   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **PRÓXIMA SESIÓN — empezar por aquí:**
+> **PRÓXIMA SESIÓN — empezar por aquí (FASE 2):**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
-> 2. **DB-4:** crear `database/init/02_seed.sql` con una organización + un usuario de
->    prueba (para poder arrancar la app en local). Verificar insertándolo y consultándolo.
-> 3. Cerrar Fase 1: merge `feat/benjamin` → `develop`. Luego **Fase 2** (capa de datos
->    `mysql2` + ayudante, migrar rutas una a una apuntando el backend a la MariaDB local).
+> 2. **DATA-0:** crear el cliente MariaDB (`mysql2`) en `backend/src/db/` + un ayudante que
+>    imite el patrón de consulta que hoy usa Supabase (para migrar las 588 llamadas sin
+>    reescribir cada una a mano). Apuntar el backend a la MariaDB local (ya tiene las envs
+>    DB_HOST=mariadb… en docker-compose).
+> 3. **DATA-n:** migrar la primera ruta (empezar por `auth.js`, es pequeña y clave) y
+>    VERIFICAR el login real con `curl` contra el backend. Una ruta = un slice = un commit.
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -44,7 +46,7 @@ prefijo (ver `CLAUDE.md` §6).
 - `[x]` Esquema Construgest extraído a `docs/schema/` (inventario + raw + funciones RPC).
 - `[x]` Base del proyecto: `CLAUDE.md` + `docs/backlog.md`.
 
-### `[~]` FASE 1 — Esquema MariaDB + entorno local (Docker + DBeaver)
+### `[x]` FASE 1 — Esquema MariaDB + entorno local (Docker + DBeaver)
 - `[x]` **DB-1** carpeta `database/` + `docker-compose.yml` (MariaDB 3308 + backend 5000).
   VERIFICADO: ambos contenedores Up, BD creada, backend responde y ve a MariaDB.
 - `[x]` **DB-2** `database/init/01_schema.sql`: 59 tablas traducidas PG→MariaDB
@@ -54,8 +56,11 @@ prefijo (ver `CLAUDE.md` §6).
 - `[x]` **DB-3** aplicado y VERIFICADO en ejecución: 59 tablas · 67 FKs · 39 CHECKs · 128 índices.
   Probada la autocarga desde cero (`down -v && up -d` → 59 tablas). **Falta: que Benjamin lo
   MIRE en DBeaver** (localhost:3308, construgest/construgest).
-- `[ ]` **DB-4** seeds mínimos (`database/init/02_seed.sql`): organización + usuario de prueba.
-  Nota: la VIEW `mcp_users_view` quedó fuera (hacerla aparte si hace falta).
+- `[x]` **DB-4** seed mínimo (`database/init/02_seed.sql`): org "Construgest (demo)" + usuario
+  `admin@construgest.local` / `construgest` (owner). VERIFICADO: JOIN user→member→org OK y
+  bcrypt valida la contraseña correcta / rechaza la incorrecta. (VIEW `mcp_users_view` fuera.)
+
+**➡️ FASE 1 COMPLETA.** Merge `feat/benjamin` → `develop`.
 
 ### `[ ]` FASE 2 — Capa de datos MariaDB (backend), ruta por ruta
 - `[ ]` **DATA-0** cliente MariaDB (`mysql2`) + ayudante para no reescribir 588 llamadas a mano.
