@@ -1,0 +1,3 @@
+# Los .sql que se dejen en esta carpeta se ejecutan automáticamente la PRIMERA vez
+# que MariaDB crea su volumen de datos (docker-entrypoint-initdb.d).
+# En la Fase 1 (DB-2) aquí irá schema.mariadb.sql. De momento está vacía a propósito.

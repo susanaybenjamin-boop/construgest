@@ -1,0 +1,1880 @@
+--- PAGE 1 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C01 MOVIMIENTO DE TIERRAS
+02AVV00002    m3    EXCAVACIÓN EN VACIADO, DE TIERRAS DE CONSIST. DURA
+Excavación, en vaciado, de tierras de consistencia dura, incluso p.p. de desbroce, retirada de toco-
+nes existentes, zanjas, perfilado de fondos y laterales. Incluso picado de piedra si fuese necesario.
+Medido el volumen teórico.
+Retirada capa vegetal    1    310,73    0,40    124,29
+Losa cimentación    1    123,70    0,30    37,11
+Piscina    1    22,78    1,80    41,00
+Visera entrada    1    2,00    1,10    0,30    0,66
+_______________________________________________________
+203,06    0,36    73,10
+02RRM00001Z m3    RELLENO CON ZAHORRA
+Relleno de zahorra, en tongadas de 20 cm comprendiendo: extendido, regado y compactado al 95%
+proctor normal. Medido el volumen en perfil compactado.
+Bajo solera    1    310,73    0,20    62,15
+A deducir
+Losa cimentación    -1    123,70    0,20    -24,74
+Piscina    -1    22,78    0,20    -4,56
+Visera entrada    -1    2,00    1,10    0,20    -0,44
+_______________________________________________________
+32,41    0,40    12,96
+02TMM00002    m3    TRANSPORTE TIERRAS
+Transporte de tierras hasta vertedero autorizado, incluso carga, descarga y canon de gestión de resi-
+duos. Medido el volumen teórico.
+Igual excavación    203,06    203,06
+_______________________________________________________
+203,06    1,06    215,24
+_______________
+TOTAL CAPÍTULO C01 MOVIMIENTO DE TIERRAS..................................................................................    301,30
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página1
+
+--- PAGE 2 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C02 CIMENTACIONES
+03WSS80000    m2    CAPA DE HORMIGÓN DE LIMPIEZA 10 cm ESP. MEDIO
+Capa de hormigón de limpieza HM-20/P/20/I, consistencia plástica y tamaño máximo del árido 20
+mm,de 10 cm de espesor mínimo, en elementos de cimentación, suministrado y puesto en obra, in-
+cluso p.p. de alisado de la superficie; según instrucción EHE y CTE. Medida la superficie ejecutada.
+Losa cimentación    1    123,70    123,70
+Piscina    1    22,78    22,78
+Visera entrada    1    2,00    1,10    0,30    0,66
+Zuncho tapia perímetro parcela    1    60,71    0,40    24,28
+_______________________________________________________
+171,42    4,47    766,25
+03WWW00001 m2    LAMINA DE POLIETILENO SOBRE SUB-BASES DE CIMENTACIÓN
+Lamina de polietileno colocada sobre sub-bases de elementos de cimentación, incluso p.p. de sola-
+pes. Medida la superficie terminada.
+Losa de cimentación    1    123,70    123,70
+Piscina    1    22,78    22,78
+Visera entrada    1    2,00    1,10    0,30    0,66
+Zuncho tapia perímetro parcela    1    60,71    0,40    24,28
+_______________________________________________________
+171,42    0,58    99,42
+03WSS00012    m3    RELLENO DE GRAVA GRUESA LIMPIA
+Relleno de grava gruesa limpia, incluso compactado de base y extendido. Medido el volumen teóri-
+co ejecutado.
+Losa de cimentación    1    123,70    0,40    49,48
+Visera entrada    1    2,00    1,10    0,20    0,44
+_______________________________________________________
+49,92    9,96    497,20
+03HRL80020    m3    HORM. ARM. HA-25/B/25/XC2 B500S EN LOSAS CIM. V/MAN.
+Hormigón armado HA-25/B/25/XC2, consistencia blanda y tamaño máximo del árido 25 mm, en lo-
+sas de cimentación, suministrado y puesta en obra, vertido manual, armadura de acero B 500 S con
+armado según documentación gráfica e instrucciones de la D.F, incluso ferrallado, separadores, vi-
+brado y curado; según instrucción EHE y CTE. Medido el volumén teórico ejecutado.
+Losa de cimentación    1    123,70    0,50    61,85
+_______________________________________________________
+61,85    75,90    4.694,42
+03HRZ80090    m3    HORM. ARM. HA-25/B/25/XC2 B500S EN ZAPATAS CORRIDAS
+Hormigón armado HA-25/B/25/XC2 fabricado en central, consistencia blanda y tamaño máximo del
+árido 25 mm, en zapatas corridas y zunchos, suministrado y puesta en obra, armadura de acero B
+500 S con armado según documentación gráfica e instrucciones de la D.F., incluso separadores, vi-
+brado y curado; según instrucción EHE y CTE. Medido el volumén teórico ejecutado.
+Visera entrada    1    2,00    1,10    0,40    0,88
+_______________________________________________________
+0,88    70,51    62,05
+03HRA80220    m3    HORM. ARM. HA-30/B/15/XC2 B500S EN VIGAS/ZUNCHO V/BOMBA
+Hormigón armado HA-25/B/25/XC2, consistencia blanda y tamaño máximo del árido 25 mm, en vi-
+gas y/o zunchos de cimentación, suministrado y puesta en obra, vertido con bomba, armadura de
+acero B 500 SD con armado según documentación gráfica, incluso p.p. de ferrallado, separadores,
+vibrado y curado; según CodE, NCSR-02 y CTE. Medido el volumén teórico ejecutado.
+Zuncho tapia perímetro parcela    1    60,71    0,40    0,40    9,71
+_______________________________________________________
+9,71    71,65    695,72
+05HRM80110G m3    HORM. ARM. HA-30/F/12/XD2 GUNITADO VASO PISCINA
+PREPARACIÓN DE LA ESTRUCTURA DE HIERRO
+-Armadura según documentación gráfica
+Formación de cuadros en toda el área de la piscina, atado y rectificado con alambre de amarre.
+-Colocación de alambre de cobre toma a tierra.
+PROYECTADO DE PISCINA CON GUNITADO VIA HUMEDA
+-Con hormigón proyectado obtenido con la ayuda de una mezcla pre-confeccionada y compacta
+sin posibilidad de poros y con una impermeabilización absoluta HA-30/F/12/XD2 (cemento de unos
+400kg/m3 y arena
+de cantera). Aplicación mediante lanzamiento a 7bar de presión, con espesor de 25cm en suelo y
+20cm en paredes aproximadamente.
+-El hormigón será regleado y fratasado, y todas las esquinas serán redondeadas.
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página2
+
+--- PAGE 3 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+Losa piscina    1    22,80    0,30    6,84
+Muros    1    23,33    0,30    1,40    9,80
+_______________________________________________________
+16,64    144,05    2.396,99
+10SSS90001    m2    SOLERA HORMIGÓN HA-25 #150x150x6 mm 15 cm ESP.
+Solera de hormigón HA-25 formada por: compactado de base, capa de arena de 10 cm de espesor,
+lámina de polietileno, solera de 15 cm de espesor, mallazo galvanizado 150*150*6 mm, y p.p. de
+junta de contorno. Medida la superficie deduciendo huecos mayores de 0,50 m2.
+Solera exterior    1    99,78    99,78
+_______________________________________________________
+99,78    11,57    1.154,45
+10SSS90001IM m2    SOLERA HORMIGÓN HA-25 #150x150x6 mm 15 cm ESP. ACABADO IMPRESO
+Solera de hormigón HA-25 formada por: compactado de base, capa de arena de 10 cm de espesor,
+lámina de polietileno, solera de 15 cm de espesor, mallazo galvanizado 150*150*6 mm, y p.p. de
+junta de contorno, con acabado impreso, diseño a definir por la D.F.. Medida la superficie deduciendo
+huecos mayores de 0,50 m2.
+Solera exterior zona garaje    1    64,23    64,23
+_______________________________________________________
+64,23    12,52    804,16
+_______________
+TOTAL CAPÍTULO C02 CIMENTACIONES..................................................................................................    11.170,66
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página3
+
+--- PAGE 4 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C03 ESTRUCTURAS
+05HRP80010N m3    HORM. ARM. HA-25/P/15/IIa EN PILARES I/ENC. MET. REV.
+Hormigón armado HA-25/F/15/XC1, consistencia fluida y tamaño máximo del árido 15 mm, en pila-
+res, para revestir, suministrado y puesto en obra, armadura de acero B 500 SD con armado según
+documentación gráfica, incluso p.p. de encofrado metálico, desencofrado, limpieza de fondos, ferralla-
+do, separadores, vibrado y curado; construido según Código Estructural y NCSR-02. Medido el
+volumen teórico ejecutado.
+Pilares    13    0,40    0,30    3,05    4,76
+2    0,40    0,30    0,50    0,12
+Pilastras porche entrada    2    0,30    0,30    2,90    0,52
+_______________________________________________________
+5,40    149,99    809,95
+05FBB00002    m2    FORJ. RETICULAR CON BLOQUES PERM. HORMIGÓN SOP. HOR. (HA-25)
+Forjado retícular de hormigón armado HA-25/F/15/XC1, consistencia plástica y tamaño máximo del
+árido 20 mm, con acero B 500 S, armado según documentación gráfica e instrucciones de la D.F.,
+canto de 25+6 cm, aligeramiento con bloques permanentes de hormigón, mallazo electrosoldado B
+500 T, capa de compresión de 6 cm, macizado de capiteles, vigas, zunchos, nervio perimetral, re-
+fuerzo de huecos y anclajes de soportes de hormigón armado, incluso p.p. de encofrado, vigas des-
+colgadas, apeos, desencofrado, vibrado y curado; construido según CodE y NCSR-02. Medida la
+superficie de fuera a fuera deduciendo huecos mayores de 1 m2.
+P. cubierta    1    135,00    135,00
+_______________________________________________________
+135,00    25,20    3.402,00
+05FUS00003    m2    FORJADO VIG. SEMIRR. ARMADURAS PRETEN. BOV. HOR. (HA-25)
+Forjado unidireccional de hormigón armado HA-25/F/15/XC1, consistencia fluida y tamaño máximo
+del árido 15 mm, canto de 25+5 cm e intereje de 70 cm, con viguetas semirresistentes de armaduras
+pretensadas, bovedillas de hormigón, armaduras complementarias con acero B 500 S, mallazo elec-
+trosoldado B 500 T, capa de compresión de 5 cm, incluso p.p. de macizado de apoyos, encofrados
+complementarios, apeos, desencofrado, vibrado y curado; construido según EFHE, Código Estruc-
+tural y NCSR-02. Medida la superficie de fuera a fuera deduciendo huecos mayores de 1 m2.
+Doble altura entrada    1    4,72    4,72
+_______________________________________________________
+4,72    16,89    79,72
+04.02    Ml PLANCHA DE POLIESTIRENO RANURADO FRENTES DE FORJADO
+Pancha de poliestireno ranurado en frentes de forjado. Medida la longitud ejecutada.
+Canto forjado    1    54,72    54,72
+_______________________________________________________
+54,72    1,32    72,23
+05HRL80020N m3    HORM. ARM. HA-25/F/15/XC1 EN LOSAS
+Hormigón armado HA-25/P/20/IIa, consistencia plástica y tamaño máximo del árido 20 mm, en lo-
+sas planas, para revestir, suministrado y puesto en obra, armadura de acero B 500 S con una cuan-
+tía según documentación gráfica e instrucciones de la D.F., incluso p.p. de encofrado de madera, de-
+sencofrado, limpieza de fondos, ferrallado, separadores, vibrado, curado, pasos de tuberías, forma-
+ción de goterón, reservas necesarias y ejecución de juntas; construido según EHE y NCSR-02.
+Medido el volumen teórico ejecutado.
+Visera entrada    1    2,00    1,10    0,20    0,44
+_______________________________________________________
+0,44    157,88    69,47
+05ACT00101N kg ACERO PERFILES LAM. EN CAL. VIGAS, PILARES Y EST. TRIANG.
+Acero en perfiles en caliente S 275 JR en estructuras, vigas, pilares y estructuras trianguladas con
+uniones soldadas, incluso corte y elaboración, montaje, lijado, imprimación con capa de imprimación
+antioxidante y p.p. de soldadura, previa limpieza de bordes, cartelas, placas de apoyo rigidizadores,
+placas de transición en forjados, cubrejuntas y piezas especiales; construido según documentación
+gráfica, instrucciones de la D.F. y NCSR-02, CTE. Medido en peso nominal.
+HEA 160
+Fachada norte    304,58    304,58
+Fachada este    426,412    426,41
+Fachada sur    182,748    182,75
+121,832    121,83
+_______________________________________________________
+1.035,57    1,10    1.139,13
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página4
+
+--- PAGE 5 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+05ACW00001PT ud    ACERO S275JR EN PLACA DE ANCLAJE A CIMENTACIÓN 35X25x1.0
+Placa de anclaje 350x250x10 mm de acero S 275 JR, con cuatro barras de acero B 500 S de 16
+mm soldadas o atornilladas y taladro central de 5 cm de diámetro, incluso corte elaboración y monta-
+je, capa de imprimación antioxidante y p.p. de elementos de unión y ayudas de albañilería, según
+documentación gráfica e instrucciones de la D.F.; construido según NCSR-02, EHE y CTE. Medi-
+da la unidad ejecutada y colocada.
+Fachada norte    5    5,00
+Fachada este    7    7,00
+Fachada sur    3    3,00
+2    2,00
+_______________________________________________________
+17,00    21,55    366,35
+_______________
+TOTAL CAPÍTULO C03 ESTRUCTURAS.....................................................................................................    5.938,85
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página5
+
+--- PAGE 6 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C04 CUBIERTAS Y PATIOS
+E09NAL020    m2    CUB. NO TRANSITABLE, GRAVA CANTO RODADO BLANCA
+Cubierta no transitable constituida por: aislamiento térmico placas rígidas de poliestireno extruído de
+100 mm. de espesor, hormigón con Arlita de 10 cm. de espesor medio como formación de pendien-
+te, lámina asfáltica adherida al soporte con soplete, mortero de regularización, lámina de geotexti in-
+cluso p.p. de solapes según recomendación del fabricante, encuentros con sumideros, juntas de dila-
+tación, y doble tela autoprotegida en encuentros con peto y sumideros, capa de grava de canto roda-
+do de color blanco de 5 cm de espesor medio, y , según documentación gráfica e instrucciones de la
+dirección facultativa. Medida la superficie ejecutada en proyección horizontal.
+Cubierta grava    1    123,70    123,70
+_______________________________________________________
+123,70    21,66    2.679,34
+09ISS00140    m2    IMPERMEAB. SUELOS, PINTURA RESINA ACRIL. + ARM. FIBRA VIDRIO
+Impermeabilización de suelos formada por: mano de imprimación con pintura de resinas acrílicas
+elásticas de un solo componente transparente mate. Incluso colocación de perfil metálico en "L" de
+goterón oculto, según documentación gráfica e instrucciones de la D.F. Medida la superficie ejecuta-
+da.
+porche    1    14,50    14,50
+alero    1    7,53    7,53
+depuradora    1    2,00    1,00    2,00
+_______________________________________________________
+24,03    15,21    365,50
+_______________
+TOTAL CAPÍTULO C04 CUBIERTAS Y PATIOS.........................................................................................    3.044,84
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página6
+
+--- PAGE 7 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C05 AISLAMIENTOS E IMPERMEABILIZACIÓN
+09TPP90036N m2    AISLAMIENTO PAREDES POLIURETANO PROYECTADO 70 mm
+Aislamiento formado por capa de poliuretano proyectado con hidrofluorcarbono HFC (0.028 W/mk)
+de 70 mm de espesor medio y densidad 35 kg/m3, incluso p.p. de preparación del paramento y lim-
+pieza; según CTE . Medida la superficie ejecutada deduciendo huecos mayores de 4 m2.
+Cerramiento vivienda    1    50,86    3,05    155,12
+_______________________________________________________
+155,12    9,00    1.396,08
+09TSS00025    m2    AISLAMIENTO SUELOS P. RÍGIDAS POLIEST. EXTRUS. 30 mm
+Aislamiento de suelos con planchas rígidas de poliestireno extrusionado de 30 mm de espesor y 25
+kg/m3 de densidad, incluso lámina de protección de polietileno y corte, colocación y limpieza del so-
+porte; según CTE . Medida la superficie ejecutada.
+Vivienda    1    120,08    120,08
+_______________________________________________________
+120,08    8,36    1.003,87
+_______________
+TOTAL CAPÍTULO C05 AISLAMIENTOS E IMPERMEABILIZACIÓN.......................................................    2.399,95
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página7
+
+--- PAGE 8 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C06 ALBAÑILERÍA
+06WPP80000    m    FORMACIÓN DE ESCALERA
+Formación de peldañeado con ladrillo perforado tosco de 24x11,5x7 cm, incluso formación de pen-
+diente, tableros, empalomados y ejecución de mesetas en escaleras, recibido con mortero de ce-
+mento M5 (1:6). Medida según la longitud de la arista de intersección entre huella y tabica, listo para
+solar.
+exterior    2    3,84    7,68
+2    1,80    3,60
+_______________________________________________________
+11,28    7,00    78,96
+06LPC00001    m2    CITARA L/PERF. TALADRO PEQUEÑO
+Citara de ladrillo perforado de 24x10x10 cm taladro pequeño, para revestir, recibido con mortero de
+cemento M5 (1:6), con plastificante; construida según CTE. Incluso ejecución de jambas en huecos.
+Medida deduciendo huecos mayores de 4 m2.
+Cerramiento    1    50,86    3,05    155,12
+Doble altura    1    7,54    0,60    4,52
+Recrecido pilar    2    0,60    3,05    3,66
+_______________________________________________________
+163,30    7,98    1.303,13
+10CEE00005    m2    ENFOSCADO SIN MAESTREAR NI FRATASAR EN PAREDES "EMBARRADO"
+Enfoscado sin maestrear ni fratasar en paredes con mortero M5 (1:6). Medido a cinta corrida dedu-
+ciendo huecos mayores de 4 m2.
+Cerramiento    1    50,86    3,05    155,12
+_______________________________________________________
+155,12    1,29    200,10
+06DTD00002    m2    TABICÓN DE LADRILLOH/D 7 cm
+Tabicón de ladrillo cerámico hueco doble 24x11,5x7 cm, recibido con mortero M5 de cemento CEM
+II/A-L 32,5 N, con plastificante; según CTE. Medido a cinta corrida deduciendo huecos mayores de
+4 m2.
+Cerramiento    1    50,86    3,05    155,12
+Divisiones
+horizontal    1    3,14    3,05    9,58
+1    6,22    3,05    18,97
+1    6,40    3,05    19,52
+1    6,70    3,05    20,44
+vertival    2    3,62    3,05    22,08
+1    2,50    3,05    7,63
+1    1,60    3,05    4,88
+_______________________________________________________
+258,22    4,77    1.231,71
+06LHC00003    m2    TABIQUE DE LADRILLO H/T 11,5 cm
+Tabique de ladrillo cerámico hueco triple de 32,5x18,5x11,5 cm, recibido con mortero M5 (1:6), con
+plastificante; construida según CTE. Medida a cinta corrida deduciendo huecos mayores de 4 m2.
+Cubierta    1    3,00    1,00    3,00
+1    2,00    1,00    2,00
+_______________________________________________________
+5,00    9,22    46,10
+06BHH80000    m2    FÁBRICA ARMADA 20 cm ESP. BLOQ. HORM. 40x20x20 cm
+Fábrica armada de 20 cm de espesor, de bloques huecos de hormigón de 40x20x20 cm, para re-
+vestir, recibidos con mortero M7,5 de cemento CEM II/A-L 32,5 N, armadura vertical formada por 2
+redondos de acero B 500 S de 12 mm de diám. cada 20 cm y armadura horizontal con 1 redondos
+de 12 mm de diám. cada hilada de bloques, incluso relleno de hormigón de la primera hilada y cada
+5 m en vertical y con 4 redondos de 12 mm de diám. vibrado y piezas especiales; según CTE. Me-
+dida deduciendo huecos.
+Vallado exterior    1    14,62    2,10    30,70
+1    1,10    3,05    3,36
+1    5,92    2,10    12,43
+Peto cubierta    1    50,86    1,20    61,03
+Depuradora    1    2,00    1,50    3,00
+2    1,00    1,50    3,00
+_______________________________________________________
+113,52    21,98    2.495,17
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página8
+
+--- PAGE 9 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+06PLACAALV m2    PLACA ALVEOLAR PREFABRICADA DE HORMIGÓN
+Cerramiento de parcela formado por placas alveolares prefabricadas de hormigón de 15 cm de espe-
+sor, recibidas entre pilares metálicas, (no incluidos), incluso rejuntado. Medida la superficie ejecuta-
+da.
+Vallado exterior    1    47,13    2,10    98,97
+_______________________________________________________
+98,97    21,31    2.109,05
+06WWT00011 m2    TABLERO DE RASILLÓN RECIBIDO CON MORTERO
+Tablero de rasillón, recibido con mortero de cemento M5 (1:6), con plastificante, incluso p.p. de ele-
+mentos resistentes complementarios y apeos. Medido en verdadera magnitud.
+Depuradora    1    2,00    1,50    3,00
+_______________________________________________________
+3,00    6,61    19,83
+06WDD00005    m    CARGADERO FORMADO POR VIGUETA AUTORRESISTENTE
+Cargadero formado por vigueta de hormigón pretensado o metálico según necesdidades constructi-
+vas, incluso ejecución de apoyo en pilar en encuentros singulares, tirantes fijados a forjado superior
+en luces superiores a 2 m, y p.p. de emparchado con elementos de fábrica de ladrillo. Medida la
+longitud ejecutada.
+V1    1    4,50    4,50
+V2    1    2,30    2,30
+V3    1    1,80    1,80
+V4    1    1,40    1,40
+V5    1    2,50    2,50
+V6    1    1,30    1,30
+P7    1    1,30    1,30
+PE    1    1,45    1,45
+_______________________________________________________
+16,55    6,71    111,05
+06WWR80000 ud    RECIBIDO DE CERCOS EN DIVISIONES INT. (TABIQUES )
+Recibido de cercos o precercos de cualquier material en divisiones interiores (tabiques y tabicones),
+con pasta de yeso negro, incluso aplomado y nivelado. Medida la superficie ejecutada.
+P1    3    3,00
+P5    1    1,00
+_______________________________________________________
+4,00    4,49    17,96
+06WWR80070 m2    RECIBIDO DE CERCOS EN CERRAM. EXTERIORES
+Ejecución de cercos de perfil tublar 60.30.3 autoportante en muro de cerramiento exterior, incluso tra-
+bajos complementarios, soldaduras y anclajes a estructura. Según documentación gráfica e instruc-
+ciones de la dirección facultativa. Medida la superficie ejecutada.
+V1    1    4,10    2,70    11,07
+V2    1    2,00    2,70    5,40
+V3    1    1,50    0,80    1,20
+V4    1    1,10    1,50    1,65
+V5    1    2,20    1,50    3,30
+V6    1    1,00    0,80    0,80
+PT    1    1,30    2,10    2,73
+PE    1    1,15    3,30    3,80
+_______________________________________________________
+29,95    6,04    180,90
+E07WA013    ud    AYUDA ALBAÑ. INST. ELECTRIC.VIV.UNIFAM.
+Ayuda de albañilería a instalación de electricidad y telecomunicaciones por vivienda unifamiliar inclu-
+yendo mano de obra en carga y descarga, materiales, apertura y tapado de rozas, recibidos, rema-
+tes y ayudas a puesta a tierra, caja general de protección, línea general de alimentación, contador en
+fachada, derivaciones individuales y cuadros de mando y protección, i/p.p. material auxiliar, limpie-
+za y medios auxiliares. Medido por unidad de vivienda.
+1    1,00
+_______________________________________________________
+1,00    96,65    96,65
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página9
+
+--- PAGE 10 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+E07WA023    ud    AYUDA ALBAÑ. INST. FONTANE.VIV.UNIFAM.
+Ayuda de albañilería a instalación de fontanería, saneamiento, climatización y ventilación, por vivien-
+da unifamiliar incluyendo mano de obra en carga y descarga, materiales, apertura y tapado de rozas,
+recibidos, remates y ayudas a acometida, tubo de alimentación, contador en fachada, accesorios y
+piezas especiales, i/p.p. de material auxiliar, limpieza y medios auxiliares. Medido por unidad de vi-
+vienda.
+1    1,00
+_______________________________________________________
+1,00    64,63    64,63
+HEA020    Ud    RECIBIDO DE PLATO DE DUCHA
+Recibido de bañera o plato de ducha, incluso formación de faldón con ladrillo cerámico hueco senci-
+llo, recibido con mortero de cemento, industrial, M-5.
+2    2,00
+_______________________________________________________
+2,00    12,20    24,40
+06DPC80420AQP m2    PLACA DE CEMENTO AQUAPANEL
+Revestimiento mediante placa de cemento Aquapanel de 12.5 mm de espesor en tres caras, ("techo,
+canto y suelo") atornillado a entramado de acero galvanizado con una separación de montantes de
+40 cm, incluso nivelación, ejecución de ángulos, encintado y repaso de juntas; construido según es-
+pecificaciones del fabricante de las placas. Según documentación gráfica e instrucciones de la D.F.
+Medida la superficie ejecutada.
+Alero    1    25,94    3,00    77,82
+1    8,63    3,00    25,89
+Porche carasuperior    1    15,88    15,88
+Falso pilar    1    4,80    3,00    14,40
+_______________________________________________________
+133,99    14,11    1.890,60
+K21    URBANIZACIÓN
+_______________________________________________________
+1,00    165,95    165,95
+_______________
+TOTAL CAPÍTULO C06 ALBAÑILERÍA........................................................................................................    10.036,19
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página10
+
+--- PAGE 11 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C07 REVESTIMIENTOS Y F. TECHOS
+10CGG00008    m2    GUARNECIDO Y ENLUCIDO MAESTREADO EN PAREDES, YESO
+Guarnecido y enlucido maestrado en paredes, con pasta de yeso YG e YF, incluso limpieza,hume-
+decido del paramento y maestras cada 1,50 m. Medida la superficie a cinta corrida desde la arista
+superior del rodapié hasta el techo o falso techo.
+Salón    1    18,33    3,00    54,99
+Recibidor    1    11,22    3,00    33,66
+D1    1    12,96    3,00    38,88
+Vestidor    1    18,32    3,00    54,96
+D2    1    13,73    3,00    41,19
+_______________________________________________________
+223,68    4,07    910,38
+10CEE00006    m2    ENFOSCADO MAESTREADO FRATASADO Y RAYADO PARA ALICATADO
+Enfoscado maestreado, fratasado y rayado en paramentos verticales, preparado para recibir alicata-
+do o chapado de piedra con adhesivo, con mortero M5 (1:6). Medida la superficie ejecutada.
+Baño 1    1    9,41    2,70    25,41
+Baño 2    1    7,67    2,70    20,71
+Cocina    1    7,90    2,70    21,33
+Lavadero    1    15,86    2,70    42,82
+Zócalo exterior vivienda    1    51,47    4,80    247,06
+a deducir fachada porche    -1    6,82    2,70    -18,41
+Previo revestimiento panel de aluminio    1    2,73    3,40    9,28
+Tapia parcela, exterior    1    26,33    1,50    39,50
+1    9,16    1,50    13,74
+Tapia parcela, interior junto a piscina    1    9,89    2,10    20,77
+_______________________________________________________
+422,21    3,00    1.266,63
+10TET00005    m2    TECHO CONTINUO PLACAS DE CARTÓN YESO, FIJ. METÁLICA
+Techo de placas de cartón yeso, resistente a la humedad en cuartos húmedos y cocina, suspendi-
+das de elementos metálicos, incluso p.p. de elementos de remate, juntas, lijado, tabicas en encuen-
+tros libres y accesorios de fijación. Medida la superficie ejecutada lista para pintar.
+Falso techo vivienda    1    101,84    101,84
+_______________________________________________________
+101,84    6,83    695,57
+10TWW00011N m2    TECHO CONTINUO CON PLACAS AQUAPANEL OUTDOOR
+Techo continuo con placas Aquapanel Outdoor, atornillados a entramado horizontal de acero galvani-
+zado, incluso replanteo, nivelación y repaso de juntas; construido según especificaciones del fabri-
+cante de los paneles. Medido superficie ejecutada.
+Porche    1    15,88    15,88
+tabica    1    7,45    0,50    3,73
+1    2,09    0,50    1,05
+_______________________________________________________
+20,66    10,62    219,41
+10CWW00007N m2    REVESTIMIENTO MONOCAPA CON TERMINACIÓN RASPADO
+Revestimiento blanco tipo REHUÉTOR, paramentos horizontales y verticales, según documentación
+gráfica e instrucciones de la D.F., aplicado con llana sobre paramentos enfoscados, o de fábrica de
+ladrillo, realizado con ligante a base de mortero modificado, plastificantes y resinas con un espesor
+mínimo de 25 mm, formado por: limpieza y preparación del soporte, extendido, planeado y regula-
+ción, raspado de la superficie hasta dejar un espesor de 15 mm y posterior cepillado, incluso p.p. de
+despieces, aristados, cantos vigas descolgadas y canto saliente fachada. Medida la superficie a cin-
+ta corrida.
+Peto cubierta    1    50,86    1,00    50,86
+_______________________________________________________
+50,86    10,77    547,76
+10CRR00100    m2    REVOCO PÉTREOBICAPA MORTERO CEMENTO
+Revoco pétreo bicapa en paredes con acabado fratasado, aplicado sobre paramentos de ladrillo, for-
+mado por: capa de mortero de cemento hidrofugado de 10 mm de espesor y capa de mortero hidráu-
+lico hidrofugado de 5 mm de espesor, incluso limpieza y preparación del soporte, extendidos, fratasa-
+do y p.p. de despieces y aristados. Medida la superficie ejecutada.
+Fachada    1    51,47    3,00    154,41
+Tapia    1    26,33    0,60    15,80
+1    26,33    2,10    55,29
+1    9,16    1,50    13,74
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página11
+
+--- PAGE 12 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+1    5,19    2,10    10,90
+Tapia medianería    2    30,21    2,10    126,88
+1    7,17    2,10    15,06
+caseta depuradora    3    1,50    1,50    1,00    6,75
+_______________________________________________________
+398,83    13,76    5.487,90
+10WAA00001    m    ALFÉIZAR DE HORMIGÓN POLÍMERO CON GOTERÓN
+Alfeizar y remate superior muros de hormigón polímero de 30 cm de anchura y 3 cm de espesor, (en
+determinadas zonas tendrá un ancho superior o inferior para adaptarse a las dimensiones de proyec-
+to) o a definir por la D.F., con goterón a uno o ambos lados según proceda, recibido con mortero bas-
+tardo M10 (1:0,5:4), incluso rejuntado con lechada de cemento blanco BL II/A-L 42,5 R, p.p. de se-
+llado de juntas con paramentos, impermeabilización con tela asfáltica autoprotegida y limpieza. Se-
+gún documentación gráfica e instrucciones de la dirección facultativa. Medida la longitud ejecutada.
+V2    1    2,00    2,00
+V3    1    1,50    1,50
+V4    1    1,10    1,10
+V5    1    2,20    2,20
+V6    1    1,00    1,00
+PT    1    1,00    1,00
+Peto cubierta    1    50,86    50,86
+Petotapia    1    71,00    71,00
+_______________________________________________________
+130,66    10,03    1.310,52
+_______________
+TOTAL CAPÍTULO C07 REVESTIMIENTOS Y F. TECHOS........................................................................    10.438,17
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página12
+
+--- PAGE 13 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C08 ALICATADOS Y PAVIMETNOS
+10SWW00061 m2    RECRECIDO DE SUELOS DE 10 cm ESP.
+Recrecido de suelos de 10 cm de espesor medio, con mortero autonivelante para suelo radiante. Me-
+dida la superficie ejecutada.
+Vivienda    1    101,84    101,84
+_______________________________________________________
+101,84    3,52    358,48
+10SCS00003N m2    SOLADO CON BALDOSAS CERÁMICA GRAN FORMATO CEMENTOSO
+Solado con baldosas cerámicas de gres porcelánico de gran formato, rectificado, C1, imitación ce-
+mentoso recibidas con mortero M5 (1:6), incluso nivelado con capa de arena de 2 cm de espesor
+medio, enlechado, p.p. de rodapié del mismo material y limpieza del pavimento. Medida la superficie
+ejecutada.
+Vivienda    1    101,84    101,84
+_______________________________________________________
+101,84    13,95    1.420,67
+10SCS00003NE m2    SOLADO CON BALDOSAS CERÁMICA GRAN FORMATO CEMENTOSO EXTERIOR
+Solado con baldosas cerámicas de gres porcelánico de gran formato para exterior, rectificado, C3,
+imitación cementoso recibidas con mortero M5 (1:6), incluso nivelado con capa de arena de 2 cm de
+espesor medio, enlechado, p.p. de rodapié del mismo material y limpieza del pavimento. Medida la
+superficie ejecutada.
+Exterior    1    103,63    103,63
+_______________________________________________________
+103,63    13,95    1.445,64
+10PCP90031    m    PELDAÑO, HUELLA Y TABICA GRES PORCELÁNICO ANTIDESLIZANTE
+Peldaño formado por huella y tabica mediante pieza especial, (mamperlán), de gres porcelánico anti-
+deslizante del mismo tipo que la solería, con mortero M5 (1:6), incluso p.p. de rodapié del mismo
+material; construido según CTE. Medido según la longitud de la arista de intersección entre huella y
+tabica. Encuentro sin bocel según documentación gráfica e instrucciones de la dirección facultativa.
+2    3,84    7,68
+2    1,80    3,60
+1    1,15    1,15
+_______________________________________________________
+12,43    10,67    132,63
+10ACA00003PN m2    APLACADO GRES PORCELÁNICO FIJACIÓN MECÁNICA
+Aplacado de gres percelánico, fijadas con anclaje de varillas de acero galvanizado, relleno con mor-
+tero bastardo M10 (1:0,5:4) fluido, incluso cajas en muro, rejuntado y limpieza, sobre fachada del edi-
+ficio, según documentación gráfica e instrucciones de la D.F. Medida la superficie deduciendo hue-
+cos mayores de 0,25 m2.
+Zócalo exterior vivienda    1    51,47    4,85    249,63
+a deducir fachada porche    -1    6,82    2,70    -18,41
+Previo revestimiento panel de aluminio    1    2,73    3,40    9,28
+Tapia parcela, exterior    1    26,33    1,50    39,50
+1    9,16    1,50    13,74
+Tapia parcela, interior junto a piscina    1    9,89    2,10    20,77
+_______________________________________________________
+314,51    18,70    5.881,34
+10AAE90003    m2    ALICATADO GRES PORCELÁNICO ADHESIVO
+Alicatado con placa de gres porcelánico a definir por la D.F., recibido con adhesivo, sobre enfoscado
+o pladur, incluso cortes y p.p. de piezas romas de acero inoxidable, rejuntado y limpieza. Medida la
+superficie ejecutada.
+Baño 1    1    9,41    2,70    25,41
+Baño 2    1    7,67    2,70    20,71
+Cocina    1    7,90    2,70    21,33
+Lavadero    1    15,86    2,70    42,82
+_______________________________________________________
+110,27    33,95    3.743,67
+10AAE90003PIS m2    ALICATADO GRES PORCELÁNICO ADHESIVO PISCINA
+Alicatado con placa de gres porcelánico de gran formato a definir por la D.F., recibido mediante doble
+encolado para piscina, incluso cortes y p.p. de piezas romas de acero inoxidable, rejuntado y limpie-
+za. Medida la superficie ejecutada.
+Suelopiscina    1    17,14    17,14
+Paredes    1    21,67    1,60    34,67
+Peldaños    5    1,00    5,00
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página13
+
+--- PAGE 14 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+depuradora    1    2,00    1,50    3,00
+1    2,00    1,20    2,40
+2    1,00    1,20    2,40
+_______________________________________________________
+64,61    33,95    2.193,51
+11SCL00001N m2    PANEL DE ALUMINIO LISO PARA FACHADA
+Panel de aluminio liso composite para fachada, lacado con el mismo RAL de las ventanas, anclaje a
+los paramentos, incluso p.p. de estructura de fijación, material de agarre y colocación. Medida de
+fuera a fuera.
+Porche    1    3,15    3,00    9,45
+1    1,90    0,60    1,14
+_______________________________________________________
+10,59    47,83    506,52
+_______________
+TOTAL CAPÍTULO C08 ALICATADOS Y PAVIMETNOS............................................................................    15.682,46
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página14
+
+--- PAGE 15 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C09 CARPINTERÍA INTERIOR
+11MPB00152    ud    PUERTA PASO, 1 H. CIEGA ABAT. CERCO 100x40 mm
+Puerta de paso, con hoja ciega abatible formada por: precerco de pino flandes de 100x30 mm, con
+garras de fijación, cerco de 100x40 mm tapajuntas de 60x15 mm y hoja prefabricada normalizada de
+35 mm canteada por dos cantos, con armazón de madera maciza, recubierto de dos paneles de DM
+y alma de poliexpan con acabado lacado color blanco, herrajes de colgar, condena en baños y dor-
+mitorios, seguridad y cierre, con pomo o manivela, en latón de primera calidad, incluso colgado. Se-
+gún documentación gráfica e instrucciones de la D.F. Medida la unidad ejecutada.
+P1    3    3,00
+P5    1    1,00
+_______________________________________________________
+4,00    55,64    222,56
+11APC00125N ud    CAJÓN ACERO GALVANIZADO PARA PUERTA CORREDERA
+Cajón de acero galvanizado empotrado en pared para alojar puerta de hojas corredera, con ancho de
+paso desde 0,62 m hasta 1,00 m y altura de 2,10 m, incluso recibido, listo para aplicar revestimiento
+o placa de cartón yeso; construida según CTE. Medida la unidad ejecutada.
+P2, P3 y P4    3    3,00
+_______________________________________________________
+3,00    29,28    87,84
+11MPB00191    ud    PUERTA 1 H. CIEGA CORREDERA
+Puerta de paso lacada en blanco, con hoja ciega corredera alojada en cámara tipo cassoneto, forma-
+da por: precerco de pino flandes de 30 mm con garras de fijación, constituido por un larguero de 185
+mm de ancho,dos de 70 mm y dos montajes de 70 mm sección de cuelgue de 70x30 mm en igual
+calidad, cerco de 40 mm para piezas de iguales anchuras, tapajuntas de 60x15 mm y hoja prefabri-
+cada normalizada de 35 mm canteada por dos cantos en madera DM, alma de poliexpan con acaba-
+do lacado color blanco, herrajes de cierre y seguridad en latón de primera calidad, sistema de desli-
+zamiento con guiador y tope, incluso colgado. Según documentación gráfica e instrucciones de la
+D.F. Medida de la unidad ejecutada.
+P2, P3 y P4    3    3,00
+_______________________________________________________
+3,00    86,81    260,43
+11MAP00051    m2    ARMARIOS COMPLETOS SEGÚN DOCUMENTACIÓN GRÁFICA
+Armario madera chapada color ceniza, acabado interior DMF lino cancún o chapado color blanco se-
+gún proceda. Con hojas abatibles formado por: precerco de 70x30 mm con garras de fijación, cerco
+de 70x40 mm y tapajuntas de 60x15 mm, en madera de pino flandes;hojas prefabricadas normaliza-
+das de 35 mm, herrajes de colgar, cerraduras, pasadores y agarradores en latón de primera calidad,
+incluso colgado. Medido de fuera a fuera del precerco. Forrado interior, módulos cajoneras, módulos
+zapateros, barra de armario. Según documentación gráfica e instrucciones de la D.F. totalmente ter-
+minado.
+Vestidor    1    2,50    2,70    6,75
+1    3,62    2,70    9,77
+_______________________________________________________
+16,52    74,12    1.224,46
+_______________
+TOTAL CAPÍTULO C09 CARPINTERÍA INTERIOR.....................................................................................    1.795,29
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página15
+
+--- PAGE 16 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C10 CARPINTERIA EXTERIOR
+11MPB00021N m2    PUERTA ENT. VIV. DOBLE NÚCLEO ACERO REFORZADO
+Puerta de entrada a vivienda para barnizar, formada por: precerco de 90x30 mm, con garras de fija-
+ción, cerco de 90x50 mm, tapajuntas de 70x20 mm y hoja de aluminio lacado en gris con el mismo
+RAL de las ventanas, doble núcleo de acero reforzado y capa aislante, interior DM lacado blanco,
+cerradura, herrajes de colgar y seguridad, tirador de acero inoxidable de 120 cm y mirilla óptica, , in-
+cluso colgado; según documentación gráfica, construida según CTE. Medida de fuera a fuera del pre-
+cerco.
+PE    1    1,00    3,30    3,30
+_______________________________________________________
+3,30    103,24    340,69
+11LVC00153N m2    VENTANA CORREDERA ALUM. LACADO GRIS
+Ventana de hojas correderas elevables, perfil embutido bajo el pavimento, ejecutada con perfiles de
+aleación de aluminio con espesor de 1,5 mm y capa de lacado en color gris espesor mínimo 60 mi-
+cras, incluso precerco de perfil tubular conformado en frío de acero galvanizado con patillas de fija-
+ción, junquillos, junta de estanqueidad de neopreno, herrajes de deslizamiento, cierre y seguridad y
+p.p. de sellado de juntas con masilla elástica. La carpintería debe cumplir los parámetros de permea-
+bilidad, estanqueidad y resistencia al viento en las zonas A o B; construida según CTE. Medida de
+fuera a fuera del cerco.
+V1    1    4,10    2,70    11,07
+_______________________________________________________
+11,07    36,07    399,29
+11LVA00151N m2    VENTANA ABATIBLE ALUM. LACADO GRIS
+Ventana de hojas abatibles y oscilobatiente, ejecutada con perfiles de aleación de aluminio con espe-
+sor de 1,5 mm y capa de lacado en color gris espesor mínimo 60 micras, incluso precerco de perfil
+tubular conformado en frío de acero galvanizado con patillas de fijación, junquillos, junta de estanquei-
+dad de neopreno, vierteaguas, herrajes de colgar y cierre y p.p. de sellado de juntas con masilla
+elástica, incluido paño ciego de aluminio donde proceda según documentación gráfica. La carpintería
+debe cumplir los parámetros de permeabilidad, estanqueidad y resistencia al viento en las zonas A o
+B; construida según CTE. Medida de fuera a fuera del cerco.
+V2    1    2,00    2,70    5,40
+V3    1    1,50    0,80    1,20
+V4    1    1,10    1,50    1,65
+V5    1    2,20    1,50    3,30
+V6    1    1,00    0,80    0,80
+P6    1    1,00    2,30    2,30
+_______________________________________________________
+14,65    137,47    2.013,94
+11SPL00101N m2    PERSIANA ENROLLABLE ALUM. ANODIZADO ACC. ELÉCTRICO
+Persiana enrollable de aluminio y lacado en color marrón, con lamas de espesor mínimo 0,6 mm, in-
+cluso motorización para cierre y apertura, guías sistema de accionamiento automático de maniobra
+eléctrica, sistema de final de carrera, elementos de fijación, material de agarre, colocación, cable de
+conexión, adaptaciones. Medida según la superficie del hueco, totalmente instalada y funcionando.
+V2    1    2,00    2,70    5,40
+V5    1    2,20    1,50    3,30
+_______________________________________________________
+8,70    127,03    1.105,16
+LVC020    m²    DOBLE ACRISTALAMIENTO "CONTROL GLASS ACÚSTICO Y SOLAR".
+Doble acristalamiento LOW.S baja emisividad térmica + seguridad (laminar) "CONTROL GLASS
+ACÚSTICO Y SOLAR", LOW.S laminar 6+6/14/4+4 laminar, conjunto formado por vidrio exterior
+LOW.S laminar 6+6 mm compuesto por dos lunas de vidrio de 6 mm, unidas mediante una lámina
+incolora de butiral de polivinilo, (lámina de color blanco donde proceda), cámara de gas deshidratada
+con perfil separador de aluminio y doble sellado perimetral, de 14 mm, rellena de gas argón y vidrio
+interior laminar 4+4 mm compuesto por dos lunas de vidrio de 4 mm, unidas mediante una lámina in-
+colora de butiral de polivinilo; 34 mm de espesor total, fijado sobre carpintería con acuñado mediante
+calzos de apoyo perimetrales y laterales, sellado en frío con silicona Sikasil WS-305-N "SIKA",
+compatible con el material soporte. Según documentación gráfica e instrucciones de la D.F.
+Incluye: Colocación, calzado, montaje y ajuste en la carpintería. Sellado final de estanqueidad. Se-
+ñalización de las hojas.
+Criterio de medición de proyecto: Superficie de carpintería a acristalar, según documentación gráfica
+de Proyecto, incluyendo en cada hoja vidriera las dimensiones del bastidor.
+Criterio de medición de obra: Se medirá la superficie realmente ejecutada según especificaciones de
+Proyecto, sumando, para cada una de las piezas.
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página16
+
+--- PAGE 17 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+V1    1    4,10    2,70    11,07
+V2    1    2,00    2,70    5,40
+P6    1    1,00    2,30    2,30
+_______________________________________________________
+18,77    119,95    2.251,46
+12ACT80013N m²    ACRIST. TÉRMICO Y ACÚSTICO, PULIDAS INCOLORAS 6/10/4+4.1 mm
+Acristalamiento aislante térmico y acústico, formado por una luna pulida incolora de 4+4.1 mm de es-
+pesor, cámara de aire deshidratado de 10 mm, control Glass acústico y solar, luna pulida incolora de
+6 mm de espesor, perfil metálico separador, desecante y doble sellado perimetral, colocado con perfil
+continuo, incluso perfil en U de neopreno, cortes y colocación de junquillos; construido según CTE e
+instrucciones del fabricante. Medida la superficie acristalada.
+V3    1    1,50    0,80    1,20
+V4    1    1,10    1,50    1,65
+V5    1    2,20    1,50    3,30
+V6    1    1,00    0,80    0,80
+_______________________________________________________
+6,95    76,68    532,93
+_______________
+TOTAL CAPÍTULO C10 CARPINTERIA EXTERIOR....................................................................................    6.643,47
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página17
+
+--- PAGE 18 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C11 CERRAJERÍA
+UVP010P10    Ud    PUERTA CANCELA VEHÍCULOS
+Puerta de entrada a garaje corredera, de una hoja de acero lacado, realizado a base de espuma de
+PVC rígido y estructura celular uniforme, dimensione 300x250 cm, perfiles rectangulares en cerco,
+para acceso de vehículos. Apertura automática, recibidos a obra; refuerzos, elementos de anclaje,
+herrajes de seguridad y cierre, sistema tipo cremallera, activación inalámbrica y dos mandos a dis-
+tancia, elementos de seguridad anti-atrapamiento, conexiones eléctricas y accesorios.
+Incluye: Replanteo. Colocación y fijación de los perfiles guía. Recibido y ayudas de albañilería. Ins-
+talación de la puerta cancela. Vertido del hormigón. Montaje del sistema de apertura. Montaje del sis-
+tema de accionamiento. Repaso y engrase de mecanismos y guías. Totalmente terminada y funcio-
+nando.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+PE2    1    1,00
+_______________________________________________________
+1,00    1.114,05    1.114,05
+UVP010b    Ud    PUERTA CANELA PEATONAL
+Puerta cancela metálica de carpintería metálica, de una hoja abatible, dimensiones 120x235 cm, para
+acceso peatonal, apertura manual, realizado a base de espuma de PVC rígido y estructura celular
+uniforme, perfiles rectangulares en cerco, para acceso peatonal. Apertura manual, recibidos a obra;
+refuerzos, elementos de anclaje, herrajes de seguridad y cierre y accesorios.
+Incluye: Replanteo. Colocación y fijación. Recibido y ayudas de albañilería. Instalación de la puerta
+cancela. Vertido del hormigón. Montaje del sistema de apertura. Montaje del sistema de acciona-
+miento. Repaso y engrase de mecanismos y guías. Totalmente terminada y funcionando.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+PE2    1    1,00
+_______________________________________________________
+1,00    537,32    537,32
+11SCA00001    m2    CELOSÍA FIJA LAMAS FIJAS AC. GALV.
+Celosía fija de lamas fijas de acero galvanizado lacado en blanco, TRS 100.30, sobre pletina 40.4,
+anclaje a los paramentos y p.p. de material de agarre y colocación. Según documentación gráfica e
+instrucciones de la D.F. Medida la superficie ejecutada
+1    54,30    1,00    54,30
+_______________________________________________________
+54,30    50,37    2.735,09
+11SBL00001-1 m    VIDRIO SOBRE MURO SIN CARPINTERÍA
+Vidrio sobre muro con perfil de montaje oculto, aluminio anodizado, capaz de soportar una fuerza ho-
+rizontal uniformemente repartida de 0,8 kN/m aplicada en el borde superior del vidrio según CTE DB
+SE-AE, de altura 100 cm, para vidrio laminar de seguridad, compuesto por dos lunas de 6 mm de
+espesor unidas mediante dos láminas incoloras de butiral de polivinilo, de 0,38 mm de espesor cada
+una. Sistema de montaje Superior, de fijación mediante perfil embutido en fábrica. Incluso anclaje quí-
+mico con varilla roscada de acero cincado para fijación a la superficie soporte.mm de espesor y an-
+clajes a elementos de fábrica o forjados, incluso p.p. de material de agarre y colocación. Según do-
+cumentación gráfica e instrucciones de la D.F.. Medida la longitud ejecutada.
+1    13,95    13,95
+_______________________________________________________
+13,95    35,08    489,37
+11SCL00001N m2    PANEL DE ALUMINIO LISO PARA FACHADA
+Panel de aluminio liso composite para fachada, lacado con el mismo RAL de las ventanas, anclaje a
+los paramentos, incluso p.p. de estructura de fijación, material de agarre y colocación. Medida de
+fuera a fuera.
+Fachada porche    1    3,15    3,40    10,71
+_______________________________________________________
+10,71    47,83    512,26
+_______________
+TOTAL CAPÍTULO C11 CERRAJERÍA.........................................................................................................    5.388,09
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página18
+
+--- PAGE 19 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C12 PINTURAS
+13IPP00001    m2    PINTURA PLÁSTICA LISA SOBRELADRILLO, YESO O CEMENTO
+Pintura plastica lisa sobre paramentos horizontales y verticales de yeso o placa prefabricada de car-
+tón yeso,formada por: lijado y limpieza del soporte, mano de fondo, plastecido, nueva mano de fondo
+y dos manos de acabado. Medida la superficie ejecutada.
+D1    1    12,96    2,80    36,29
+1    10,75    10,75
+Vestidor    1    18,32    2,80    51,30
+1    11,31    11,31
+Baño 1    1    5,52    5,52
+D2    1    13,73    2,80    38,44
+1    11,73    11,73
+Recibidor    1    11,22    2,80    31,42
+1    6,48    6,48
+Baño 2    1    3,56    3,56
+Salón    1    18,33    2,80    51,32
+1    39,03    39,03
+Lavadero    1    9,68    9,68
+_______________________________________________________
+306,83    1,94    595,25
+21PEEE00004 m2    PINTURA ESMALTE SINTÉTICO S/CARP. METÁLICA
+Pintura al esmalte sintético sobre carpinteria metálica formada por: rascado y limpieza de óxidos; im-
+primación anticorrosiva y dos manos de color. Medidas dos caras.
+HEA 160
+Fachada norte    5    2,00    1,00    10,00
+Fachada este    7    2,00    1,00    14,00
+Fachada sur    3    2,00    1,00    6,00
+2    2,00    1,00    4,00
+_______________________________________________________
+34,00    4,47    151,98
+_______________
+TOTAL CAPÍTULO C12 PINTURAS..............................................................................................................    747,23
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página19
+
+--- PAGE 20 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C13 ELECTRICIDAD Y TELECOMUNICACIONES
+08EPP00003    u ARQUETA DE CONEXIÓN DE PUESTA A TIERRA DE 38x50x25 cm
+Arqueta de conexión de puesta a tierra de 38x50x25cm formada por fábrica de ladrillo macizo de me-
+dio pie de espesor, solera de hormigón HM-20 y tapa de hormigón HM-20 con cerco de perfil lami-
+nado L 60.6, tubo de fibrocemento de 60 mm de diámetro interior y punto de puesta a tierra, incluso
+excavación, relleno y conexiones; construida según REBT. Medida la cantidad ejecutada.
+2    2,00
+_______________________________________________________
+2,00    34,93    69,86
+08EPP00005    u PICA DE PUESTA A TIERRA
+Pica de puesta a tierra formada por electrodo de acero recubierto de cobre de 14 mm de diámetro y 2
+m de longitud, incluso hincado y conexiones, construida según REBT. Medida la cantidad ejecutada.
+3    3,00
+_______________________________________________________
+3,00    36,38    109,14
+08EPP00113    m    LÍNEA PRINCIPAL PUESTA TIERRA, 35 mm2 SUPERFICIE
+1    90,00    90,00
+_______________________________________________________
+90,00    2,94    264,60
+08EWW00095N u CAJA PROTECCIÓN Y MEDIDA, NIVEL ELECTRIF. MED./C
+Suministro e instalación en el interior de hornacina mural, de caja de protección y medida CPM1-S2,
+de hasta 63 A de intensidad, para 1 contador monofásico, formada por una envolvente aislante, pre-
+cintable, autoventilada y con mirilla de material transparente resistente a la acción de los rayos ultra-
+violetas, para instalación empotrada. Incluso equipo completo de medida, bornes de conexión, bases
+cortacircuitos y fusibles para protección de la derivación individual. Normalizada por la empresa su-
+ministradora y preparada para acometida subterránea. Totalmente montada, conexionada y probada.
+A) Incluye: Replanteo de la situación de los conductos y anclajes de la caja. Fijación. Colocación de
+tubos y piezas especiales. Conexionado.
+B) Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica
+de Proyecto.
+C) Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según es-
+pecificaciones de Proyecto.
+1    1,00
+_______________________________________________________
+1,00    66,95    66,95
+08ERR00001    m    LÍNEA GENERAL ALIMENT. 5x6 mm2 EMPOTRADA
+Línea general de alimentación instalada con cable de cobre de cinco conductores ES07Z1-K (AS) de
+6 mm2 de sección nominal en fases, empotrada y aislada bajo tubo de 60 mm de diámetro, incluso
+p.p. de pequeño material y ayudas de albañilería; construida según REBT y normas de la compañía
+suministradora. Medida la longitud ejecutada desde la caja general de protección hasta el contador.
+1    32,00    32,00
+_______________________________________________________
+32,00    4,25    136,00
+08EWW00016N u CAJA C.MANDO Y PROTECCIÓN
+Caja y cuadro de mando y protección, para empotrar con interruptor de corte general omnipolar, inte-
+rruptores diferenciales, magnetotérmicos y I.C.P., según documentación gráfica, con tapa precinta-
+ble, incluso ayudas de albañilería; construido según REBT. Medida la unidad instalada.
+1    1,00
+_______________________________________________________
+1,00    1.193,26    1.193,26
+IPI010    Ud    Sistema interno de protección contra sobretensiones, formado por
+Sistema interno de protección contra sobretensiones, formado por 6 protectores contra sobretensio-
+nes: 2 protectores para las líneas de suministro eléctrico, 1 protector para la línea telefónica, 1 protec-
+tor para la línea de transmisión de datos, 1 protector para la línea informática y 1 protector para la lí-
+nea de transmisión de señales de radiodifusión sonora y televisión.
+1    1,00
+_______________________________________________________
+1,00    659,33    659,33
+08EWW00030 u ARMARIO CUADRO TELECOMUNICACIONES Y VARIOS
+Armario para cuadro de de telecomunicaciones, construido en plástico, para empotrar, con aparellaje,
+incluso ayudas de albañilería, circuitos de conexión desde red exterior y distribución interior, uno ha-
+cia cada estancia con tapa ciega similar a los mecanismos, construido según REBT. Medida la uni-
+dad instalada.
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página20
+
+--- PAGE 21 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+1    1,00
+_______________________________________________________
+1,00    150,80    150,80
+08ELL00001    u PUNTO DE LUZ SENCILLO EMPOTRADO
+Punto de luz sencillo instalado con cable de cobre ES(07Z1-K)/RZ1-K de 1,5 mm2 de sección nomi-
+nal, empotrado y aislado con tubo de PVC flexible de 13 mm de diámetro, incluso mecanismos de
+primera calidad empotrados y p.p. de cajas de derivación, derivación desde el cuadro de protección
+y ayudas de albañilería; construido según REBT. Medida la unidad instalada. Incluso interruptor es-
+tanco en exterior.
+Visera entrada    1    1,00
+D2    1    1,00
+Baño 2    2    2,00
+Salón    2    2,00
+Cocina    1    1,00
+_______________________________________________________
+7,00    6,39    44,73
+08ELL00006    u PUNTO DE LUZ DOBLE EMPOTRADO
+Punto de luz doble instalado con cable de cobre ES(07Z1-K)/RZ1-K de 1,5 mm2 de sección nominal,
+empotrado y aislado con tubo de PVC flexible de 13 mm de diámetro, incluso mecanismos de pri-
+mera calidad empotrados y p.p. de cajas de derivación, derivación desde el cuadro de protección y
+ayudas de albañilería; construido según REBT. Medida la unidad instalada. Incluso interruptor estan-
+co en exterior.
+Baño1    2    2,00
+D2    1    1,00
+Porche    1    1,00
+_______________________________________________________
+4,00    8,18    32,72
+08ELL00009    u PUNTO DE LUZ MÚLTIPLE EMPOTRADO
+Punto de luz multiple instalado con cable de cobre ES(07Z1-K)/RZ1-K de 1,5 mm2 de sección nomi-
+nal, empotrado yaislado con tubo de PVC flexible de 13 mm de diámetro, incluso mecanismos de
+primera calidad empotrados y p.p. de cajas de derivación, derivación desde el cuadro de protección
+y ayudas de albañilería; construido según REBT. Medida la unidad instalada. Incluso interruptor es-
+tanco en exterior.
+Vestidor    1    1,00
+Salón    1    1,00
+Cocina    1    1,00
+Aparcamiento    1    1,00
+Porche    1    1,00
+Piscina    1    1,00
+Exterior    3    3,00
+_______________________________________________________
+9,00    14,94    134,46
+08ELL00002    u PUNTO DE LUZ CONMUTADO EMPOTRADO
+Punto de luz conmutado, (2 interruptores), instalado con cable de cobre ES(07Z1-K)/RZ1-K de 1,5
+mm2 de sección nominal, empotrado y aislado con tubo de PVC flexible de 13 mm de diámetro, in-
+cluso mecanismos de primera calidad empotrados y p.p. de cajas de derivación, derivación desde el
+cuadro de protección y ayudas de albañilería; construido según REBT. Medida la unidad instalada.
+Incluso interruptor estanco en exterior.
+Vestidor    1    1,00
+Recibidor    1    1,00
+_______________________________________________________
+2,00    11,88    23,76
+08ELL00007    u PUNTO DE LUZ CONMUTADO DOBLE EMPOTRADO
+Punto de luz conmutado doble, (2 interruptores), instalado con cable de cobre ES(07Z1-K)/RZ1-K de
+1,5 mm2 de sección nominal mínima, empotrado y aislado con tubo de PVC flexible de 13 mm de
+diámetro, incluso mecanismos de primera calidad empotrados y p.p. de cajas de derivación, deriva-
+ción desde el cuadro de protección y ayudas de albañilería; construido según REBT. Medida la uni-
+dad instalada. Incluso interruptor estanco en exterior.
+Recibidor    1    1,00
+_______________________________________________________
+1,00    14,80    14,80
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página21
+
+--- PAGE 22 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+08ELL00010    u PUNTO DE LUZ CONMUTADO MÚLTIPLE EMPOTRADO
+Punto de luz conmutado multiple, (2 interruptores), instalado con cable ES(07Z1-K)/RZ1-K de cobre
+de 1,5 mm2 de sección nominal, empotrado y aislado con tubo de PVC flexible de 13 mm de diáme-
+tro, incluso mecanismos de primera calidad empotrados y p.p. de cajas de derivación, derivación
+desde el cuadro de protección y ayudas de albañilería; construido según REBT. Medida la unidad
+instalada. Incluso interruptor estanco en exterior.
+Lavadero    1    1,00
+Vestidor    1    1,00
+_______________________________________________________
+2,00    30,59    61,18
+08ELL00011    u PUNTO DE LUZ DE CRUCE MÚLTIPLE EMPOTRADO
+Punto de luz de cruce multiple, (3 interruptores), instalado con cable ES(07Z1-K)/RZ1-K de cobre de
+1,5 mm2 de sección nominal, empotrado y aislado con tubo de PVC flexible de 13 mm de diámetro,
+incluso mecanismos de primera calidad empotrados y p.p. de cajas de derivación, derivación desde
+el cuadro de protección y ayudas de albañilería; construido según REBT. Medida la unidad instalada.
+Incluso interruptor estanco en exterior.
+D1    2    2,00
+D2    1    1,00
+_______________________________________________________
+3,00    42,11    126,33
+08ETT00003    u TOMA CORRIENTE EMPOTRADA 16 A CON 2,5 mm2
+Toma de corriente empotrada de 16 A con puesta a tierra, instalada con cable de cobre
+ES(07Z1-K)/RZ1-K de 2,5 mm2 de sección nominal, empotrado y aislado bajo tubo de PVC flexible
+de 13 mm de diámetro, incluso mecanismo de primera calidad y p.p. de cajas de derivación y ayu-
+das de albañilería; construido REBT. Medida la unidad instalada.
+D1    4    4,00
+Baño 1    3    3,00
+Vestidor    3    3,00
+D2    3    3,00
+Baño 2    2    2,00
+Recibidor    2    2,00
+Salón-cocina    14    14,00
+Lavadero    4    4,00
+_______________________________________________________
+35,00    13,96    488,60
+08ETT00005    u TOMA CORRIENTE EMPOTRADA 20 A CON 6 mm2
+Toma de corriente empotrada de 20 A con puesta a tierra, instalada con cable de cobre
+ES(07Z1-K)/RZ1-K de 6 mm2 de sección nominal, empotrado y aislado bajo tubo de PVC flexible
+de 23 mm de diámetro, incluso mecanismos de primera calidad y p.p. de cajas de derivación y ayu-
+das de albañilería; construido según REBT. Medida la cantidad ejecutada.
+Lavadero    2    2,00
+Cocina    1    1,00
+_______________________________________________________
+3,00    23,31    69,93
+08ETT00006    u TOMA CORRIENTE EMPOTRADA 25 A CON 6 mm2
+Toma de corriente empotrada de 25 A con puesta a tierra, instalada con cable de cobre
+ES(07Z1-K)/RZ1-K de 6 mm2 de sección nominal, empotrado y aislado bajo tubo de PVC flexible
+de 23 mm de diámetro, incluso mecanismos de primera calidad y p.p. de cajas de derivación y ayu-
+das de albañilería; construido según REBT. Medida la unidad instalada.
+Cocina    1    1,00
+Lavadero    1    1,00
+_______________________________________________________
+2,00    19,48    38,96
+08ETT00026    u TOMA CORRIENTE ESTANCA 16 A CON 2,5 mm2
+Toma de corriente estanca de 16 A con puesta a tierra, instalada con cable de cobre
+ES(07Z1-K)/RZ1-K de 2,5 mm2 de sección nominal, aislado con tubo de PVC rígido de 13 mm de
+diámetro y 1 mm de pared, toma de corriente formada por caja estanca, mecanismo y tapa articula-
+da, colocado con prensaestopas, muelles de acero inoxidable y conos, incluso cajas de conexiones,
+grapas, ayudas de albañilería y conexiones; construida según REBT. Medida la unidad instalada.
+Porche    1    1,00
+Coche    1    1,00
+_______________________________________________________
+2,00    13,24    26,48
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página22
+
+--- PAGE 23 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+08ETT000032E u TOMA CORRIENTE ESTANCA 32 A CON 6 mm2
+Toma de corriente estanca de 32 A con puesta a tierra, instalada con cable de cobre
+ES(07Z1-K)/RZ1-K de 6 mm2 de sección nominal, aislado con tubo de PVC rígido de 13 mm de diá-
+metro y1 mm de pared, toma de corriente formada por caja estanca, mecanismo y tapa articulada,
+colocado con prensaestopas, muelles de acero inoxidable y conos, incluso cajas de conexiones,
+grapas, ayudas de albañilería y conexiones; construida según REBT. Medida la unidad instalada.
+Aparcamiento    1    1,00
+_______________________________________________________
+1,00    19,48    19,48
+08EWW00001 u PUNTO TIMBRE 1,5 mm2
+Punto de timbre con cable de cobre ES(07Z1-K)/RZ1-K de 1,5 mm2 de sección nominal, aislado con
+tubo de PVC flexible de 13mm de diámetro, incluso zumbador y mecanismo pulsador de primera ca-
+lidad, p.p. de cajas de derivación y ayudas de albañilería; construido según REBT. Medida la unidad
+instalada.
+1    1,00
+_______________________________________________________
+1,00    11,09    11,09
+08KVW00600    u TOMA DE USUARIO DE TV/FM/FI EMPOTRADA
+Toma de usuario (BAT) para señales de TV y FM terrestres y de satelite en FI (frecuencia interme-
+dia), formada por mecanismo de toma separadora final, incluso colocación en caja de registro y co-
+nexión, incluso p.p. de cableado. construido según reglamento de ICT. Medida la unidad ejecutada.
+D1    1    1,00
+Salón    1    1,00
+Porche    1    1,00
+_______________________________________________________
+3,00    3,64    10,92
+08KDP00030    u TOMA VOZ-DATOS RJ45 CAT6
+Colocación mecanismo con toma para informática tipo RJ-45 conectada, grimpada y v erificada. In-
+cluos p.p. de cableado hasta el cuadro o punto de distribución de telecomunicaciones.
+D1    1    1,00
+D2    1    1,00
+Salón    1    1,00
+_______________________________________________________
+3,00    7,30    21,90
+08KVA00001    u EQUIPO DE CAPTACIÓN PARA UHF-VHF Y FM S/MASTIL 6 m
+Equipo de captación para UHF-VHT-FM, con ganancia de 14 dB, formado por mastil de acero gal-
+vanizado de 6 m de altura, antenas, cable coaxial y conductor de puesta a tierra hasta el equipo de
+cabecera, incluso colocación, conexión, tubo corrugado en vacío hasta cuadro telecomunicaciones y
+ayudas de alabañileria; construida según reglamento de ICT. Medida la unidad ejecutada.
+1    1,00
+_______________________________________________________
+1,00    74,54    74,54
+E19PV220    ud    VIDEOPORTERO DIG. COL. VIV. UNIF.
+Videoportero digital empotrar Legrand Serie 7, para una vivienda unifamiliar, formado por un kit com-
+pleto con placa para pulsador, caja empotrar, monitor color CLASSE 100 V 12 B manos libres, uno
+por cada planta, (3 en total: 2 en P. baja y uno en P. primra). Llamada electrónica, confirmación de
+llamada en placa, iluminación de escena por infrarrojos y monitor con autoencendido para vigilancia,
+incluso montaje, encendido de cortesía de luz de entrada, clableado y conexionado completo, medida
+la unidad instalada y funcionando.
+1    1,00
+_______________________________________________________
+1,00    663,36    663,36
+_______________
+TOTAL CAPÍTULO C13 ELECTRICIDAD Y TELECOMUNICACIONES.....................................................    4.513,18
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página23
+
+--- PAGE 24 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C14 ENERGÍA SOLAR FOTOVOLTAICA
+08OOC00010    u MÓDULO FOTOVOLTÁICO POLICRISTALINO 330Wp/24V Y PP AUXILIARES S/D
+Módulo solar fotovoltáico de células de silicio policristalino para instalaciones conectadas a red, insta-
+lado sobre estructura soporte también incluida, potencia máxima 450W, tensión de potencia óptima
+(Vmp) 37,80 V, corriente nominal (lmpp) 8,74 A, corriente de cortocircuito (Isc) 9,14A, tensión en cir-
+cuito abierto (Voc) 46,9V, 72 células, rendimiento 17,01%, temperatura de trabajo -40ºC/+85ºC, di-
+mensiones 1956x992x50 mm. Totalmente montado y conexionado, incluída cajas de conexiones,
+cconectores y p.p. de pequeño material y medios auxiliares, incluido latiguillos de CC de 6mm2 de
+sección de conexionado de paneles en serie cuando sea necesario. Incluido suministro e instalación
+de cable de tierra de cobre desnudo de 16mm2 trenzado y con protección contra la corrosión desde
+el campo fotovoltaico, hasta la tierra común del edificio. En caso de que la tierra existente no cumpla
+con los valores requeridos por el REBT, incluido suministro e instlacion de pica de tierra independien-
+te. Puesta a tierra de las masas a travez de conductor de proteccion de 6mm2. Todo ello, incluido
+transporte y maquinaria de elevación necesaria. Colocación en cubierta del edificio. Medida la unidad
+instalada, ejecutada, terminada, probada y funcionando.
+10    10,00
+_______________________________________________________
+10,00    114,40    1.144,00
+08ORW00102O u INVERSOR SOLAR MONOFÁSICO 5.0 kW
+Suminitro e instalación de inversor monofásico de conexión de red de potencia nominal igual a 5.0
+kW a 230 V, con grado de protección IP65, con 2 MMPT y preparado para almacenar el excedente
+de producción fotovoltaica en una batería de litio de alto voltaje, con comunicación para monitoriza-
+ción remota mediante smartphone, tablet o PC, puertos Ethernet, RS-485 y protocolo Modbus. Uni-
+dad totalmente instalada, revisada y en funcionamiento.
+1    1,00
+_______________________________________________________
+1,00    558,71    558,71
+08ORR90201N u VATÍMETRO
+Medidor de potencia encargado de contabilizar la potencia inyectada a la red, y el consumo del edfi-
+cio. Empleado para aplicaciones de gestión de red básica y coste de energía. Proporciona las capa-
+cidades de medición necesarias para asignación de uso de energía, ahorros de energías puntuales,
+optimización de eficiencia y uso de equipos y evaluación de alto nivel de calidad de potencia een
+una red eléctrica. Unidad totalmente instalada, revisada y en funcionamiento.
+1    1,00
+_______________________________________________________
+1,00    200,73    200,73
+_______________
+TOTAL CAPÍTULO C14 ENERGÍA SOLAR FOTOVOLTAICA....................................................................    1.903,44
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página24
+
+--- PAGE 25 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C15 FONTANERÍA, ACS, CALEFACCIÓN Y CLIMATIZACIÓN
+SUBCAPÍTULO C08.01 SANEAMIENTO
+04WAA00001N u ACOMETIDA A LA RED GENERAL DE ALCANTARILLADO
+Acometida general de saneamiento a la red general del municipio, de PVC liso, serie SN-4, rigidez
+anular nominal 4 kN/m², de 160 mm de diámetro, pegado mediante adhesivo, incluso p.p. de levan-
+tado de pavimento, excavación de zanja, relleno y reposición de acabado a su estado original,
+construida según Ordenanza Municipal. Medida la cantidad ejecutada.
+1    1,00
+_______________________________________________________
+1,00    884,08    884,08
+02.02    ud    VÁLVULA ANTIRRETORNO
+ud.Suministro y montaje de válvula antirretorno de PVC de 160 PLUVIAL Y 200 FECAL mm de
+diámetro, con clapeta de polipropileno, junta labiada y registro en la parte superior, colocada entre el
+colector de salida y la acometida. Totalmente montada.
+1    1,00
+_______________________________________________________
+1,00    81,37    81,37
+04EAP90001    u ARQUETA DE PASO DE 70X70 cm 1 m PROF. EXC. EN TIERRAS.
+Arqueta depaso de 70x70 cm dimensiones interiores y 1 m de profundidad media, formada por sole-
+ra de hormigón HM-20 de 15 cm de espesor con formación de pendientes, fábrica de ladrillo perfora-
+do por tabla de 1/2 pie, enfoscada y bruñida por el interior, tapa de hormigón armado prefabricado,
+con cerco de perfil laminado L 50.5 y conexión de tubos de entrada y salida, incluso excavación en
+tierras y relleno; construido según CTE. Medida la cantidad ejecutada.
+Pluviales    8    8,00
+Fecales    4    4,00
+_______________________________________________________
+12,00    52,03    624,36
+04EAS00001    u ARQUETA SIFÓNICA DE 80X80 cm EXC. EN TIERRAS
+Arqueta sifónica de 80x80 cm dimensiones interiores y 1 m de profundidad, formada por solera de
+hormigón HM-20 de 15 cm de espesor, fábrica de ladrillo perforado por tabla de 1/2 pie, enfoscada y
+bruñida por el interior; formación de sifón con tapa interior y cadenilla, tapa prefabricada de hormigón
+armado con cerco de perfil laminado L 50.5 y conexión de tubos de entrada y salida, incluso exca-
+vación en tierras y relleno; construida según CTE y Ordenanza Municipal. Medida la cantidad ejecu-
+tada.
+Pluviales    1    1,00
+_______________________________________________________
+1,00    80,23    80,23
+04EEE90056    u ARQUETA DE BOMBEO 1x1 m Y PROFUNDIDAD 1 m.
+Arqueta de bombeo de dimensiones interiores 2x1,5 m y 1,5 m de profundidad, formada por solera
+de hormigón armado HA-30/B/20/IIb+Qb de 15 cm de espesor fábrica de ladrillo perforado por tabla
+de 1 pie, enfoscada y bruñida por el interior, bancada formada por dado de hormigón tapa prefabrica-
+da de hormigón armado con cerco de perfil laminado L 50.5, conexión de tubos de alcantarillado, in-
+cluso conjunto de dos bombas iguales, para funcionamiento alternativo, siendo cada una de ellas una
+electrobomba sumergible con impulsor vórtex, para achique de aguas residuales y fecales con cuer-
+pos en suspensión o filamentosos, construida en hierro fundido, con una potencia de 1,1 kW, cone-
+xiones eléctricas y cuadro de protección y funcionamiento alternativo de las bombas automático con
+señal luminosa de avería, excavación en tierras y relleno; construido según CTE y Ordenanza Mu-
+nicipal. Medida la cantidad ejecutada, totalmente terminada y funcionando.
+1    1,00
+_______________________________________________________
+1,00    172,32    172,32
+04ECP90007    m    COLECTOR ENTERRADO TUBERIA PRES. PVC DIÁM. 160 mm.
+Colector enterrado de tubería presión de PVC 4 kg/cm2, de 164 mm de diámetro nominal, colocado
+sobre lecho de arena de 10 cm de espesor, incluso p.p. de cinta de señalización, piezas especiales,
+apisonado, excavación en tierras y relleno; construido según CTE. Medida la longitud entre ejes de
+arquetas.
+Fecales    1    15,00    15,00
+1    2,00    2,00
+1    5,50    5,50
+1    4,00    4,00
+1    2,00    2,00
+Pluviales    1    28,00    28,00
+1    40,00    40,00
+1    7,00    7,00
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página25
+
+--- PAGE 26 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+_______________________________________________________
+103,50    9,61    994,64
+04CCP00003    m    COLECTOR COLGADO DE PVC DIÁM. 110 mm
+1    14,00    14,00
+_______________________________________________________
+14,00    8,49    118,86
+CANALETA 2 m. CAN.HORMIGÓN POLÍMERO REJILLA RANURADA
+Canaleta de drenaje superficial oculta para zonas de carga ligera y pesada, formado por piezas prefa-
+bricadas de hormigón polímero 130x130 cm. de medidas exteriores, sin pendiente incorporada y con
+rejilla ranurada de acero cincado, colocadas sobre cama de arena de río compactada, incluso con
+p.p. de arquetas arenero, piezas especiales y pequeño material, montado, nivelado y con p.p. de
+medios auxiliares, según documentación gráfica e instrucciones de la dirección facultativa. Incluso
+recibido y conexionadado a la red de saneamiento.
+Aparcamiento    1    17,00    17,00
+1    17,50    17,50
+1    7,50    7,50
+_______________________________________________________
+42,00    20,46    859,32
+CANALCUB    m. CANAL CUBIERTA
+Canaleta de drenaje superficial para cubierta plana no transitable, con pendiente incorporada y con re-
+jilla ranurada de PVC, sumideros, piezas especiales y pequeño material, montado, nivelado y con
+p.p. de medios auxiliares, según documentación gráfica e instrucciones de la dirección facultativa. In-
+cluso recibido y conexionadado a la red de saneamiento.
+Cubierta    1    14,00    14,00
+_______________________________________________________
+14,00    3,70    51,80
+04VBP00002    m    BAJANTE DE PVC REFORZADO, DIÁM. 110 mm
+Bajante de PVC reforzado, de 110 mm de diámetro nominal, incluso sellado de uniones, paso de for-
+jados, abrazaderas y p.p. de piezas especiales; construido según CTE. Medida la longitud ejecuta-
+da.
+1    3,60    3,60
+_______________________________________________________
+3,60    6,52    23,47
+_______________
+TOTAL SUBCAPÍTULO C08.01 SANEAMIENTO.....................    3.890,45
+SUBCAPÍTULO C08.02 FONTANERÍA
+08FAA90001    u ACOMETIDA DE AGUA DE 20 A 32 mm
+Acometida de aguas realizada en tubo de polietileno de media o alta densidad, de 20 a 32 mm de diá-
+metro exterior, desde el punto de toma hasta la llave de registro, incluso p.p. de piezas especiales,
+obras complementarias y ayuda de albañilería; construido según CTE y normas de la compañía su-
+ministradora. Medida la unidad ejecutada.
+1    1,00
+_______________________________________________________
+1,00    290,63    290,63
+08FFP90120    m    CANALIZACIÓN POLIETILENO PE, ENTERRADA, DIÁM. 32x2,4 mm
+Canalización de polietileno PE de alta densidad con uniones mecánicas, empotrada, de 32 mm de
+diámetro exterior y 2,4 mm de espesor, apto uso alimentario, PN 10, incluso p.p. piezas especiales,
+pequeño material y ayudas de albañilería; instalada según CTE. Medida la longitud ejecutada.
+1    24,00    24,00
+_______________________________________________________
+24,00    4,32    103,68
+08FVC00052    u LLAVE COMPUERTA DIÁM. 1 1/4"
+Llave de compuerta colocada en canalización de 1 1/4" (28/32mm) de diámetro, incluso pequeño
+material; construida según CTE, e instrucciones del fabricante. Medida la unidad instalada.
+3    3,00
+_______________________________________________________
+3,00    10,83    32,49
+08FVL00052    u LLAVE PASO CON GRIFO DE VACIADO 2 1/4"
+Llave de paso con grifo de vaciado colocada en canalización de 1 1/4" (28/32mm) de diámetro, in-
+cluso pequeño material; construida según CTE, e instrucciones del fabricante. Medida la unidad ins-
+talada.
+2    2,00
+_______________________________________________________
+2,00    27,21    54,42
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página26
+
+--- PAGE 27 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+E20XET040    ud    INS.POLIET. ASEO C/DUCHA
+Instalación de fontanería para un baño dotado de lavabo, inodoro y bañera o plato de ducha realizada
+con tuberías de polietileno reticulado para las redes de agua fría y caliente utilizando derivaciones por
+tés y con tuberías de PVC serie B, UNE-EN-1453, para la red de desagüe con los diámetros nece-
+sarios para cada punto de servicio, con bote sifónico para los aparatos, incluso llaves de paso y p.p.
+de bajante de PVC de 110 mm. y manguetón de enlace para el inodoro, terminada y sin aparatos
+sanitarios. Las tomas de agua y los desagües se entregarán con tapones. s/CTE-HS-4/5. Incluso
+p.p. de red de distribución interior según documentación gráfica e instrucciones de la D.F.
+1    1,00
+_______________________________________________________
+1,00    94,07    94,07
+E20XET0202L ud    INS.POLIET. BAÑO COMPLETO 2 LAVABOS INODORO Y DUCHA
+Instalación de fontanería para un baño dotado de dos lavabos, inodoro, grifo para inodoro y ducha re-
+alizada con tuberíasde polietileno reticulado para las redes de agua fría y caliente utilizando deriva-
+ciones por tés y con tuberías de PVC serie B, UNE-EN-1453, para la red de desagüe con los diá-
+metros necesarios para cada punto de servicio, con bote sifónico para los aparatos, incluso llaves de
+paso y p.p. de bajante de PVC de 110 mm. y manguetón de enlace para el inodoro, terminada y sin
+aparatos sanitarios. Las tomas de agua y los desagües se entregarán con tapones. s/CTE-HS-4/5.
+1    1,00
+_______________________________________________________
+1,00    144,80    144,80
+E20XET030N    ud    INS.POLIET. COCINA
+Instalación de fontanería para una cocina dotándole con tomas para fregadero y lavavajillas realizada
+con tuberías de polietileno reticulado para las redes de agua fría y caliente utilizando derivaciones por
+tés y con tuberías de PVC serie C, UNE-EN-1453, para la red de desagüe con los diámetros nece-
+sarios para cada punto de servicio, con sifones individuales para los aparatos, incluso llaves de pa-
+so y p.p. de bajante de PVC de 110 mm. y manguetón de enlace para el inodoro, terminada y sin
+aparatos. Las tomas de agua y los desagües se entregarán con tapones. s/CTE-HS-4/5. Incluso
+p.p. de red de distribución interior según documentación gráfica e instrucciones de la D.F.
+1    1,00
+_______________________________________________________
+1,00    97,17    97,17
+E20XET030    ud    INS.POLIET. LAVADERO
+Instalación de fontanería para un lavadero dotándole con tomas para pila y lavadora realizada con tu-
+berías de polietileno reticulado para las redes de agua fría y caliente utilizando derivaciones por tés y
+con tuberías de PVC serie C, UNE-EN-1453, para la red de desagüe con los diámetros necesarios
+para cada punto de servicio, con sifones individuales para los aparatos, incluso llaves de paso y
+p.p. de bajante de PVC de 110 mm. y manguetón de enlace para el inodoro, terminada y sin apara-
+tos. Las tomas de agua y los desagües se entregarán con tapones. s/CTE-HS-4/5. Incluso p.p. de
+red de distribución interior según documentación gráfica e instrucciones de la D.F.
+1    1,00
+_______________________________________________________
+1,00    97,17    97,17
+E20XAT010    ud    INST. F. PUNTO BALDEO
+Instalación de fontanería para un punto de baldeo realizada con tuberías de polietileno reticulado para
+la red de agua fría, totalmente terminada según normativa vigente, incluso p.p. de tramo de red y gri-
+fería. s/CTE-HS-4/5. Incluso p.p. de red de distribución interior según documentación gráfica e ins-
+trucciones de la D.F.
+4    4,00
+_______________________________________________________
+4,00    13,51    54,04
+_______________
+TOTAL SUBCAPÍTULO C08.02 FONTANERÍA........................    968,47
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página27
+
+--- PAGE 28 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+SUBCAPÍTULO C08.03 CALEFACCIÓN, CLIMATIZACIÓN Y A.C.S.
+ICS020    Ud    BOMBA DE CIRCULACIÓN
+Electrobomba centrífuga, de hierro fundido, de tres velocidades, con una potencia de 0,071 kW, im-
+pulsor de tecnopolímero, eje motor de acero cromado, bocas roscadas macho de 1", aislamiento cla-
+se H, para alimentación monofásica a 230 V. Incluso puente de manómetros formado por manóme-
+tro, válvulas de esfera y tubería de cobre; elementos de montaje; caja de conexiones eléctricas con
+condensador y accesorios necesarios para su correcto funcionamiento.
+Incluye: Replanteo. Colocación de la bomba de circulación. Conexión a la red de distribución. Com-
+probación de su correcto funcionamiento.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+1    1,00
+_______________________________________________________
+1,00    204,49    204,49
+ICE110b    m²    SISTEMA DE CALEFACCIÓN Y REFRIGERACIÓN POR SUELO RADIANTE, CON C
+Sistema de calefacción y refrigeración por suelo radiante "UPONOR IBERIA", compuesto por film
+de polietileno, banda de espuma de polietileno (PE), de 150x10 mm, modelo Multi Autofijación, panel
+aislante de poliestireno expandido (EPS), con tiras de velcro para fijación de los tubos, con mejora
+del aislamiento acústico a ruido aéreo y de impacto, de 10000x1000 mm y 25 mm de espesor, pro-
+porcionando una reducción del nivel global de presión de ruido de impactos de 26 dB, modelo Klett
+Autofijación Neorol G, tubo de polietileno reticulado (PE-Xa) con barrera de oxígeno (EVOH), de 16
+mm de diámetro exterior y 2 mm de espesor, con tiras exteriores de velcro en espiral para fijación a
+panel aislante, modelo Klett Autofijación Confort Pipe PLUS. Totalmente montado, conexionado y
+probado.
+Incluye: Preparación y limpieza de la superficie de apoyo. Replanteo de la instalación. Extendido del
+film de polietileno. Fijación del zócalo perimetral. Colocación de los paneles. Replanteo de la tubería.
+Colocación y fijación de las tuberías. 5 termostatos para el control de temperatura por zonas. No in-
+cluye el vertido y extendido de la capa de mortero autonivelante. Realización de pruebas de servi-
+cio.
+Criterio de medición de proyecto: Superficie útil, medida según documentación gráfica de Proyecto.
+Criterio de medición de obra: Se medirá la superficie realmente ejecutada según especificaciones de
+Proyecto.
+Vivienda    1    101,84    101,84
+_______________________________________________________
+101,84    13,83    1.408,45
+08CCC00182N u EQUIPO DE AEROTERMIA FRÍO Y CALOR
+Equipo de aerotermia completo, calefacción para suelo radiante y ACS con depósito de inercia de
+200l y depósito de 150l, de 2,5 a 18 kW (2150 a 12900 kcal/h) potencia útil, formada por cuerpo de
+caldeo de acero con aislamiento térmico, resistencias, circulador, vasos de expansión, termostatos
+de temperatura y seguridad, válvula de seguridad del circuito calefac., interruptores para los distintos
+escalones de potencia, programador, interruptor general y módulos control, conexiones para agua,
+conexiones entre el equipo exterior y el interior, contenido todo en envolvente de chapa esmaltada,
+placa de identificación energética, homologado por el M.I., montaje y ayudas de albañilería. Según
+documentación gráfica, normas del fabricante para dar servicio a una vivienda unifamiliar con una su-
+perficie de 120 m2. Medida la unidad totalmente instalada y funcionando.
+1    1,00
+_______________________________________________________
+1,00    885,72    885,72
+08CAF00005N u EQUIPO ACOND. AIRE, C. HOR. ENFR. POR AIRE 9300 frig/h
+Equipo autónomo de acondicionamiento de aire con bomba de calor, equipo exterior e interior, enfria-
+do por aire, de 9300 frig/h capacidad total en condiciones normales de funcionamiento en frío, mueble
+de chapa galvanizada pintada al horno, con aislamiento termo-acústico, conteniendo: un compresor
+hermetico de 7,6 kW pot. abs. 220-0-380.3.50, baterías condensadora y evaporadora, circuito carga-
+do con gas R-22, un ventilador centrifugo de 1,5 CV para cond. y otro de 1 CV para evap., caudal
+5000 m3/h, presión est. disp. >10 mm.c.a. a 900 r.p.m., filtro de aire, cuadro eléctrico de maniobra,
+presostatos de alta y baja, vávula de expansión, sifón de Cu desagüe, colocado sobre apoyos elás-
+ticos, ayudas de albañilería. Conexiones entre la unidad interior y exteior, red eléctrica y conexión
+con la red de saneamiento. Medida la cantidad ejecutada totalmente instalada y funcionando.
+1    1,00
+_______________________________________________________
+1,00    1.684,86    1.684,86
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página28
+
+--- PAGE 29 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+09.09    m    CANALIZACIÓN FIBRA VIDRIO CLIMAVER PLUS
+Canalización de aire realizado con placas de fibra de vidrio Climaver Plus de 25 mm, i/embocadu-
+ras, derivaciones, elementos de fijación y piezas especiales, S/NTE-ICI-22.
+1    18,00    18,00
+_______________________________________________________
+18,00    6,03    108,54
+09.10    ud    DIFUSOR LINEAL 4 RANURAS
+Ud. Difusor lineal construido en perfil de aluminio extruido con cuatro ranuras, , i/p.p. de piezas de
+remate, totalmente instalado, s/NTE-ICI-25.
+10    10,00
+_______________________________________________________
+10,00    16,05    160,50
+_______________
+TOTAL SUBCAPÍTULO C08.03 CALEFACCIÓN,....................    4.452,56
+SUBCAPÍTULO C08.04 PISCINA
+UPN010b    m²    Impermeabilización del vaso con sistema weber.
+Impermeabilización del vaso con sistema weber.
+Suelo piscina    1    17,14    17,14
+Pardes piscina    1    21,17    1,70    35,99
+_______________________________________________________
+53,13    13,70    727,88
+08FWW00003-N u INSTALACIÓN FILTRACIÓN Y CLORACIÓN SALINA PISCINA
+Equipo completo de depuración para piscina de hasta 50 m3, constituido por: EQUIPO DE FILTRA-
+CIÓN COMPACTO ALOJADA EN SÓTANO construido en poliéster reforzado con fibra de vidrio,
+colector de plástico, válvulas de mariposa para filtrado y lavado, prefiltros de cabello, cestos colado-
+res, bombas centrífugas, motores eléctricos, manómetros; CIRCUITO CERRADO DE TUBERÍAS
+DE PVC alrededor de la piscina y enlace del filtro con el grupo motobomba y ACCESORIOS
+constituidos por: 1 sumiderode fondo antitorbellino de poliéster, 3 boquillas de impulsión de ABS y 3
+skimmers de ABS, SISTEMA DE CLORACIÓN SALINA: sistema de cloracion de la piscina
+compuesto por: Control electrónico de mando y regulación y célula de electrolisis, electrolisis salina
+bs one evo 35gr/hora salinidad 2gr/lt, kit ph y bomba dosific. Para bsv pro, kit modulo cloro por orp
+en oro para bsv pro, sal para piscina (saco 25kg) y garrafa reductor ph liquido para bomba, ELEC-
+TROBOMA: Electrobomba autoaspirante de polipropileno reforzado con fibra de vidrio, con una po-
+tencia de 0,43 kW, 3000 r.p.m., cierre mecánico de acero inoxidable AISI 316, motor asíncrono, pro-
+tección IP55, aislamiento clase F, para alimentación monofásica a 230 V y 50 Hz de frecuencia,
+caudal máximo 8,5 m³/h para una presión de 8 m.c.a. y nivel de presión sonora 68 dBA. Incluso
+prefiltro, VÁLVULA SELECTORA: Válvula selectora de resinas termoplásticas de ABS, de 6 vías,
+de 1/2", sistema de cierre de la tapa por bayoneta y presión máxima de trabajo de 3,43 bar. Incluso
+elementos de conexión. PREFILTRO: Prefiltro de plástico, con dos salidas de 2", caudal máximo 10
+m³/h y presión máxima de trabajo de 2,5 bar, con válvula de purga de 3/4", de acero inoxidable AI-
+SI 316. Incluso pie soporte y accesorios.
+Totalmente instalado y en funcionamiento., incluso conexiones con fontanería y red de saneamiento,
+cuadro eléctrico, soldaduras, contratubo, pequeño material y ayudas de albañilería; construido según
+CTE. La unidad ejecutada y puesta en funcionamiento. Inluidas luminarias según documentación grá-
+fica e instrucciones de la D.F.
+1    1,00
+_______________________________________________________
+1,00    1.573,17    1.573,17
+08FGD00001-N u DUCHA SOLAR PISCINA
+Ducha solar para piscina, de aluminio, con maneta monomando y rociador fijo, con sistema antical y
+depósito acumulador de aluminio de 30 litros para calentar el agua aprovechando la energía solar, fija-
+da a una superficie soporte (no incluida en este precio), con anclajes dotados de mecanismo para co-
+nexión equipotencial. Incluso desagüe y pequeña red de saneamiento a parterre próximo, replanteo,
+anclajes, topes, embellecedores, juntas, tacos y tornillos, racor de conexión, tuberías para conduc-
+ción de agua, elementos de anclaje y eliminación y limpieza del material sobrante. Totalmente monta-
+da y probada por la empresa instaladora incluyendo ayudas de albañilería; construido según CTE e
+instrucciones del fabricante. Medida la cantidad ejecutada.
+1    1,00
+_______________________________________________________
+1,00    71,54    71,54
+_______________
+TOTAL SUBCAPÍTULO C08.04 PISCINA .................................    2.372,59
+____________
+TOTAL CAPÍTULO C15 FONTANERÍA, ACS, CALEFACCIÓN Y CLIMATIZACIÓN................................    11.684,07
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página29
+
+--- PAGE 30 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C16 APARATOS SANITARIOS
+E21ALE050    ud    LAV. 2 SENOS 170x50 S.ALTA.BLANCO
+Lavabo de porcelana vitrificada blanco, de dos senos 170x50 cm.,senos y encimera de una misma
+pieza, con grifo mezclador monomando, con aireador y enlaces de alimentación flexibles, incluso
+válvula de desagüe de 32 mm., llaves de escuadra de 1/2" cromadas, y latiguillos flexibles de 20
+cm. y de 1/2", instalado y funcionando.
+1    1,00
+_______________________________________________________
+1,00    103,92    103,92
+E21ALU020    ud    LAV.1 SENO 80x49 BLA.G.MEZCL.
+Lavabo de porcelana vitrificada blanco, mural, de 80x49 cm., de 1 seno, colocado mediante anclajes
+de fijación a la pared, con grifería mezcladora de caño central, giratorio, con aireador, incluso válvula
+de desagüe de 32 mm en acero inoxidable, llaves de escuadra de 1/2" cromadas, y latiguillos flexi-
+bles de 20 cm. y de 1/2", instalado y funcionando.
+1    1,00
+_______________________________________________________
+1,00    217,74    217,74
+E21ANB080    ud    INOD. SUSPENDIDO T.BAJO COMPL.S.ALTA BLA.
+Inodoro suspendido de porcelana vitrificada en blanco, de tanque oculto en tabiquería o cerramiento,
+colocado mediante tacos y tornillos al solado, incluso sellado con silicona, y compuesto por: taza,
+tanque bajo alojado en cámara, con tapa amortiguada y mecanismos y asiento con tapa lacados, con
+bisagras de acero, instalado, incluso con llave de escuadra de 1/2" cromada y latiguillo flexible de 20
+cm. y de 1/2", funcionando.
+2    2,00
+_______________________________________________________
+2,00    159,13    318,26
+E21ADA010    ud    P.DUCHA ACR.170x90 G.MMDO.
+Plato de ducha acrílico, rectangular, de longitud variable hasta 220x90 cm., colocación enrasado con
+el pavimento, con grifería mezcladora exterior monomando con ducha teléfono con rociador regulable,
+flexible de 150 cm. y soporte para la ducha, cromada, incluso válvula de desagüe con salida hori-
+zontal de 40 mm., instalada y funcionando.
+2    2,00
+_______________________________________________________
+2,00    275,65    551,30
+08FSB00001    u BIDÉ PORCELANA VITRIFICADA, COLOR BLANCO, C. MEDIA
+Bide de porcelana vitrificada, en color blanco calidad alta, tornillos de fijación y orificios insinuados
+para grifería, construido según CTE, e instrucciones del fabricante , incluso colocación, sellado y
+ayudas de albañilería. Con grifo mezclador monomando, con aireador y enlaces de alimentación fle-
+xibles, incluso válvula de desagüe de 32 mm., llaves de escuadra de 1/2" cromadas, y latiguillos
+flexibles de 20 cm. y de 1/2", instalado y funcionando.
+1    1,00
+_______________________________________________________
+1,00    29,38    29,38
+_______________
+TOTAL CAPÍTULO C16 APARATOS SANITARIOS....................................................................................    1.220,60
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página30
+
+--- PAGE 31 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C17 VENTILACIÓN
+IVA030    Ud    Boca de extracción para ventilación.
+Boca de extracción, autorregulable, caudal máximo 21 l/s, aislamiento acústico de 39,8 dBA forma-
+da por rejilla color blanco, cuerpo de plástico color blanco de 150x33x150 mm con cuello de cone-
+xión de 125 mm de diámetro, junta de caucho y regulador de plástico con membrana de silicona y
+muelle de recuperación. Incluso elementos de fijación.
+Incluye: Replanteo. Montaje. Colocación y fijación del elemento al conducto de extracción.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+2    2,00
+_______________________________________________________
+2,00    13,42    26,84
+IVA010    Ud    Aireador de admisión para ventilación.
+Aireador de admisión graduable, de aluminio lacado en color a elegir de la carta RAL, caudal máxi-
+mo 10 l/s, de 1200x80x12 mm, con abertura de 800x12 mm, aislamiento acústico de 39 dBA y filtro
+antipolución. Incluso elementos de fijación.
+Incluye: Replanteo. Montaje. Colocación y fijación del aireador encima de la carpintería.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+4    4,00
+_______________________________________________________
+4,00    30,01    120,04
+IVA020    Ud    Abertura de paso para ventilación.
+Aireador de paso, de aluminio, caudal máximo 15 l/s, de 725x20x82 mm, con silenciador acústico
+de espuma de resina de melamina y aislamiento acústico de 34 dBA. Incluso elementos de fijación.
+Incluye: Replanteo. Colocación y fijación del aireador entre el marco y la batiente de la puerta inte-
+rior.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+4    4,00
+_______________________________________________________
+4,00    18,56    74,24
+IVM036    Ud    Ventilador de extracción para tejado.
+Ventilador helicoidal para tejado, con hélice de plástico reforzada con fibra de vidrio, cuerpo y som-
+brerete de aluminio, base de acero galvanizado y motor para alimentación monofásica a 230 V y 50
+Hz de frecuencia, con protección térmica, aislamiento clase F, grado de protección IP65, de 835
+r.p.m., potencia absorbida 0,22 kW, caudal máximo 3900 m³/h, nivel de presión sonora 52 dBA, con
+malla de protección contra la entrada de hojas y pájaros, para conducto de extracción de 450 mm de
+diámetro; instalación en el extremo exterior del conducto de extracción (boca de expulsión). Incluso
+accesorios y elementos de fijación.
+Incluye: Replanteo. Colocación y fijación. Conexionado y comprobación de su correcto funciona-
+miento.
+Criterio de medición de proyecto: Número de unidades previstas, según documentación gráfica de
+Proyecto.
+Criterio de medición de obra: Se medirá el número de unidades realmente ejecutadas según especifi-
+caciones de Proyecto.
+3    3,00
+_______________________________________________________
+3,00    619,86    1.859,58
+IVN110    UD    ATENUADOR ACÚSTICO
+Atenuador acústico, incluso fijaciones y material complementario, totalmente instalado y conectado
+con la red de ventilación.
+1    1,00
+_______________________________________________________
+1,00    22,52    22,52
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página31
+
+--- PAGE 32 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+IVV020b    m    Conducto circular de chapa de acero galvanizado.
+Conducto circular de ventilación, formado por tubo de chapa de acero galvanizado de pared simple
+helicoidal, de 100 mm de diámetro y 0,5 mm de espesor, colocado en posición horizontal. Incluso
+material auxiliar para montaje y sujeción a la obra, accesorios y piezas especiales.
+Criterio de valoración económica: El precio no incluye las compuertas de regulación, las compuertas
+cortafuego, las rejillas ni los difusores.
+Incluye: Replanteo del recorrido del conducto y de la situación de los elementos de sujeción. Presen-
+tación de tubos, accesorios y piezas especiales. Fijación del material auxiliar para montaje y suje-
+ción a la obra. Montaje, conexionado y comprobación de su correcto funcionamiento. Realización de
+pruebas de servicio.
+Criterio de medición de proyecto: Longitud proyectada, según documentación gráfica de Proyecto,
+medida entre los ejes de los elementos o de los puntos a conectar, sin descontar las piezas especia-
+les.
+Criterio de medición de obra: Se medirá la longitud realmente ejecutada según especificaciones de
+Proyecto.
+1    18,00    18,00
+_______________________________________________________
+18,00    4,15    74,70
+08CVW00011    u VISERA PROTEC. 900x350 mm EQ. VENTILACION-EXTRACCIÓN CABINA
+Visera protección para equipos de ventilación o extracción en cabina montados en exterior, construi-
+das en chapa de acero galvanizada, inclinada 30º y con tela metálica antipajaros, con unas dimen-
+siones de 900x350 mm, preparados para acoplar a impulsión o aspiración, incluso pequeño material.
+Medida la cantidad ejecutada.
+1    1,00
+_______________________________________________________
+1,00    19,99    19,99
+_______________
+TOTAL CAPÍTULO C17 VENTILACIÓN........................................................................................................    2.197,91
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página32
+
+--- PAGE 33 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C18 CONTROL DE CALIDAD Y ENSAYOS
+CC    u CONTROL DE CALIDAD
+La valoración del control de calidad, según documento de control de calidad, normativa vigente e ins-
+trucciones de la D.F.
+1    1,00
+_______________________________________________________
+1,00    422,65    422,65
+_______________
+TOTAL CAPÍTULO C18 CONTROL DE CALIDAD Y ENSAYOS................................................................    422,65
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página33
+
+--- PAGE 34 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C19 GESTIÓN DE RESIDUOS
+GRSJIEJS    ud    GESTIÓN DE RESIDUOS
+Gestión de residuos de vivienda unifamiliar a ejecutar según documentación de proyecto.
+1    1,00
+_______________________________________________________
+1,00    426,92    426,92
+_______________
+TOTAL CAPÍTULO C19 GESTIÓN DE RESIDUOS......................................................................................    426,92
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página34
+
+--- PAGE 35 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+CAPÍTULO C20 SEGURIDAD Y SALUD
+SUBCAPÍTULO 001 Instalaciones de salubridad
+E28PF020    ud    Extinto polvo abc
+Extintor de polvo químico ABC polivalente antibrasa de eficacia 34A/144B, de 9 kg. de agente extin-
+tor, con soporte, manómetro comprobable y manguera con difusor, según norma EN-3:1996. Medi-
+da la unidad instalada. s/ R.D. 486/97.
+1    1,00
+_______________________________________________________
+1,00    0,53    0,53
+_______________
+TOTAL SUBCAPÍTULO 001 Instalaciones de salubridad .....    0,53
+SUBCAPÍTULO 002 Señalización
+19SSA00041    ml Cordón de balizamiento reflectante
+Cordón de balizamiento reflectante, sobre soporte de acero de diámetro 10 mm, incluso colocación
+de acuerdo con las especificaciones y modelos del R.D. 485/97. Medida la longitud ejecutada.
+1    50,00    50,00
+_______________________________________________________
+50,00    0,63    31,50
+19SSA00100    m2    Cerramiento provisional de obra
+Cerramiento provisional de obra, realizado con postes cada 3 m de perfiles tubulares galvanizados
+de 50 mm de diám. interior, panel rígido de malla galvanizada y p.p. de piezas prefabricadas de hor-
+migón moldeado para apoyo y alojamiento de postes y ayudas de albañilería. Medida la superficie
+ejecutada.
+fachada principal    1    30,00    2,00    60,00
+_______________________________________________________
+60,00    0,18    10,80
+19SSS90301    ud    Señales indicadoras
+Señal de seguridad PVC 2 mm tipo señales indicadoras de 30x30 cm con soporte de 50 mm de diá-
+metro, incluso colocación y p.p. de desmontaje de acuerdo con R.D. 485/97. Medida la unidad eje-
+cutada.
+1    1,00
+_______________________________________________________
+1,00    0,63    0,63
+_______________
+TOTAL SUBCAPÍTULO 002 Señalización................................    42,93
+SUBCAPÍTULO 003 Protecciones colectivas
+D41GA001    m2    Red horizontal protección de huecos
+M2. Red horizontal para protección de huecos de poliamida de hilo de D=4 mm. y malla de 75x75
+mm. incluso colocación y desmontado.
+1    5,00    5,00
+_______________________________________________________
+5,00    2,06    10,30
+D41GA310    ud    Tapa provisional para arqueta
+Ud. Tapa provisional para arquetas, huecos de forjado o asimilables, formada mediante tablones de
+madera de 20x5 cm. armados mediante clavazón, incluso colocación (amortización en dos puestas).
+10    10,00
+_______________________________________________________
+10,00    0,12    1,20
+19SCB00001    ml Barandilla de protección de borde
+Barandilla resistente de protección de 0,90 m de altura, formada por: soportes metálicos sistema mor-
+daza en borde, pasamanos, protección intermedia y rodapié de 0,20 m, de madera de pino en tablon-
+cillo, incluso desmontado, p.p. de pequeño material y mantenimiento. según R.D. 1627/97. Medida
+la longitud ejecutada.
+1    120,00    120,00
+_______________________________________________________
+120,00    1,94    232,80
+19SCR90040    m2    Protección encofrado red horizontal
+Protección en ejecución de encofrado de forjado con red de seguridad de poliamida (HT) de 4 mm y
+luz de malla 10x10 cm, horizontal fijada a los puntales del encofrado de 1 m de calle, incluso p.p. de
+ganchos y cuerdas de sujección, desmontaje y mantenimiento, según R.D. 1627/97. Medida la su-
+perficie protegida.
+techo de baja    1    120,00    120,00
+_______________________________________________________
+120,00    0,65    78,00
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página35
+
+--- PAGE 36 ---
+PRESUPUESTO Y MEDICIONES
+CÓDIGO    RESUMEN    UDS LONGITUD ANCHURA ALTURA PARCIALES CANTIDAD    PRECIO    IMPORTE
+_____________________________________________________________________________________________________________________________________________
+F04AB610    ud    Colocación punto de anclaje en cubierta
+Colocación de punto de anclaje fijo en cubierta inclinada mediante recibido, tacos químicos, tacos de
+barra de acero inoxidable o tornillería. Medida la unidad instalada. Certificado CE EN 795. s/R.D.
+773/97 y R.D. 1407/92. I/p.p. de medios auxiliares.
+Nota: Estos anclajes servirán para el futuro mantenimiento de las cubiertas.
+azotea    2    2,00
+_______________________________________________________
+2,00    2,43    4,86
+_______________
+TOTAL SUBCAPÍTULO 003 Protecciones colectivas............    327,16
+SUBCAPÍTULO 004 Protecciones individuales
+YIX010    ud    Conjunto de equipos de protección individual
+Conjunto de equipos de protección individual necesarios para los trabajadores de la contrata principal,
+subcontratas y trabajadores autónomos durante la duración de la ejecución de la obra, para el cumpli-
+miento de la normativa vigente en materia de Seguridad y Salud en el Trabajo.
+1    1,00
+_______________________________________________________
+1,00    12,00    12,00
+_______________
+TOTAL SUBCAPÍTULO 004 Protecciones individuales ........    12,00
+____________
+TOTAL CAPÍTULO C20 SEGURIDAD Y SALUD.........................................................................................    382,62
+____________
+TOTAL..............................................................................................................................................................    96.337,89
+______________________________________________________________________________________________
+23 de diciembre de 2025
+Página36

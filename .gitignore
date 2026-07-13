@@ -1,0 +1,21 @@
+node_modules/
+.next/
+dist/
+.env
+.env.local
+*.log
+.DS_Store
+
+# Credenciales / secretos (NO subir NUNCA)
+google-vision-key.json
+*-credentials.json
+backend/construgest-web-*.json
+backend/*service-account*.json
+*.p12
+*.pem
+
+# Datos locales de MariaDB (volumen Docker)
+database/data/
+
+# Claude worktrees locales
+.claude/worktrees/

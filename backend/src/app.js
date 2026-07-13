@@ -1,0 +1,138 @@
+import 'dotenv/config'
+import express from 'express'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
+
+// Route imports
+import authRoutes from './routes/auth.js'
+import projectRoutes from './routes/projects.js'
+import budgetRoutes from './routes/budgets.js'
+import certificationRoutes from './routes/certifications.js'
+import expenseRoutes from './routes/expenses.js'
+import materialRoutes from './routes/materials.js'
+import planRoutes from './routes/plans.js'
+import aiRoutes from './routes/ai.js'
+import libraryRoutes from './routes/library.js'
+import suppliersRoutes from './routes/suppliers.js'
+import settingsRoutes from './routes/settings.js'
+import workLogRoutes from './routes/workLogs.js'
+import supplierMaterialRoutes from './routes/supplierMaterials.js'
+import workersRoutes from './routes/workers.js'
+import equipmentCatalogRoutes from './routes/equipmentCatalog.js'
+import subcontractorsRoutes from './routes/subcontractors.js'
+import adminRoutes from './routes/admin.js'
+import branchRoutes from './routes/branches.js'
+import mailboxRoutes from './routes/mailbox.js'
+import notificationRoutes from './routes/notifications.js'
+import ferrappRoutes from './routes/ferrapp.js'
+
+const app = express()
+const PORT = process.env.PORT || 5000
+
+// CORS - manual implementation for Express 5 compatibility
+const ALLOWED_ORIGINS = [
+  'https://construgest-web.vercel.app',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL,
+].filter(Boolean)
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+  } else if (origin) {
+    // Allow any vercel preview deploys
+    if (origin.endsWith('.vercel.app') || origin.startsWith('http://localhost')) {
+      res.setHeader('Access-Control-Allow-Origin', origin)
+    }
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
+  res.setHeader('Access-Control-Expose-Headers', 'X-Renewed-Token')
+  res.setHeader('Access-Control-Max-Age', '86400')
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end()
+  }
+  next()
+})
+app.use(express.json({ limit: '50mb' }))
+
+// Security headers (cross-origin policies relajadas: permitimos llamadas
+// desde frontends en otros dominios — el control real lo hace CORS arriba).
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  crossOriginOpenerPolicy: false,
+  contentSecurityPolicy: false,
+}))
+
+// Detrás de Render/Vercel hay proxy, así que confiamos en la cadena de IPs
+// para que el rate limiter use la IP del cliente y no la del proxy.
+app.set('trust proxy', 1)
+
+// Rate limit global: protege la API entera. Ventana de 1 min, 300 req/IP.
+// Un dashboard activo cabe holgado. Ajustar si vemos falsos positivos.
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 300,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones. Intenta de nuevo en un minuto.' },
+})
+app.use('/api/', globalLimiter)
+
+// Rate limit más estricto para IA: cada llamada cuesta. 30 req/min/IP.
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Has alcanzado el límite de peticiones a IA. Espera un minuto.' },
+})
+
+// Health check
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', service: 'construgest-api' })
+})
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// Routes
+app.use('/api/auth', authRoutes)
+app.use('/api/projects', projectRoutes)
+app.use('/api/budgets', budgetRoutes)
+app.use('/api/certifications', certificationRoutes)
+app.use('/api/expenses', expenseRoutes)
+app.use('/api/materials', materialRoutes)
+app.use('/api/plans', planRoutes)
+app.use('/api/ai', aiLimiter, aiRoutes)
+app.use('/api/library', libraryRoutes)
+app.use('/api/suppliers', suppliersRoutes)
+app.use('/api/settings', settingsRoutes)
+app.use('/api/work-logs', workLogRoutes)
+app.use('/api/supplier-materials', supplierMaterialRoutes)
+app.use('/api/workers', workersRoutes)
+app.use('/api/equipment-catalog', equipmentCatalogRoutes)
+app.use('/api/subcontractors', subcontractorsRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/branches', branchRoutes)
+app.use('/api/mailbox', mailboxRoutes)
+app.use('/api/notifications', notificationRoutes)
+app.use('/api/ferrapp', ferrappRoutes)
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('Error:', err.message)
+  res.status(err.status || 500).json({
+    error: err.message || 'Error interno del servidor',
+  })
+})
+
+app.listen(PORT, () => {
+  console.log(`ConstruGest API running on port ${PORT}`)
+})
+
+export default app

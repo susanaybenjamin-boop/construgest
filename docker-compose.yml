@@ -1,0 +1,66 @@
+# ============================================================================
+# Entorno de desarrollo local de Construgest.
+#   - mariadb : la base de datos local (puerto 3308 en tu PC, para no chocar
+#               con el 3307 de Benjagest). DBeaver se conecta aquí.
+#   - backend : la API Node/Express en un contenedor (puerto 5000).
+#
+# Arrancar:   docker compose up -d
+# Ver estado: docker compose ps
+# Logs:       docker compose logs -f backend
+# Parar:      docker compose down          (los datos de la BD se conservan)
+# Borrar BD:  docker compose down -v        (¡borra el volumen de datos!)
+#
+# NOTA: de momento el backend sigue hablando con Supabase (nube) usando su
+# backend/.env. Esto es para dejar el entorno Docker montado y probado. En la
+# FASE 2 apuntaremos el backend a la MariaDB de aquí (servicio "mariadb").
+# Credenciales de MariaDB = solo desarrollo local, no son secretos de producción.
+# ============================================================================
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    container_name: construgest-mariadb
+    restart: unless-stopped
+    ports:
+      - "3308:3306"          # host 3308  ->  contenedor 3306
+    environment:
+      MARIADB_ROOT_PASSWORD: construgest_root
+      MARIADB_DATABASE: construgest
+      MARIADB_USER: construgest
+      MARIADB_PASSWORD: construgest
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      # Todo .sql que dejemos en database/init/ se ejecuta SOLO la primera vez
+      # que se crea el volumen (aquí cargaremos schema.mariadb.sql en la Fase 1).
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: construgest-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./backend/.env         # Supabase + claves de IA (por ahora)
+    environment:
+      # Preparado para la Fase 2 (aún no se usa): cómo llegar a la MariaDB de arriba.
+      # Dentro de la red de Docker el host de la BD es el nombre del servicio: "mariadb".
+      DB_HOST: mariadb
+      DB_PORT: "3306"
+      DB_NAME: construgest
+      DB_USER: construgest
+      DB_PASSWORD: construgest
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+volumes:
+  mariadb_data:

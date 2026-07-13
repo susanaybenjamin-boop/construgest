@@ -1,0 +1,280 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Ferrapp custom theme colors */
+@theme inline {
+  --color-surface: #1e293b;
+  --color-surface-light: #334155;
+  --color-accent: #f59e0b;
+  --color-accent-dark: #d97706;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+}
+
+/* Override shared CSS vars inside ferrapp scope for dark theme */
+.ferrapp-theme {
+  --background: 222.2 84% 4.9%;
+  --foreground: 214 32% 91%;
+  --border: 215 25% 35%;
+}
+
+.ferrapp-theme input[type="number"]::-webkit-inner-spin-button,
+.ferrapp-theme input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  --radius: 0.5rem;
+  --success: 142.1 76.2% 36.3%;
+  --warning: 38 92% 50%;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  /* Card y popover un pelin mas claros que background para que los paneles
+     (bg-white en codigo) destaquen en modo oscuro en vez de fundirse con el
+     fondo. Antes tenian el mismo valor que background y las partidas
+     expandidas parecian un bloque plano. */
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217.2 91.2% 59.8%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217.2 32.6% 17.5%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  /* Texto secundario/meta: subimos el brillo de 65% a 78% para que labels
+     pequenos (11px) como "Pendiente", "Certif.", descripciones en preview
+     y placeholders se lean bien sobre fondo oscuro. El valor anterior
+     pasaba AA pero resultaba dificil de leer en tipografia pequena. */
+  --muted-foreground: 215 20% 78%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 224.3 76.3% 48%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ── Global button styles ── */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+button:not(:disabled):focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* ── Rich Text Editor (Tiptap) ── */
+.rich-editor-content .tiptap {
+  min-height: 200px;
+  padding: 12px 16px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.6;
+  color: hsl(var(--foreground));
+}
+
+.rich-editor-content .tiptap p {
+  margin: 0.25em 0;
+}
+
+.rich-editor-content .tiptap h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0.5em 0 0.25em;
+  color: hsl(var(--foreground));
+}
+
+.rich-editor-content .tiptap h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+  color: hsl(var(--foreground) / 0.9);
+}
+
+.rich-editor-content .tiptap h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.4em 0 0.2em;
+  color: hsl(var(--foreground) / 0.8);
+}
+
+.rich-editor-content .tiptap ul {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin: 0.25em 0;
+}
+
+.rich-editor-content .tiptap ol {
+  list-style: decimal;
+  padding-left: 1.5em;
+  margin: 0.25em 0;
+}
+
+.rich-editor-content .tiptap li {
+  margin: 0.1em 0;
+}
+
+.rich-editor-content .tiptap mark {
+  background-color: hsl(var(--warning) / 0.3);
+  color: hsl(var(--foreground));
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.rich-editor-content .tiptap u {
+  text-decoration: underline;
+}
+
+.rich-editor-content .tiptap s {
+  text-decoration: line-through;
+}
+
+/* Placeholder via Tiptap's empty state */
+.rich-editor-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+
+/* ── Dark mode safety-net ──
+   Mapea utilidades Tailwind claras más usadas a variables CSS en modo oscuro.
+   Cubre ~85% de la app sin editar componentes. */
+.dark { color-scheme: dark; }
+
+/* Fondos */
+.dark .bg-white        { background-color: hsl(var(--card)); }
+.dark .bg-gray-50,
+.dark .bg-gray-100     { background-color: hsl(var(--muted)); }
+.dark .bg-gray-200     { background-color: hsl(var(--secondary)); }
+.dark .bg-slate-50,
+.dark .bg-slate-100    { background-color: hsl(var(--muted)); }
+
+/* Textos */
+.dark .text-black,
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-slate-900  { color: hsl(var(--foreground)); }
+.dark .text-gray-700,
+.dark .text-gray-600   { color: hsl(var(--foreground) / 0.85); }
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-slate-500  { color: hsl(var(--muted-foreground)); }
+
+/* Bordes, divide y ring */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-slate-200 { border-color: hsl(var(--border)); }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: hsl(var(--border)); }
+.dark .ring-gray-200   { --tw-ring-color: hsl(var(--border)); }
+
+/* Hover comunes */
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover { background-color: hsl(var(--accent)); }
+
+/* Selects nativos: los <option> no heredan los estilos del safety-net,
+   hay que forzarles background y color en oscuro. */
+.dark select,
+.dark select option,
+.dark select optgroup {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+.dark select option:checked,
+.dark select option:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* Inputs: asegurar texto legible y placeholder visible en oscuro */
+.dark input,
+.dark textarea {
+  color: hsl(var(--foreground));
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Datalist options (autocomplete del navegador) */
+.dark datalist option {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+
+/* Ferrapp ya se diseña oscuro con colores propios (text-black sobre fondos ámbar, etc.).
+   Restauramos los literales cuando el safety-net los convertiría en ilegibles. */
+.dark .ferrapp-theme .text-black,
+.dark .ferrapp-theme.text-black { color: #000; }
+.dark .ferrapp-theme .bg-white,
+.dark .ferrapp-theme.bg-white { background-color: #fff; }
+
+/* Escape hatch: mantener un subárbol en claro (visor PDF, planos, firmas) */
+.dark .theme-light-locked,
+.dark .theme-light-locked * { color-scheme: light; }
+.dark .theme-light-locked .bg-white { background-color: #fff; }
+.dark .theme-light-locked .text-black,
+.dark .theme-light-locked .text-gray-900 { color: #000; }
+.dark .theme-light-locked .text-gray-800 { color: #1f2937; }
+.dark .theme-light-locked .text-gray-700 { color: #374151; }
+.dark .theme-light-locked .text-gray-600 { color: #4b5563; }
+.dark .theme-light-locked .text-gray-500 { color: #6b7280; }
+.dark .theme-light-locked .text-gray-400 { color: #9ca3af; }
+.dark .theme-light-locked .bg-gray-50 { background-color: #f9fafb; }
+.dark .theme-light-locked .bg-gray-100 { background-color: #f3f4f6; }
+.dark .theme-light-locked .bg-gray-200 { background-color: #e5e7eb; }
+.dark .theme-light-locked .border-gray-100 { border-color: #f3f4f6; }
+.dark .theme-light-locked .border-gray-200 { border-color: #e5e7eb; }
+.dark .theme-light-locked .border-gray-300 { border-color: #d1d5db; }

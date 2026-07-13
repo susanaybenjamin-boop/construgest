@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="102" fill="#2563eb"/>
+  <g fill="white">
+    <rect x="102" y="130" width="134" height="255" rx="8"/>
+    <rect x="276" y="80" width="134" height="305" rx="8"/>
+    <rect x="122" y="152" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="182" y="152" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="122" y="210" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="182" y="210" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="122" y="268" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="182" y="268" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="296" y="102" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="356" y="102" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="296" y="160" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="356" y="160" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="296" y="218" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="356" y="218" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="296" y="276" width="32" height="38" rx="4" fill="#2563eb"/>
+    <rect x="356" y="276" width="32" height="38" rx="4" fill="#2563eb"/>
+  </g>
+  <text x="256" y="452" fill="white" font-family="Arial,sans-serif" font-weight="bold" font-size="70" text-anchor="middle">CG</text>
+</svg>
