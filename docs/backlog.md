@@ -10,14 +10,18 @@
 > - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
 >   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **PRÓXIMA SESIÓN — empezar por aquí (FASE 2):**
+> **FASE 2 EN CURSO.** DATA-0 (shim mysql2 compatible con Supabase) + DATA-1 (`auth.js`
+> migrado a MariaDB) HECHOS y verificados con curl (login/register/me). El shim está en
+> `backend/src/db/local.js`; migrar una ruta = cambiar su import a `../db/local.js`.
+>
+> **PRÓXIMA SESIÓN — empezar por aquí:**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
-> 2. **DATA-0:** crear el cliente MariaDB (`mysql2`) en `backend/src/db/` + un ayudante que
->    imite el patrón de consulta que hoy usa Supabase (para migrar las 588 llamadas sin
->    reescribir cada una a mano). Apuntar el backend a la MariaDB local (ya tiene las envs
->    DB_HOST=mariadb… en docker-compose).
-> 3. **DATA-n:** migrar la primera ruta (empezar por `auth.js`, es pequeña y clave) y
->    VERIFICAR el login real con `curl` contra el backend. Una ruta = un slice = un commit.
+>    Tras editar código del backend: `docker compose up -d --build backend` (rebuild rápido).
+> 2. **DATA-2:** migrar la siguiente ruta (p.ej. `settings.js` o `projects.js`), cambiando su
+>    import a `../db/local.js` y **ampliando el shim** según los operadores que use (posibles:
+>    `.order`, `.in`, `.or`, selects anidados `tabla(...)`). VERIFICAR con curl. Un slice = un commit.
+> 3. Ojo: rutas que usan `.rpc()` (equipmentCatalog, subcontractors, workers) o `.storage`
+>    (expenses, mailbox) necesitarán ampliar el shim / reimplementar las RPC en Node.
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -62,10 +66,17 @@ prefijo (ver `CLAUDE.md` §6).
 
 **➡️ FASE 1 COMPLETA.** Merge `feat/benjamin` → `develop`.
 
-### `[ ]` FASE 2 — Capa de datos MariaDB (backend), ruta por ruta
-- `[ ]` **DATA-0** cliente MariaDB (`mysql2`) + ayudante para no reescribir 588 llamadas a mano.
-- `[ ]` **DATA-n** migrar cada ruta de `backend/src/routes/` (una por slice), verificando con `curl`.
-- `[ ]` reimplementar las 25 funciones RPC en Node.
+### `[~]` FASE 2 — Capa de datos MariaDB (backend), ruta por ruta
+- `[x]` **DATA-0** cliente `mysql2` (`backend/src/db/mariadb.js`, pool con typeCast TINYINT→bool y
+  timezone UTC) + **shim compatible con Supabase** (`backend/src/db/local.js`): `.from/.select/
+  .insert/.update/.delete/.eq/.neq/.gt/.gte/.lt/.lte/.is/.in/.like/.ilike/.order/.limit/.single/
+  .maybeSingle`, awaitable, devuelve `{data,error}`, insert/update+select vía RETURNING. Migrar
+  = cambiar el import de una ruta a `../db/local.js` (sin reescribir llamadas).
+- `[x]` **DATA-1** `auth.js` migrado y VERIFICADO con curl: login OK/401/401, register 201
+  (INSERT RETURNING), /me 200. (Shim aún NO soporta: selects anidados `tabla(...)`, `.or()`,
+  `.rpc()`, `.storage` → se amplían cuando una ruta lo pida.)
+- `[ ]` **DATA-n** migrar el resto de rutas (una por slice), ampliando el shim según haga falta,
+  verificando cada una con `curl`. Reimplementar las 25 funciones RPC en Node cuando toquen.
 
 ### `[ ]` FASE 3 — Storage y Realtime locales
 - `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).
