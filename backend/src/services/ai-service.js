@@ -498,6 +498,50 @@ async function tryGemini(genAI, textPrompt, images, options) {
   throw new Error('Ningún modelo Gemini disponible')
 }
 
+// ── Proveedor LOCAL: Ollama (100% local, sin internet) ──
+// El backend corre en Docker; Ollama corre en el host -> host.docker.internal.
+// Configurable por env: OLLAMA_HOST / OLLAMA_MODEL.
+const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://host.docker.internal:11434'
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b'
+
+async function tryLocal(textPrompt, imageFiles, options) {
+  const model = options.localModel || OLLAMA_MODEL
+  const body = {
+    model,
+    prompt: textPrompt,
+    stream: false,
+    // OJO: NO usar format:'json' aquí. Fuerza a Ollama a un ÚNICO objeto JSON y las
+    // skills que devuelven ARRAY (extract-materials, suggest-optimizations, ...) se
+    // colapsan a un solo elemento. Las skills ya piden el JSON en el prompt y
+    // parseAIResponse() lo extrae/repara (igual que con la nube). La fiabilidad por
+    // esquema (structured outputs por skill) se abordará en AI-2.
+    options: {
+      temperature: options.temperature ?? 0.1,
+      num_ctx: options.numCtx || 8192,
+    },
+  }
+  // Ollama admite imágenes base64 SOLO en modelos de visión. qwen2.5:3b es
+  // solo-texto y las ignora; el OCR con visión local se aborda en AI-3.
+  if (imageFiles && imageFiles.length > 0) {
+    body.images = imageFiles.map((i) => i.data)
+  }
+
+  const res = await fetch(`${OLLAMA_HOST}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
+  const data = await res.json()
+  const result = parseAIResponse(data.response || '')
+  result.__usage = {
+    provider: 'local', model,
+    inputTokens: data.prompt_eval_count || 0,
+    outputTokens: data.eval_count || 0,
+  }
+  return result
+}
+
 /**
  * Call AI with multi-provider fallback
  * options.organizationId: if provided, fetches org-specific keys from DB
@@ -516,53 +560,68 @@ export async function callAI(prompt, options = {}) {
     }
   }
 
-  // Check if user has AI enabled
-  if (options.userId) {
-    const { data: userData } = await supabase
-      .from('cons_users')
-      .select('ai_enabled')
-      .eq('id', options.userId)
-      .single()
-    if (userData && userData.ai_enabled === false) {
-      throw new Error('Tu acceso a IA está desactivado. Contacta al administrador.')
+  // ── Orden de proveedores. Por defecto **100% LOCAL** (Ollama). Configurable con
+  //    AI_PROVIDER_ORDER (p.ej. "local" | "local,anthropic" | "anthropic,groq,gemini").
+  const providerOrder = options.providerOrder
+    || (process.env.AI_PROVIDER_ORDER
+        ? process.env.AI_PROVIDER_ORDER.split(',').map((s) => s.trim()).filter(Boolean)
+        : ['local'])
+  // Modo 100% local: NO se toca Supabase (claves/cuotas/pricing/logging). La nube
+  // queda como red de seguridad detrás de este flag hasta borrarla (AI-5).
+  const localOnly = providerOrder.every((p) => p === 'local')
+
+  let anthropic = null, groq = null, genAI = null, sources = {}, keySource = 'own'
+  if (!localOnly) {
+    // Check if user has AI enabled
+    if (options.userId) {
+      const { data: userData } = await supabase
+        .from('cons_users')
+        .select('ai_enabled')
+        .eq('id', options.userId)
+        .single()
+      if (userData && userData.ai_enabled === false) {
+        throw new Error('Tu acceso a IA está desactivado. Contacta al administrador.')
+      }
     }
-  }
 
-  // MCP: Check quota before calling AI
-  if (options.organizationId) {
-    const quotaCheck = await mcpTracker.checkQuota({
-      orgId: options.organizationId,
-      userId: options.userId || null
-    })
-    if (!quotaCheck.allowed) {
-      const reason = quotaCheck.reason === 'daily_limit'
-        ? `Has alcanzado tu límite de ${quotaCheck.limit} consultas diarias.`
-        : quotaCheck.reason === 'monthly_limit'
-        ? `Has alcanzado tu límite de ${quotaCheck.limit} consultas mensuales.`
-        : quotaCheck.reason === 'ai_disabled'
-        ? 'El servicio de IA está desactivado para tu organización.'
-        : 'Límite de IA alcanzado.'
-      throw new Error(reason)
+    // MCP: Check quota before calling AI
+    if (options.organizationId) {
+      const quotaCheck = await mcpTracker.checkQuota({
+        orgId: options.organizationId,
+        userId: options.userId || null
+      })
+      if (!quotaCheck.allowed) {
+        const reason = quotaCheck.reason === 'daily_limit'
+          ? `Has alcanzado tu límite de ${quotaCheck.limit} consultas diarias.`
+          : quotaCheck.reason === 'monthly_limit'
+          ? `Has alcanzado tu límite de ${quotaCheck.limit} consultas mensuales.`
+          : quotaCheck.reason === 'ai_disabled'
+          ? 'El servicio de IA está desactivado para tu organización.'
+          : 'Límite de IA alcanzado.'
+        throw new Error(reason)
+      }
     }
-  }
 
-  let orgKeys = await getKeysForOrg(options.organizationId)
-  let keySource = 'own'
-
-  // If org has no keys, try master org keys
-  const hasOrgKeys = orgKeys.anthropic_api_key || orgKeys.groq_api_key || orgKeys.gemini_api_key
-  if (!hasOrgKeys) {
-    const masterKeys = await getMasterOrgKeys()
-    if (masterKeys.anthropic_api_key || masterKeys.groq_api_key || masterKeys.gemini_api_key) {
-      orgKeys = { ...masterKeys, ...orgKeys } // preserve any enabled/disabled flags from org
-      keySource = 'master'
+    let orgKeys = await getKeysForOrg(options.organizationId)
+    // If org has no keys, try master org keys
+    const hasOrgKeys = orgKeys.anthropic_api_key || orgKeys.groq_api_key || orgKeys.gemini_api_key
+    if (!hasOrgKeys) {
+      const masterKeys = await getMasterOrgKeys()
+      if (masterKeys.anthropic_api_key || masterKeys.groq_api_key || masterKeys.gemini_api_key) {
+        orgKeys = { ...masterKeys, ...orgKeys } // preserve any enabled/disabled flags from org
+        keySource = 'master'
+      }
     }
+
+    const clients = getClients(orgKeys, keySource)
+    anthropic = clients.anthropic
+    groq = clients.groq
+    genAI = clients.genAI
+    sources = clients.sources
+
+    // Auto-refresh pricing if stale (fire-and-forget, non-blocking on error)
+    refreshPricingIfNeeded(genAI).catch(() => {})
   }
-
-  const { anthropic, groq, genAI, sources } = getClients(orgKeys, keySource)
-
-  // Auto-refresh pricing if stale (fire-and-forget, non-blocking on error)
-  refreshPricingIfNeeded(genAI).catch(() => {})
 
   const errors = []
 
@@ -575,9 +634,12 @@ export async function callAI(prompt, options = {}) {
   const pdfDocs = images.filter(i => i.mimeType === 'application/pdf')
   const imageFiles = images.filter(i => i.mimeType !== 'application/pdf')
 
-  const providerOrder = options.providerOrder || ['anthropic', 'groq', 'gemini']
-
   const providers = {
+    local: {
+      client: true,
+      fn: () => tryLocal(textPrompt, imageFiles, options),
+      skipReason: null,   // Ollama no necesita clave; el OCR con visión llega en AI-3
+    },
     anthropic: {
       client: anthropic,
       fn: () => tryAnthropic(anthropic, textPrompt, images, pdfDocs, imageFiles, options),
@@ -606,18 +668,21 @@ export async function callAI(prompt, options = {}) {
 
     try {
       const result = await provider.fn()
-      // Log consumption (fire-and-forget)
+      // Log consumption (fire-and-forget). El proveedor LOCAL es gratis y offline:
+      // no se registra consumo ni se toca Supabase.
       if (result.__usage) {
-        logAIConsumption({
-          organizationId: options.organizationId,
-          userId: options.userId,
-          provider: result.__usage.provider,
-          model: result.__usage.model,
-          inputTokens: result.__usage.inputTokens,
-          outputTokens: result.__usage.outputTokens,
-          keySource: sources[providerName] || keySource,
-          operation: options.operation || 'unknown',
-        })
+        if (providerName !== 'local') {
+          logAIConsumption({
+            organizationId: options.organizationId,
+            userId: options.userId,
+            provider: result.__usage.provider,
+            model: result.__usage.model,
+            inputTokens: result.__usage.inputTokens,
+            outputTokens: result.__usage.outputTokens,
+            keySource: sources[providerName] || keySource,
+            operation: options.operation || 'unknown',
+          })
+        }
         delete result.__usage
       }
       // Guardar en cache para deduplicar llamadas repetidas. No cacheamos
