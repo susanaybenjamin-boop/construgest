@@ -86,8 +86,19 @@ prefijo (ver `CLAUDE.md` §6).
       objetos/arrays → JSON. (Antes petaba `Incorrect datetime value`.)
   Nota: `authMiddleware` es solo-JWT (no toca BD); las funciones de acceso a proyecto de
   `middlewares/auth.js` SÍ usan Supabase y habrá que migrarlas al tocar budgets/workLogs/etc.
-- `[ ]` **DATA-n** migrar el resto de rutas (una por slice), ampliando el shim según haga falta,
-  verificando cada una con `curl`. Reimplementar las 25 funciones RPC en Node cuando toquen.
+- `[x]` **DATA-3 (oleada 1)** migradas: `notifications`, `plans`, `ferrapp`, `admin`, `branches`,
+  `library`, `budgets` + las funciones de acceso a proyecto de `middlewares/auth.js`. Shim
+  ampliado con `.upsert` (INSERT..ON DUPLICATE KEY UPDATE), `.or('col.op.val,...')` y
+  `.not(col,'is',null)`. VERIFICADO: endpoints de lectura 200; `.or` (branches invitations,
+  library search), `.upsert` (etiquetas ferrapp), `.not` (library chapters). budgets/plans:
+  la capa de acceso ya va a MariaDB (403 correcto sin proyecto); falta seed de proyecto/
+  presupuesto para verificar sus DATOS a fondo.
+- `[ ]` **DATA-n** rutas pendientes por dificultad:
+    · **Storage** (ficheros→disco): `settings`, `projects`, `expenses`, `mailbox`.
+    · **Selects anidados** `tabla(...)` (implementar en shim o reescribir): `materials`,
+      `workLogs`, `certifications`, `supplierMaterials`, `equipmentCatalog`.
+    · **RPC** (reimplementar 25 funciones en Node): `equipmentCatalog`, `subcontractors`, `workers`.
+    · Revisar `ai.js` (usa `services/mcp-ai-tracker.js`, que aún va a Supabase).
 
 ### `[ ]` FASE 3 — Storage y Realtime locales
 - `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).

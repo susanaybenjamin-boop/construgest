@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware, projectAccessMiddleware, budgetAccessMiddleware, comparisonAccessMiddleware, comparisonGroupAccessMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 import { notifyBudgetChange, notifyProjectsChange } from '../services/realtimeBroadcast.js'
 import {
   computeSuggestions,

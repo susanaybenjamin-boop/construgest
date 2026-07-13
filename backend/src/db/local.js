@@ -1,30 +1,27 @@
 // ============================================================================
 // Ayudante que IMITA la API del query-builder de Supabase sobre MariaDB (mysql2).
 // Objetivo: migrar las rutas cambiando solo el import, sin reescribir a mano las
-// ~588 llamadas `.from().select().eq()...`. Devuelve siempre { data, error },
-// igual que @supabase/supabase-js.
+// ~588 llamadas. Devuelve siempre { data, error }, igual que @supabase/supabase-js.
 //
-// Soportado (se irá ampliando ruta a ruta, según haga falta — Fase 2):
+// Soportado:
 //   .from(tabla)
-//   .select(cols) .insert(obj|obj[]) .update(obj) .delete()
-//   .eq .neq .gt .gte .lt .lte .is .in .like .ilike
+//   .select(cols) .insert(obj|obj[]) .update(obj) .delete() .upsert(obj|obj[],{onConflict})
+//   .eq .neq .gt .gte .lt .lte .is .in .like .ilike .or('col.op.val,col.op.val')
 //   .order(col,{ascending}) .limit(n) .single() .maybeSingle()
-//   insert/update/delete + .select(...) => usa RETURNING de MariaDB 10.5+
-// NO soportado aún (lanza error claro cuando una ruta lo necesite):
-//   selects anidados "tabla(...)", .or(), .rpc(), .storage
+//   insert/delete + .select() => RETURNING (MariaDB 10.5+)
+//   update/upsert + .select() => SELECT posterior (MariaDB no tiene UPDATE/ON DUP RETURNING)
+// NO soportado aún (lanza error claro): selects anidados "tabla(...)", .rpc(), .storage
 // ============================================================================
 import pool from './mariadb.js'
 
 const qi = (id) => '`' + String(id).replace(/`/g, '') + '`'
 
-// 'YYYY-MM-DD HH:MM:SS.mmm' en UTC (formato que acepta MariaDB DATETIME(3)).
 const toMariaDateTime = (d) => d.toISOString().slice(0, 23).replace('T', ' ')
 
 // Normaliza un valor JS al formato que espera MariaDB (mysql2 no lo hace solo):
-//  - Date o string ISO-8601 con hora ("...T..Z") -> DATETIME MariaDB en UTC.
-//    (Postgres/Supabase aceptaban ISO con 'T'/'Z'; MariaDB DATETIME no.)
+//  - Date/string ISO-8601 con hora ("...T..Z") -> DATETIME MariaDB en UTC.
 //  - objeto/array -> JSON string (para columnas JSON, antes jsonb/arrays).
-//  - resto (números, booleanos, 'YYYY-MM-DD', texto) -> sin tocar.
+//  - resto -> sin tocar.
 function normVal(v) {
   if (v === undefined || v === null) return null
   if (v instanceof Date) return toMariaDateTime(v)
@@ -36,13 +33,17 @@ function normVal(v) {
   return v
 }
 
+const OP_MAP = { eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=', like: 'LIKE', ilike: 'LIKE' }
+
 class Builder {
   constructor(table) {
     this.table = table
     this.op = 'select'
     this.cols = '*'
     this.filters = []
+    this.orClauses = []       // [{ frag, params }]
     this.values = null
+    this.onConflict = null
     this.orders = []
     this.lim = null
     this.single_ = false
@@ -51,13 +52,14 @@ class Builder {
   }
 
   select(cols = '*') {
-    if (this.op === 'insert' || this.op === 'update' || this.op === 'delete') this.returning = true
+    if (this.op === 'insert' || this.op === 'update' || this.op === 'delete' || this.op === 'upsert') this.returning = true
     this.cols = cols
     return this
   }
   insert(obj) { this.op = 'insert'; this.values = obj; return this }
   update(obj) { this.op = 'update'; this.values = obj; return this }
   delete() { this.op = 'delete'; return this }
+  upsert(obj, opts = {}) { this.op = 'upsert'; this.values = obj; this.onConflict = opts.onConflict || null; return this }
 
   eq(c, v) { this.filters.push([c, '=', v]); return this }
   neq(c, v) { this.filters.push([c, '<>', v]); return this }
@@ -66,9 +68,32 @@ class Builder {
   lt(c, v) { this.filters.push([c, '<', v]); return this }
   lte(c, v) { this.filters.push([c, '<=', v]); return this }
   is(c, v) { this.filters.push([c, v === null ? 'IS NULL' : '=', v]); return this }
+  not(c, op, v) {
+    if (op === 'is' && v === null) { this.filters.push([c, 'IS NOT NULL', null]); return this }
+    this.filters.push([c, 'NOT ' + (OP_MAP[op] || '='), v]); return this
+  }
   in(c, arr) { this.filters.push([c, 'IN', arr]); return this }
   like(c, p) { this.filters.push([c, 'LIKE', p]); return this }
-  ilike(c, p) { this.filters.push([c, 'LIKE', p]); return this } // collation _ci => ya es case-insensitive
+  ilike(c, p) { this.filters.push([c, 'LIKE', p]); return this } // collation _ci => case-insensitive
+
+  // Supabase .or('col.op.value,col.op.value') -> (col OP ? OR col OP ?)
+  or(str) {
+    const frags = []
+    const params = []
+    for (const term of str.split(',').map((t) => t.trim()).filter(Boolean)) {
+      const i1 = term.indexOf('.')
+      const i2 = term.indexOf('.', i1 + 1)
+      if (i1 < 0 || i2 < 0) continue
+      const col = term.slice(0, i1)
+      const op = term.slice(i1 + 1, i2)
+      let val = term.slice(i2 + 1)
+      if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1)
+      frags.push(`${qi(col)} ${OP_MAP[op] || '='} ?`)
+      params.push(normVal(val))
+    }
+    if (frags.length) this.orClauses.push({ frag: '(' + frags.join(' OR ') + ')', params })
+    return this
+  }
 
   order(c, opts = {}) { this.orders.push([c, opts.ascending === false ? 'DESC' : 'ASC']); return this }
   limit(n) { this.lim = n; return this }
@@ -76,9 +101,10 @@ class Builder {
   maybeSingle() { this.single_ = true; this.maybe = true; return this }
 
   _where(params) {
-    if (!this.filters.length) return ''
     const parts = this.filters.map(([c, op, v]) => {
       if (op === 'IS NULL') return `${qi(c)} IS NULL`
+      if (op === 'IS NOT NULL') return `${qi(c)} IS NOT NULL`
+      if (op.startsWith('NOT ')) { params.push(normVal(v)); return `NOT (${qi(c)} ${op.slice(4)} ?)` }
       if (op === 'IN') {
         if (!v.length) return '1=0'
         params.push(...v.map(normVal))
@@ -87,7 +113,15 @@ class Builder {
       params.push(normVal(v))
       return `${qi(c)} ${op} ?`
     })
-    return ' WHERE ' + parts.join(' AND ')
+    for (const oc of this.orClauses) { parts.push(oc.frag); params.push(...oc.params) }
+    return parts.length ? ' WHERE ' + parts.join(' AND ') : ''
+  }
+
+  _selectTail(sql) {
+    if (this.orders.length) sql += ' ORDER BY ' + this.orders.map(([c, d]) => `${qi(c)} ${d}`).join(', ')
+    if (this.lim != null) sql += ` LIMIT ${Number(this.lim)}`
+    else if (this.single_) sql += ' LIMIT 2'
+    return sql
   }
 
   _sql() {
@@ -97,24 +131,24 @@ class Builder {
     const params = []
     let sql
     if (this.op === 'select') {
-      sql = `SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params)
-      if (this.orders.length) sql += ' ORDER BY ' + this.orders.map(([c, d]) => `${qi(c)} ${d}`).join(', ')
-      if (this.lim != null) sql += ` LIMIT ${Number(this.lim)}`
-      else if (this.single_) sql += ' LIMIT 2' // para detectar >1 fila
-    } else if (this.op === 'insert') {
+      sql = this._selectTail(`SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params))
+    } else if (this.op === 'insert' || this.op === 'upsert') {
       const rows = Array.isArray(this.values) ? this.values : [this.values]
       const keys = Object.keys(rows[0])
       const ph = rows.map(() => `(${keys.map(() => '?').join(',')})`).join(', ')
       rows.forEach((r) => keys.forEach((k) => params.push(normVal(r[k]))))
       sql = `INSERT INTO ${qi(this.table)} (${keys.map(qi).join(', ')}) VALUES ${ph}`
-      if (this.returning) sql += ` RETURNING ${this.cols}`
+      if (this.op === 'upsert') {
+        sql += ' ON DUPLICATE KEY UPDATE ' + keys.map((k) => `${qi(k)} = VALUES(${qi(k)})`).join(', ')
+      } else if (this.returning) {
+        sql += ` RETURNING ${this.cols}`
+      }
     } else if (this.op === 'update') {
       const keys = Object.keys(this.values)
       sql = `UPDATE ${qi(this.table)} SET ` + keys.map((k) => `${qi(k)} = ?`).join(', ')
       keys.forEach((k) => params.push(normVal(this.values[k])))
       sql += this._where(params)
-      // OJO: MariaDB NO soporta UPDATE ... RETURNING (sí INSERT/DELETE). El
-      // .select() tras un update se resuelve con un SELECT posterior (ver exec()).
+      // MariaDB no soporta UPDATE...RETURNING -> el .select() se resuelve en exec() con un SELECT.
     } else if (this.op === 'delete') {
       sql = `DELETE FROM ${qi(this.table)}` + this._where(params)
       if (this.returning) sql += ` RETURNING ${this.cols}`
@@ -122,22 +156,27 @@ class Builder {
     return { sql, params }
   }
 
-  // SELECT de re-lectura (para update+select, ya que MariaDB no tiene UPDATE RETURNING).
+  // Re-lectura tras update/upsert (MariaDB no tiene RETURNING para esos casos).
   _reselectSql() {
     const params = []
-    let sql = `SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params)
-    if (this.lim != null) sql += ` LIMIT ${Number(this.lim)}`
-    else if (this.single_) sql += ' LIMIT 2'
-    return { sql, params }
+    if (this.op === 'upsert') {
+      // localizar por las columnas de conflicto (onConflict) o por id si está en el objeto
+      const obj = Array.isArray(this.values) ? this.values[0] : this.values
+      const keyCols = this.onConflict
+        ? this.onConflict.split(',').map((s) => s.trim())
+        : (obj && obj.id !== undefined ? ['id'] : [])
+      const where = keyCols.map((k) => { params.push(normVal(obj[k])); return `${qi(k)} = ?` }).join(' AND ')
+      return { sql: `SELECT ${this.cols} FROM ${qi(this.table)}` + (where ? ` WHERE ${where}` : '') + ' LIMIT 2', params }
+    }
+    return { sql: this._selectTail(`SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params)), params }
   }
 
   async exec() {
     try {
       const { sql, params } = this._sql()
       const [res] = await pool.query(sql, params)
-      let rows = Array.isArray(res) ? res : null // OkPacket (insert/update sin RETURNING) => null
-      // update + .select(): releer la(s) fila(s) con los mismos filtros
-      if (this.op === 'update' && this.returning) {
+      let rows = Array.isArray(res) ? res : null // OkPacket (insert/update/upsert sin RETURNING) => null
+      if ((this.op === 'update' || this.op === 'upsert') && this.returning) {
         const rs = this._reselectSql()
         const [rows2] = await pool.query(rs.sql, rs.params)
         rows = rows2
@@ -155,7 +194,6 @@ class Builder {
     }
   }
 
-  // Hace el builder "awaitable" igual que Supabase (se puede `await` sin método terminal).
   then(resolve, reject) { this.exec().then(resolve, reject) }
   catch(reject) { return this.exec().catch(reject) }
 }

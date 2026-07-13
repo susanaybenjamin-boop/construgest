@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 import { callAI } from '../services/ai-service.js'
 
 const router = Router()
