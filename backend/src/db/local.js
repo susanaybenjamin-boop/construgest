@@ -10,10 +10,12 @@
 //   .order(col,{ascending}) .limit(n) .single() .maybeSingle()
 //   insert/delete + .select() => RETURNING (MariaDB 10.5+)
 //   update/upsert + .select() => SELECT posterior (MariaDB no tiene UPDATE/ON DUP RETURNING)
-// NO soportado aún (lanza error claro): selects anidados "tabla(...)", .rpc(), .storage
+//   .rpc(nombre, params) => despacha a db/rpc.js (funciones RPC reimplementadas en Node)
+//   .storage => db/storage.js (ficheros en disco)
 // ============================================================================
 import pool from './mariadb.js'
 import storage from './storage.js'
+import callRpc from './rpc.js'
 
 const qi = (id) => '`' + String(id).replace(/`/g, '') + '`'
 
@@ -253,9 +255,65 @@ class Builder {
     return { data: rows, error: null }
   }
 
+  // Mutación (insert/update/delete/upsert) con .select() ANIDADO: se ejecuta la
+  // mutación, se recuperan las filas afectadas (RETURNING en insert/delete, que
+  // MariaDB sí soporta; re-SELECT en update/upsert) y se resuelven los embeds.
+  async _execNestedMutation() {
+    const sel = parseSelect(this.cols)
+    const returning = colsForQuery(sel)
+    let rows = []
+    if (this.op === 'insert') {
+      const vrows = Array.isArray(this.values) ? this.values : [this.values]
+      const keys = Object.keys(vrows[0])
+      const params = []
+      const ph = vrows.map(() => `(${keys.map(() => '?').join(',')})`).join(', ')
+      vrows.forEach((r) => keys.forEach((k) => params.push(normVal(r[k]))))
+      const sql = `INSERT INTO ${qi(this.table)} (${keys.map(qi).join(', ')}) VALUES ${ph} RETURNING ${returning}`
+      ;[rows] = await pool.query(sql, params)
+    } else if (this.op === 'delete') {
+      const params = []
+      const sql = `DELETE FROM ${qi(this.table)}` + this._where(params) + ` RETURNING ${returning}`
+      ;[rows] = await pool.query(sql, params)
+    } else if (this.op === 'update') {
+      const params = []
+      const keys = Object.keys(this.values)
+      let sql = `UPDATE ${qi(this.table)} SET ` + keys.map((k) => `${qi(k)} = ?`).join(', ')
+      keys.forEach((k) => params.push(normVal(this.values[k])))
+      sql += this._where(params)
+      await pool.query(sql, params)
+      const p2 = []
+      ;[rows] = await pool.query(
+        this._selectTail(`SELECT ${returning} FROM ${qi(this.table)}` + this._where(p2)), p2)
+    } else if (this.op === 'upsert') {
+      const vrows = Array.isArray(this.values) ? this.values : [this.values]
+      const keys = Object.keys(vrows[0])
+      const params = []
+      const ph = vrows.map(() => `(${keys.map(() => '?').join(',')})`).join(', ')
+      vrows.forEach((r) => keys.forEach((k) => params.push(normVal(r[k]))))
+      let sql = `INSERT INTO ${qi(this.table)} (${keys.map(qi).join(', ')}) VALUES ${ph}`
+      sql += ' ON DUPLICATE KEY UPDATE ' + keys.map((k) => `${qi(k)} = VALUES(${qi(k)})`).join(', ')
+      await pool.query(sql, params)
+      const obj = vrows[0]
+      const keyCols = this.onConflict
+        ? this.onConflict.split(',').map((s) => s.trim())
+        : (obj.id !== undefined ? ['id'] : [])
+      const p2 = []
+      const where = keyCols.map((k) => { p2.push(normVal(obj[k])); return `${qi(k)} = ?` }).join(' AND ')
+      ;[rows] = await pool.query(
+        `SELECT ${returning} FROM ${qi(this.table)}` + (where ? ` WHERE ${where}` : '') + ' LIMIT 2', p2)
+    }
+    await attachEmbeds(rows, sel)
+    if (this.single_) {
+      if (!rows.length) return { data: null, error: this.maybe ? null : { code: 'PGRST116', message: 'No rows found' } }
+      return { data: rows[0], error: null }
+    }
+    return { data: rows, error: null }
+  }
+
   async exec() {
     try {
       if (this.op === 'select' && this.cols.includes('(')) return await this._execNested()
+      if (this.op !== 'select' && this.returning && this.cols.includes('(')) return await this._execNestedMutation()
       const { sql, params } = this._sql()
       const [res] = await pool.query(sql, params)
       let rows = Array.isArray(res) ? res : null // OkPacket (insert/update/upsert sin RETURNING) => null
@@ -283,7 +341,7 @@ class Builder {
 
 const local = {
   from(table) { return new Builder(table) },
-  rpc() { return Promise.resolve({ data: null, error: { message: 'shim: rpc() no implementado aún' } }) },
+  rpc(name, params) { return callRpc(name, params) },
   storage,
 }
 

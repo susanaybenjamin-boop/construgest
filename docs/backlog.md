@@ -10,21 +10,26 @@
 > - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
 >   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **FASE 2 EN CURSO — 17 de ~21 ficheros de ruta migrados** a `../db/local.js` y verificados.
+> **FASE 2 COMPLETA (rutas de dominio) — 20 de ~21 ficheros migrados** a `../db/local.js` y
+> verificados. Solo queda `ai.js` (+ servicios IA/realtime), que pertenece a Fase 3/4.
 > El shim (`backend/src/db/local.js`) ya maneja: select/insert/update/delete/upsert, eq/neq/gt/
 > gte/lt/lte/is/in/like/ilike/or/not, order/limit/range/single/maybeSingle, RETURNING (insert/
 > delete), update&upsert+select vía re-SELECT, normalización fechas ISO→DATETIME y objetos→JSON,
-> selects anidados `alias:tabla(...)`, columnas reservadas entrecomilladas, y **storage en disco**
-> (`db/storage.js` + `/api/files`). Migrar ruta = cambiar su import.
+> selects anidados `alias:tabla(...)` (en select Y en mutación insert/update/delete/upsert+select),
+> columnas reservadas entrecomilladas, **storage en disco** (`db/storage.js` + `/api/files`) y
+> **`.rpc(nombre, params)`** (despacha a `db/rpc.js`). Migrar ruta = cambiar su import.
 >
-> **PRÓXIMA SESIÓN — empezar por aquí (queda SOLO la oleada 4: RPC):**
+> **PRÓXIMA SESIÓN — empezar por aquí (Fase 2 de rutas HECHA):**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
 >    Tras editar backend: `docker compose up -d --build backend`.
-> 2. **Oleada 4 — RPC (última):** crear `backend/src/db/rpc.js` reimplementando las 25 funciones
->    (fuente `docs/schema/raw/rpc-functions.postgres.sql`) + añadir `.rpc(nombre, params)` al shim.
->    Migrar `equipmentCatalog`, `subcontractors`, `workers`. Verificar CRUD con curl.
-> 3. Luego `ai.js` + servicios (mcp-ai-tracker). El realtime → Fase 3.
-> 4. Con todo probado: merge `feat/benjamin` → `develop`. Después Fase 3 (Realtime→polling).
+> 2. **Merge `feat/benjamin` → `develop`** (`--no-ff`): toda la capa de datos de rutas está
+>    migrada y probada en ejecución.
+> 3. **Fase 3 — Realtime → polling/WebSocket** y migrar los servicios que aún usan Supabase:
+>    `services/ai-service.js`, `notificationService.js`, `realtimeBroadcast.js`,
+>    `mcp-ai-tracker.js` + la ruta `ai.js`. Para las cuotas de IA hay que reimplementar
+>    `mcp_check_quota` / `mcp_check_and_record_usage` en `db/rpc.js` (aún NO están; requieren
+>    las tablas `mcp_ai_quotas`/`mcp_ai_user_quotas`/`mcp_ai_consumption`).
+> 4. Fase 4 (IA) y Fase 5 (empaquetado `.msi`).
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -109,17 +114,27 @@ prefijo (ver `CLAUDE.md` §6).
   Rutas migradas: `settings`, `projects`, `expenses`, `mailbox`. Shim: +`.range()` + entrecomillado
   de columnas reservadas (key/value/date...). VERIFICADO e2e: subir recibo→disco→URL firmada→
   recuperar contenido; projects/settings/mailbox 200; sin regresiones.
-- `[ ]` **DATA-3 (oleada 4) — RPC** (LO ÚLTIMO). Reimplementar las 25 funciones en Node (fuente en
-  `docs/schema/raw/rpc-functions.postgres.sql`) en un `db/rpc.js` + añadir `.rpc(nombre, params)`
-  al shim que despache ahí. Migrar `equipmentCatalog` (usa además anidado, ya soportado),
-  `subcontractors`, `workers`. Verificar CRUD de cada uno con curl.
-- `[ ]` Revisar `ai.js` + servicios `mcp-ai-tracker.js`/`notificationService.js`/
-  `realtimeBroadcast.js` (aún importan Supabase). El realtime se aborda en la Fase 3.
+- `[x]` **DATA-3 (oleada 4) — RPC** hecha y VERIFICADA con curl. `db/rpc.js` reimplementa en Node
+  las 21 funciones `rpc_*` de equipment/workers/subcontractors/sub_documents (fuente
+  `docs/schema/raw/rpc-functions.postgres.sql`) + `.rpc(nombre,params)` en el shim que despacha ahí.
+  Migradas `equipmentCatalog`, `subcontractors`, `workers`. VERIFICADO e2e (login→CRUD): workers
+  (incl. `certifications` JSON hidratado a array, `is_subcontracted` booleano); subcontractors +
+  documentos PRL + `expiring` (JOIN) + `specialties` (DISTINCT); equipment + `categories` + link de
+  material (insert + select ANIDADO). **Al hacerlo se amplió el shim**: `insert/update/delete/upsert
+  + .select(anidado)` (antes lanzaba "no soportado"); insert/delete vía `RETURNING`, update/upsert
+  vía re-SELECT, y en todos se resuelven los embeds. Sin regresiones en rutas previas.
+  · NOTA (deuda sistémica del shim, no bloqueante): las columnas `DATE` vuelven como Date de mysql2
+    y `res.json` las serializa a ISO con hora (p.ej. `hire_date: "2026-01-15T00:00:00.000Z"`), no
+    `"2026-01-15"` como la nube. Aplica a TODAS las rutas con DATE; si molesta en UI, poner
+    `dateStrings: ['DATE']` en el pool y re-verificar las rutas ya migradas.
+- `[ ]` **Servicios que aún importan Supabase** (Fase 3/4): `services/ai-service.js`,
+  `notificationService.js`, `realtimeBroadcast.js`, `mcp-ai-tracker.js` + ruta `ai.js`. Incluye
+  reimplementar las 2 RPC de cuotas `mcp_check_quota`/`mcp_check_and_record_usage` en `db/rpc.js`.
 
-**Migradas (17 ficheros de ruta + middleware):** auth, suppliers, notifications, plans, ferrapp,
+**Migradas (20 ficheros de ruta + middleware):** auth, suppliers, notifications, plans, ferrapp,
 admin, branches, library, budgets, materials, supplierMaterials, workLogs, certifications,
-settings, projects, expenses, mailbox + middlewares/auth.js. **Pendientes (4):** equipmentCatalog,
-subcontractors, workers, ai.
+settings, projects, expenses, mailbox, equipmentCatalog, subcontractors, workers +
+middlewares/auth.js. **Pendiente (1):** ai.js (+ servicios IA/realtime → Fase 3/4).
 
 ### `[ ]` FASE 3 — Storage y Realtime locales
 - `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).
