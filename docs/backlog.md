@@ -2,34 +2,41 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-07-13
 >
-> **FASE 0 y FASE 1 COMPLETAS y verificadas.** Entorno local Docker + MariaDB con esquema y seed.
+> **FASE 0 y FASE 1 COMPLETAS.** Entorno local Docker + MariaDB con esquema y seed.
 > - Repo GitHub **privado** `susanaybenjamin-boop/construgest`. Ramas: trabajo en
->   **`feat/benjamin`** → merge `--no-ff` a `develop` al probar. **Los `git push` los hace
->   Benjamin** (el guardarraíl de Claude Code los bloquea por señal de visibilidad cacheada).
+>   **`feat/benjamin`** → merge `--no-ff` a `develop` al probar.
 > - `docker-compose.yml`: **MariaDB 11.4 puerto 3308** + **backend Node puerto 5000**.
-> - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
->   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
+>   El backend ya apunta a la MariaDB local y a **Ollama del host** (IA local).
+> - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` + `03_seed_demo.sql`.
 >
-> **FASE 2 COMPLETA (rutas de dominio) — 20 de ~21 ficheros migrados** a `../db/local.js` y
-> verificados. Solo queda `ai.js` (+ servicios IA/realtime), que pertenece a Fase 3/4.
-> El shim (`backend/src/db/local.js`) ya maneja: select/insert/update/delete/upsert, eq/neq/gt/
-> gte/lt/lte/is/in/like/ilike/or/not, order/limit/range/single/maybeSingle, RETURNING (insert/
-> delete), update&upsert+select vía re-SELECT, normalización fechas ISO→DATETIME y objetos→JSON,
-> selects anidados `alias:tabla(...)` (en select Y en mutación insert/update/delete/upsert+select),
-> columnas reservadas entrecomilladas, **storage en disco** (`db/storage.js` + `/api/files`) y
-> **`.rpc(nombre, params)`** (despacha a `db/rpc.js`). Migrar ruta = cambiar su import.
+> **FASE 2 (capa de datos) COMPLETA — 20/21 rutas migradas** a `../db/local.js`. El shim maneja
+> select/insert/update/delete/upsert, todos los filtros, RETURNING, selects anidados (en select y
+> en mutación), storage en disco y `.rpc()`. (`ai.js` no va a MariaDB: la IA se reescribió a local.)
 >
-> **PRÓXIMA SESIÓN — empezar por aquí (Fase 2 de rutas HECHA):**
-> 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
+> **FASE 4 (IA LOCAL) MUY AVANZADA — la IA ya es 100% local, sin nube ni Supabase.**
+> - **Motor:** `services/ai-service.js` reescrito a local puro (Ollama, `qwen2.5:3b`). `callAI()`
+>   igual que antes pero solo local; caché en memoria; `tryLocal` con `num_predict≤2048`.
+> - **Extracción** (`extract-materials`): Capa 1 determinista (regex code/precio/unidad, normaliza
+>   nº ES) + LLM de refuerzo (`services/extraction.js`). Fiable y consistente.
+> - **OCR** (`parse-budget-pdf`): 100% local, `services/local-ocr.js` (pdftoppm+tesseract `spa`);
+>   texto-primero, OCR-fallback. Tesseract+poppler instalados en la imagen (Dockerfile).
+> - **Chat eliminado.** Sin cuotas/pricing/consumo en el motor.
+>
+> **PRÓXIMA SESIÓN — empezar por aquí:**
+> 1. Leer esta cabecera + `CLAUDE.md`. **Requisito nuevo del entorno:** tener **Ollama corriendo en
+>    el host** con el modelo `qwen2.5:3b` (`ollama pull qwen2.5:3b`). Arrancar: `docker compose up -d`.
 >    Tras editar backend: `docker compose up -d --build backend`.
-> 2. **Merge `feat/benjamin` → `develop`** (`--no-ff`): toda la capa de datos de rutas está
->    migrada y probada en ejecución.
-> 3. **Fase 4 — IA LOCAL (EN CURSO):** decidido migrar a IA 100% local (Ollama + modelo 3B,
->    portátil i5/8GB sin GPU, SIN chat). Spike AI-0 en marcha: probar `qwen2.5:3b` con
->    `extract-materials`. Ver el plan completo en la sección FASE 4. Las RPC de cuotas de IA
->    **ya no se reimplementan** (sobran al ser local). `notificationService`/`realtimeBroadcast`
->    → Fase 3 (Realtime → polling).
-> 4. Fase 3 (Realtime) y Fase 5 (empaquetado `.msi` con Ollama + modelo embebidos).
+> 2. **Análisis de presupuestos (AI-2, el grueso):** el 3B alucina números → rediseñar las ~16 skills
+>    de `routes/ai.js` para **CALCULAR en código** (Capa 1: varianzas, totales, duplicados, outliers)
+>    y dejar al LLM solo el texto narrativo. Empezar por `analyze-budget`/`suggest-optimizations`.
+>    Receta de prompt (probada): sin frase "responde []"; ejemplos realistas (no placeholders);
+>    códigos por regex.
+> 3. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + fuzzy-match de catálogo.
+> 4. **Follow-up limpieza (AI-5):** desmantelar el panel admin de IA (`routes/admin.js` +
+>    `services/mcp-ai-tracker.js` + frontend) y la UI de claves-cloud en `settings.js` (aún usan
+>    Supabase/SDKs de nube). Al ser IA local/gratis, sobra.
+> 5. **Fase 3** (Realtime → polling; `notificationService`/`realtimeBroadcast`) y **Fase 5**
+>    (empaquetado `.msi`: MariaDB + Node + Next + **Ollama+modelo** + **tesseract+poppler**).
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -42,6 +49,11 @@
 - **MariaDB (Docker):** puerto host **3308** → 3306 contenedor. BD `construgest`,
   usuario `construgest` / pass `construgest`, root pass `construgest_root`. Solo dev local.
 - **Backend (Docker):** puerto **5000**. Único backend (se dejó de usar el de VS Code).
+  Imagen: `node:22-alpine` + **tesseract-ocr + tesseract-ocr-data-spa + poppler-utils** (OCR local).
+- **IA local (Ollama):** corre en el **HOST** (no en Docker). El backend lo alcanza por
+  `OLLAMA_HOST=http://host.docker.internal:11434`. Modelo `OLLAMA_MODEL=qwen2.5:3b`
+  (`ollama pull qwen2.5:3b`). `AI_PROVIDER_ORDER=local` (100% local; sin claves cloud).
+  **Requisito para arrancar el entorno:** Ollama instalado y el modelo descargado.
 - **Git:** repo NUEVO independiente (sin remoto aún). Ramas: **`feat/benjamin`** (trabajo)
   → merge `--no-ff` a **`develop`** cuando esté PROBADO; `main` = estable (releases, luego).
   No usar el `origin` de construgest-web.
