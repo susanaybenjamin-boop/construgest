@@ -136,8 +136,16 @@ no está completo hasta trocearlo.
   backlog. Un slice = un commit pequeño y revertible.
 - Commit en español + `Co-Authored-By: Claude`. Commits pequeños "por si hay que revertir".
 - **NUNCA** `--no-verify`, `--amend`/`--force` sobre commits ya pusheados.
-- Estrategia de ramas (feat/develop) y remoto: **pendiente de decidir con Benjamin**
-  (ver backlog). No pushear a remotos del repo viejo sin confirmar.
+- **Flujo de ramas (decidido 2026-07-13):** se trabaja en **`feat/benjamin`** (commit
+  por slice). Cuando un slice/bloque está **probado en ejecución**, merge `--no-ff` a
+  **`develop`**. `main` se reserva para lo estable (releases), más adelante.
+  ```bash
+  git checkout feat/benjamin        # trabajar aquí
+  git commit -m "..."               # commits pequeños por slice
+  git checkout develop && git merge --no-ff feat/benjamin -m "merge: ..."
+  git checkout feat/benjamin        # volver a trabajar
+  ```
+- Aún **sin remoto** (repo nuevo local). No pushear al `origin` del repo viejo.
 
 ---
 

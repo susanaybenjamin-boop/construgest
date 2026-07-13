@@ -30,8 +30,9 @@
 - **MariaDB (Docker):** puerto host **3308** → 3306 contenedor. BD `construgest`,
   usuario `construgest` / pass `construgest`, root pass `construgest_root`. Solo dev local.
 - **Backend (Docker):** puerto **5000**. Único backend (se dejó de usar el de VS Code).
-- **Git:** repo NUEVO independiente (sin remoto aún). Rama `main`. Cuando haya GitHub,
-  crear repo nuevo y decidir flujo de ramas. No usar el `origin` de construgest-web.
+- **Git:** repo NUEVO independiente (sin remoto aún). Ramas: **`feat/benjamin`** (trabajo)
+  → merge `--no-ff` a **`develop`** cuando esté PROBADO; `main` = estable (releases, luego).
+  No usar el `origin` de construgest-web.
 
 ---
 
