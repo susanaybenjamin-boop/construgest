@@ -52,7 +52,7 @@ function parseSelect(str) {
   const baseCols = []; const embeds = []
   for (const p of splitTopComma(str)) {
     if (p.includes('(')) {
-      const m = p.match(/^(\w+):(\w+)\(([\s\S]*)\)$/) || p.match(/^(\w+)\(([\s\S]*)\)$/)
+      const m = p.match(/^(\w+):(\w+)\s*\(([\s\S]*)\)$/) || p.match(/^(\w+)\s*\(([\s\S]*)\)$/)
       if (m.length === 4) embeds.push({ alias: m[1], table: m[2], sel: parseSelect(m[3]) })
       else embeds.push({ alias: m[1], table: m[1], sel: parseSelect(m[2]) })
     } else baseCols.push(p)

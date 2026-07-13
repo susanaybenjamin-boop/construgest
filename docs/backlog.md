@@ -97,7 +97,12 @@ prefijo (ver `CLAUDE.md` §6).
 - `[x]` **DATA-3 (oleada 2)** shim: **resolver de selects anidados** `alias:tabla(cols, nested:...)`
   por FK convencional `alias_id` (recursivo). Migradas: `materials`, `supplierMaterials`,
   `workLogs`, `certifications`. VERIFICADO con datos reales (supplier-materials devuelve
-  embeds `supplier{}`/`material{}`). workLogs/certifications: falta seed proyecto para datos.
+  embeds `supplier{}`/`material{}`). Fix: el parser de anidados ahora tolera espacios/saltos
+  de línea antes del `(` (selects multilínea).
+- `[x]` **Seed demo + verificación budgets/workLogs/certifications.** `database/init/03_seed_demo.sql`
+  (proyecto + presupuesto completo + parte + certificación). VERIFICADO con datos reales:
+  budgets `/project/:id` y `/:id/full` (capítulos→partidas→mediciones); workLogs 6 endpoints
+  GET 200; certifications 5 endpoints GET 200 (incl. `/:id/summary` con anidado multilínea).
 - `[ ]` **DATA-3 (oleada 3) — STORAGE** (ficheros Supabase → disco local). Rutas: `settings`,
   `projects`, `expenses`, `mailbox`. Necesita una capa de almacenamiento en disco que
   reemplace `supabase.storage` (subir/descargar/borrar/signed-url). Reusar `localApi`/`syncService`.
