@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+// FASE 2 (DATA-2): migrado a MariaDB local vía el shim compatible con Supabase.
+import supabase from '../db/local.js'
 
 const router = Router()
 

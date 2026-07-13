@@ -17,6 +17,25 @@ import pool from './mariadb.js'
 
 const qi = (id) => '`' + String(id).replace(/`/g, '') + '`'
 
+// 'YYYY-MM-DD HH:MM:SS.mmm' en UTC (formato que acepta MariaDB DATETIME(3)).
+const toMariaDateTime = (d) => d.toISOString().slice(0, 23).replace('T', ' ')
+
+// Normaliza un valor JS al formato que espera MariaDB (mysql2 no lo hace solo):
+//  - Date o string ISO-8601 con hora ("...T..Z") -> DATETIME MariaDB en UTC.
+//    (Postgres/Supabase aceptaban ISO con 'T'/'Z'; MariaDB DATETIME no.)
+//  - objeto/array -> JSON string (para columnas JSON, antes jsonb/arrays).
+//  - resto (números, booleanos, 'YYYY-MM-DD', texto) -> sin tocar.
+function normVal(v) {
+  if (v === undefined || v === null) return null
+  if (v instanceof Date) return toMariaDateTime(v)
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) {
+    const d = new Date(v)
+    if (!Number.isNaN(d.getTime())) return toMariaDateTime(d)
+  }
+  if (typeof v === 'object') return JSON.stringify(v)
+  return v
+}
+
 class Builder {
   constructor(table) {
     this.table = table
@@ -62,10 +81,10 @@ class Builder {
       if (op === 'IS NULL') return `${qi(c)} IS NULL`
       if (op === 'IN') {
         if (!v.length) return '1=0'
-        params.push(...v)
+        params.push(...v.map(normVal))
         return `${qi(c)} IN (${v.map(() => '?').join(',')})`
       }
-      params.push(v)
+      params.push(normVal(v))
       return `${qi(c)} ${op} ?`
     })
     return ' WHERE ' + parts.join(' AND ')
@@ -86,15 +105,16 @@ class Builder {
       const rows = Array.isArray(this.values) ? this.values : [this.values]
       const keys = Object.keys(rows[0])
       const ph = rows.map(() => `(${keys.map(() => '?').join(',')})`).join(', ')
-      rows.forEach((r) => keys.forEach((k) => params.push(r[k] === undefined ? null : r[k])))
+      rows.forEach((r) => keys.forEach((k) => params.push(normVal(r[k]))))
       sql = `INSERT INTO ${qi(this.table)} (${keys.map(qi).join(', ')}) VALUES ${ph}`
       if (this.returning) sql += ` RETURNING ${this.cols}`
     } else if (this.op === 'update') {
       const keys = Object.keys(this.values)
       sql = `UPDATE ${qi(this.table)} SET ` + keys.map((k) => `${qi(k)} = ?`).join(', ')
-      keys.forEach((k) => params.push(this.values[k] === undefined ? null : this.values[k]))
+      keys.forEach((k) => params.push(normVal(this.values[k])))
       sql += this._where(params)
-      if (this.returning) sql += ` RETURNING ${this.cols}`
+      // OJO: MariaDB NO soporta UPDATE ... RETURNING (sí INSERT/DELETE). El
+      // .select() tras un update se resuelve con un SELECT posterior (ver exec()).
     } else if (this.op === 'delete') {
       sql = `DELETE FROM ${qi(this.table)}` + this._where(params)
       if (this.returning) sql += ` RETURNING ${this.cols}`
@@ -102,11 +122,26 @@ class Builder {
     return { sql, params }
   }
 
+  // SELECT de re-lectura (para update+select, ya que MariaDB no tiene UPDATE RETURNING).
+  _reselectSql() {
+    const params = []
+    let sql = `SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params)
+    if (this.lim != null) sql += ` LIMIT ${Number(this.lim)}`
+    else if (this.single_) sql += ' LIMIT 2'
+    return { sql, params }
+  }
+
   async exec() {
     try {
       const { sql, params } = this._sql()
       const [res] = await pool.query(sql, params)
-      const rows = Array.isArray(res) ? res : null // OkPacket (insert/update sin RETURNING) => null
+      let rows = Array.isArray(res) ? res : null // OkPacket (insert/update sin RETURNING) => null
+      // update + .select(): releer la(s) fila(s) con los mismos filtros
+      if (this.op === 'update' && this.returning) {
+        const rs = this._reselectSql()
+        const [rows2] = await pool.query(rs.sql, rs.params)
+        rows = rows2
+      }
       if (this.single_) {
         if (!rows || rows.length === 0) {
           return { data: null, error: this.maybe ? null : { code: 'PGRST116', message: 'No rows found' } }

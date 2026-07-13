@@ -10,18 +10,20 @@
 > - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
 >   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **FASE 2 EN CURSO.** DATA-0 (shim mysql2 compatible con Supabase) + DATA-1 (`auth.js`
-> migrado a MariaDB) HECHOS y verificados con curl (login/register/me). El shim está en
-> `backend/src/db/local.js`; migrar una ruta = cambiar su import a `../db/local.js`.
+> **FASE 2 EN CURSO.** Migradas y verificadas con curl: **DATA-0** (shim mysql2 compat. Supabase),
+> **DATA-1** `auth.js`, **DATA-2** `suppliers.js`. El shim (`backend/src/db/local.js`) ya maneja
+> select/insert/update/delete/eq.../order/limit/single, RETURNING (insert/delete), update+select
+> vía re-SELECT, y normaliza fechas ISO→DATETIME y objetos→JSON. Migrar ruta = cambiar el import.
 >
 > **PRÓXIMA SESIÓN — empezar por aquí:**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
->    Tras editar código del backend: `docker compose up -d --build backend` (rebuild rápido).
-> 2. **DATA-2:** migrar la siguiente ruta (p.ej. `settings.js` o `projects.js`), cambiando su
->    import a `../db/local.js` y **ampliando el shim** según los operadores que use (posibles:
->    `.order`, `.in`, `.or`, selects anidados `tabla(...)`). VERIFICAR con curl. Un slice = un commit.
-> 3. Ojo: rutas que usan `.rpc()` (equipmentCatalog, subcontractors, workers) o `.storage`
->    (expenses, mailbox) necesitarán ampliar el shim / reimplementar las RPC en Node.
+>    Tras editar backend: `docker compose up -d --build backend` (rebuild rápido).
+> 2. **DATA-3:** siguiente ruta. Sugerencia por dificultad creciente:
+>    `notifications.js`/`plans.js` (fáciles; plans añade `.upsert` → implementarlo en el shim),
+>    luego `projects.js` (core, usa `.storage`→sync a disco), y dejar para el final las de
+>    `.rpc()` (equipment/subcontractors/workers) y selects anidados `tabla(...)` (materials,
+>    workLogs, certifications, supplierMaterials). VERIFICAR cada una con curl.
+> 3. Cuando haya varias rutas migradas y probadas: merge `feat/benjamin` → `develop`.
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -75,6 +77,15 @@ prefijo (ver `CLAUDE.md` §6).
 - `[x]` **DATA-1** `auth.js` migrado y VERIFICADO con curl: login OK/401/401, register 201
   (INSERT RETURNING), /me 200. (Shim aún NO soporta: selects anidados `tabla(...)`, `.or()`,
   `.rpc()`, `.storage` → se amplían cuando una ruta lo pida.)
+- `[x]` **DATA-2** `suppliers.js` migrado y VERIFICADO con curl (CRUD completo: crear/listar/
+  obtener/editar/soft-delete + filtro activos/todos). Al hacerlo se arreglaron **2 bugs
+  sistémicos del shim** (aplican a todas las rutas):
+    · MariaDB NO tiene `UPDATE ... RETURNING` → update+`.select()` se resuelve con un SELECT
+      posterior con los mismos filtros.
+    · Normalización de valores (`normVal`): fechas ISO `...T..Z`/Date → DATETIME MariaDB (UTC),
+      objetos/arrays → JSON. (Antes petaba `Incorrect datetime value`.)
+  Nota: `authMiddleware` es solo-JWT (no toca BD); las funciones de acceso a proyecto de
+  `middlewares/auth.js` SÍ usan Supabase y habrá que migrarlas al tocar budgets/workLogs/etc.
 - `[ ]` **DATA-n** migrar el resto de rutas (una por slice), ampliando el shim según haga falta,
   verificando cada una con `curl`. Reimplementar las 25 funciones RPC en Node cuando toquen.
 
