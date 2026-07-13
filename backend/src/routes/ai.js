@@ -557,23 +557,27 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
 
     let result
 
-    // Intentar OCR con Vision si hay PDF original
-    if (pdfBase64) {
-      try {
-        const visionResult = await parseBudgetWithVision(pdfBase64, req.user.organization_id, req.user.id)
-        if (visionResult && visionResult.chapters && visionResult.chapters.length > 0) {
-          result = visionResult
-          console.log(`[parse-budget-pdf] Vision OCR: ${result.chapters.length} capitulos, ${result.chapters.reduce((s, c) => s + c.items.length, 0)} partidas`)
-        }
-      } catch (err) {
-        console.log(`[parse-budget-pdf] Vision OCR fallo: ${err.message}, usando metodo texto`)
-      }
+    // 1) Método texto (rápido): pdfjs (frontend) + parser algorítmico + LLM local.
+    //    Es lo normal para PDFs digitales; el OCR (lento en CPU) solo si esto no da nada.
+    if (text) {
+      const r = await parseBudgetFromText(text, true, req.user.organization_id, req.user.id)
+      if (r.logs?.length) console.log(`[parse-budget-pdf] ${r.logs[r.logs.length - 1]}`)
+      if (r.chapters?.length > 0) result = r
     }
 
-    // Fallback: metodo texto (pdfjs-dist + algoritmico + IA)
-    if (!result && text) {
-      result = await parseBudgetFromText(text, true, req.user.organization_id, req.user.id)
-      if (result.logs?.length) console.log(`[parse-budget-pdf] ${result.logs[result.logs.length - 1]}`)
+    // 2) Fallback: OCR LOCAL (PDF escaneado sin capa de texto).
+    if (!result && pdfBase64) {
+      try {
+        const ocrResult = await parseBudgetWithVision(pdfBase64, req.user.organization_id, req.user.id)
+        if (ocrResult?.chapters?.length > 0) {
+          result = ocrResult
+          console.log(`[parse-budget-pdf] OCR local: ${result.chapters.length} capitulos, ${result.chapters.reduce((s, c) => s + c.items.length, 0)} partidas`)
+        } else if (ocrResult) {
+          result = ocrResult   // devolver logs aunque no haya capítulos
+        }
+      } catch (err) {
+        console.log(`[parse-budget-pdf] OCR local fallo: ${err.message}`)
+      }
     }
 
     if (!result) {

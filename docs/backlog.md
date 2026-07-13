@@ -194,7 +194,15 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     frase de fallback. → **No basta afinar prompts: hay que CALCULAR en código (Capa 1)** (varianzas,
     totales, duplicados, outliers de precio) y dejar al LLM solo el texto narrativo. Rediseño por
     skill = el grueso del trabajo restante.
-- `[ ]` **AI-3:** OCR local (Tesseract) para PDFs escaneados; mantener pdfjs + BC3/PZH.
+- `[x]` **AI-3 (OCR local) HECHO y VERIFICADO e2e.** `services/local-ocr.js` (pdftoppm→PNG→tesseract
+  `spa`). `parseBudgetWithVision` reescrita: Vision-nube → **OCR local** + `parseBudgetFromText`
+  (reusa algorítmico + LLM local). Ruta `parse-budget-pdf`: **texto primero** (rápido), OCR fallback
+  (lento). Dockerfile: `apk add tesseract-ocr tesseract-ocr-data-spa poppler-utils`. `tryLocal` con
+  **tope de generación** `num_predict≤2048` (en CPU sin tope una llamada tarda minutos — visto colgar).
+  VERIFICADO: PDF escaneado (imagen) → OCR 307 chars en ~3s → 2 capítulos y 4 partidas correctas
+  (códigos/unidades/cantidades/precios), 100% offline. Total ~104s (el peor caso, escaneado).
+  · PENDIENTE Fase 5: en el `.msi` Windows hay que empaquetar tesseract+poppler (o WASM); ahora solo
+    están en la imagen Docker Linux.
 - `[ ]` **AI-4:** bucle de correcciones (tabla local + few-shot + fuzzy-match de catálogo).
 - `[ ]` **AI-5:** eliminar maquinaria de coste/cuotas (mcp-ai-tracker, cons_ai_pricing,
   cons_ai_consumption, quotas). **Ya NO se reimplementan las RPC `mcp_check_quota`/

@@ -518,6 +518,10 @@ async function tryLocal(textPrompt, imageFiles, options) {
     options: {
       temperature: options.temperature ?? 0.1,
       num_ctx: options.numCtx || 8192,
+      // Tope DURO de generación. En CPU (~10 tok/s) sin tope una llamada puede
+      // tardar minutos. Se respeta options.maxTokens pero se capa a 2048 para
+      // no colgar el proceso; los presupuestos grandes los resuelve la Capa 1.
+      num_predict: Math.min(options.maxTokens || 1024, 2048),
     },
   }
   // Ollama admite imágenes base64 SOLO en modelos de visión. qwen2.5:3b es
