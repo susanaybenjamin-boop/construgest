@@ -4,10 +4,11 @@ Toda la BD vive aquí. Se ejecuta con Docker (ver `docker-compose.yml` en la ra�
 
 ## Estructura
 - `init/` — scripts `.sql` que MariaDB ejecuta **la primera vez** que crea su volumen
-  (orden alfabético). Aquí irá `schema.mariadb.sql` en la Fase 1 (DB-2).
-- (Fase 1) `schema.mariadb.sql` — CREATE TABLE de las 60 tablas de Construgest,
-  traducidas desde el inventario de `../docs/schema/`.
-- (Fase 1) `seed.sql` — datos mínimos de prueba (organización + usuario) para arrancar.
+  (orden alfabético). Se autocargan al hacer `docker compose up -d` con el volumen vacío.
+  - `01_schema.sql` — ✅ las **59 tablas** de Construgest traducidas a MariaDB desde el
+    inventario de `../docs/schema/` (generado en DB-2; 67 FKs, 39 CHECKs, 128 índices).
+  - (pendiente DB-4) `02_seed.sql` — datos mínimos (organización + usuario) para arrancar.
+- La vista `mcp_users_view` quedó fuera (es una VIEW; se hará aparte si hace falta).
 
 ## Conexión (DBeaver o cualquier cliente)
 | Campo | Valor |
