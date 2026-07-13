@@ -10,20 +10,21 @@
 > - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
 >   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **FASE 2 EN CURSO.** Migradas y verificadas con curl: **DATA-0** (shim mysql2 compat. Supabase),
-> **DATA-1** `auth.js`, **DATA-2** `suppliers.js`. El shim (`backend/src/db/local.js`) ya maneja
-> select/insert/update/delete/eq.../order/limit/single, RETURNING (insert/delete), update+select
-> vía re-SELECT, y normaliza fechas ISO→DATETIME y objetos→JSON. Migrar ruta = cambiar el import.
+> **FASE 2 EN CURSO — 13 de ~21 ficheros de ruta migrados** a `../db/local.js` y verificados.
+> El shim (`backend/src/db/local.js`) ya maneja: select/insert/update/delete/upsert, eq/neq/
+> gt/gte/lt/lte/is/in/like/ilike/or/not, order/limit/single/maybeSingle, RETURNING (insert/
+> delete), update&upsert+select vía re-SELECT, normalización fechas ISO→DATETIME y objetos→JSON,
+> y **selects anidados** `alias:tabla(...)`. Migrar ruta = cambiar su import.
 >
-> **PRÓXIMA SESIÓN — empezar por aquí:**
+> **PRÓXIMA SESIÓN — empezar por aquí (quedan 8 rutas, 2 subsistemas nuevos):**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
->    Tras editar backend: `docker compose up -d --build backend` (rebuild rápido).
-> 2. **DATA-3:** siguiente ruta. Sugerencia por dificultad creciente:
->    `notifications.js`/`plans.js` (fáciles; plans añade `.upsert` → implementarlo en el shim),
->    luego `projects.js` (core, usa `.storage`→sync a disco), y dejar para el final las de
->    `.rpc()` (equipment/subcontractors/workers) y selects anidados `tabla(...)` (materials,
->    workLogs, certifications, supplierMaterials). VERIFICAR cada una con curl.
-> 3. Cuando haya varias rutas migradas y probadas: merge `feat/benjamin` → `develop`.
+>    Tras editar backend: `docker compose up -d --build backend`.
+> 2. **Oleada 3 — STORAGE:** crear capa de ficheros en disco (reemplaza `supabase.storage`) y
+>    migrar `settings`, `projects`, `expenses`, `mailbox`.
+> 3. **Oleada 4 — RPC:** reimplementar las 25 funciones (fuente en `docs/schema/raw/`) + `.rpc()`
+>    en el shim; migrar `equipmentCatalog`, `subcontractors`, `workers`. Luego `ai.js` + servicios.
+> 4. Para verificar budgets/workLogs/certifications a fondo hace falta seed de un proyecto+presupuesto.
+> 5. Cuando esté todo probado: merge `feat/benjamin` → `develop`.
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -93,12 +94,24 @@ prefijo (ver `CLAUDE.md` §6).
   library search), `.upsert` (etiquetas ferrapp), `.not` (library chapters). budgets/plans:
   la capa de acceso ya va a MariaDB (403 correcto sin proyecto); falta seed de proyecto/
   presupuesto para verificar sus DATOS a fondo.
-- `[ ]` **DATA-n** rutas pendientes por dificultad:
-    · **Storage** (ficheros→disco): `settings`, `projects`, `expenses`, `mailbox`.
-    · **Selects anidados** `tabla(...)` (implementar en shim o reescribir): `materials`,
-      `workLogs`, `certifications`, `supplierMaterials`, `equipmentCatalog`.
-    · **RPC** (reimplementar 25 funciones en Node): `equipmentCatalog`, `subcontractors`, `workers`.
-    · Revisar `ai.js` (usa `services/mcp-ai-tracker.js`, que aún va a Supabase).
+- `[x]` **DATA-3 (oleada 2)** shim: **resolver de selects anidados** `alias:tabla(cols, nested:...)`
+  por FK convencional `alias_id` (recursivo). Migradas: `materials`, `supplierMaterials`,
+  `workLogs`, `certifications`. VERIFICADO con datos reales (supplier-materials devuelve
+  embeds `supplier{}`/`material{}`). workLogs/certifications: falta seed proyecto para datos.
+- `[ ]` **DATA-3 (oleada 3) — STORAGE** (ficheros Supabase → disco local). Rutas: `settings`,
+  `projects`, `expenses`, `mailbox`. Necesita una capa de almacenamiento en disco que
+  reemplace `supabase.storage` (subir/descargar/borrar/signed-url). Reusar `localApi`/`syncService`.
+- `[ ]` **DATA-3 (oleada 4) — RPC** (reimplementar las 25 funciones en Node; fuente en
+  `docs/schema/raw/rpc-functions.postgres.sql`). Rutas: `equipmentCatalog` (además anidado),
+  `subcontractors`, `workers`. Añadir `.rpc(nombre, params)` al shim que despache a las
+  reimplementaciones.
+- `[ ]` Revisar `ai.js` + `services/mcp-ai-tracker.js`, `notificationService.js`,
+  `realtimeBroadcast.js` (aún importan Supabase).
+
+**Migradas hasta ahora (13 ficheros de ruta + middleware):** auth, suppliers, notifications,
+plans, ferrapp, admin, branches, library, budgets, materials, supplierMaterials, workLogs,
+certifications + middlewares/auth.js. **Pendientes:** settings, projects, expenses, mailbox,
+equipmentCatalog, subcontractors, workers, ai.
 
 ### `[ ]` FASE 3 — Storage y Realtime locales
 - `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).
