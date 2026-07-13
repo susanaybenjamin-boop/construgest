@@ -10,21 +10,21 @@
 > - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
 >   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **FASE 2 EN CURSO — 13 de ~21 ficheros de ruta migrados** a `../db/local.js` y verificados.
-> El shim (`backend/src/db/local.js`) ya maneja: select/insert/update/delete/upsert, eq/neq/
-> gt/gte/lt/lte/is/in/like/ilike/or/not, order/limit/single/maybeSingle, RETURNING (insert/
+> **FASE 2 EN CURSO — 17 de ~21 ficheros de ruta migrados** a `../db/local.js` y verificados.
+> El shim (`backend/src/db/local.js`) ya maneja: select/insert/update/delete/upsert, eq/neq/gt/
+> gte/lt/lte/is/in/like/ilike/or/not, order/limit/range/single/maybeSingle, RETURNING (insert/
 > delete), update&upsert+select vía re-SELECT, normalización fechas ISO→DATETIME y objetos→JSON,
-> y **selects anidados** `alias:tabla(...)`. Migrar ruta = cambiar su import.
+> selects anidados `alias:tabla(...)`, columnas reservadas entrecomilladas, y **storage en disco**
+> (`db/storage.js` + `/api/files`). Migrar ruta = cambiar su import.
 >
-> **PRÓXIMA SESIÓN — empezar por aquí (quedan 8 rutas, 2 subsistemas nuevos):**
+> **PRÓXIMA SESIÓN — empezar por aquí (queda SOLO la oleada 4: RPC):**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
 >    Tras editar backend: `docker compose up -d --build backend`.
-> 2. **Oleada 3 — STORAGE:** crear capa de ficheros en disco (reemplaza `supabase.storage`) y
->    migrar `settings`, `projects`, `expenses`, `mailbox`.
-> 3. **Oleada 4 — RPC:** reimplementar las 25 funciones (fuente en `docs/schema/raw/`) + `.rpc()`
->    en el shim; migrar `equipmentCatalog`, `subcontractors`, `workers`. Luego `ai.js` + servicios.
-> 4. Para verificar budgets/workLogs/certifications a fondo hace falta seed de un proyecto+presupuesto.
-> 5. Cuando esté todo probado: merge `feat/benjamin` → `develop`.
+> 2. **Oleada 4 — RPC (última):** crear `backend/src/db/rpc.js` reimplementando las 25 funciones
+>    (fuente `docs/schema/raw/rpc-functions.postgres.sql`) + añadir `.rpc(nombre, params)` al shim.
+>    Migrar `equipmentCatalog`, `subcontractors`, `workers`. Verificar CRUD con curl.
+> 3. Luego `ai.js` + servicios (mcp-ai-tracker). El realtime → Fase 3.
+> 4. Con todo probado: merge `feat/benjamin` → `develop`. Después Fase 3 (Realtime→polling).
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -103,20 +103,23 @@ prefijo (ver `CLAUDE.md` §6).
   (proyecto + presupuesto completo + parte + certificación). VERIFICADO con datos reales:
   budgets `/project/:id` y `/:id/full` (capítulos→partidas→mediciones); workLogs 6 endpoints
   GET 200; certifications 5 endpoints GET 200 (incl. `/:id/summary` con anidado multilínea).
-- `[ ]` **DATA-3 (oleada 3) — STORAGE** (ficheros Supabase → disco local). Rutas: `settings`,
-  `projects`, `expenses`, `mailbox`. Necesita una capa de almacenamiento en disco que
-  reemplace `supabase.storage` (subir/descargar/borrar/signed-url). Reusar `localApi`/`syncService`.
-- `[ ]` **DATA-3 (oleada 4) — RPC** (reimplementar las 25 funciones en Node; fuente en
-  `docs/schema/raw/rpc-functions.postgres.sql`). Rutas: `equipmentCatalog` (además anidado),
-  `subcontractors`, `workers`. Añadir `.rpc(nombre, params)` al shim que despache a las
-  reimplementaciones.
-- `[ ]` Revisar `ai.js` + `services/mcp-ai-tracker.js`, `notificationService.js`,
-  `realtimeBroadcast.js` (aún importan Supabase).
+- `[x]` **DATA-3 (oleada 3) — STORAGE** hecha y verificada. `db/storage.js` (capa de ficheros en
+  disco compatible con `supabase.storage`: upload/update/download/remove/createSignedUrl(s)) +
+  `routes/files.js` (sirve `/api/files/:bucket/*splat`) + volumen Docker `construgest_files:/data`.
+  Rutas migradas: `settings`, `projects`, `expenses`, `mailbox`. Shim: +`.range()` + entrecomillado
+  de columnas reservadas (key/value/date...). VERIFICADO e2e: subir recibo→disco→URL firmada→
+  recuperar contenido; projects/settings/mailbox 200; sin regresiones.
+- `[ ]` **DATA-3 (oleada 4) — RPC** (LO ÚLTIMO). Reimplementar las 25 funciones en Node (fuente en
+  `docs/schema/raw/rpc-functions.postgres.sql`) en un `db/rpc.js` + añadir `.rpc(nombre, params)`
+  al shim que despache ahí. Migrar `equipmentCatalog` (usa además anidado, ya soportado),
+  `subcontractors`, `workers`. Verificar CRUD de cada uno con curl.
+- `[ ]` Revisar `ai.js` + servicios `mcp-ai-tracker.js`/`notificationService.js`/
+  `realtimeBroadcast.js` (aún importan Supabase). El realtime se aborda en la Fase 3.
 
-**Migradas hasta ahora (13 ficheros de ruta + middleware):** auth, suppliers, notifications,
-plans, ferrapp, admin, branches, library, budgets, materials, supplierMaterials, workLogs,
-certifications + middlewares/auth.js. **Pendientes:** settings, projects, expenses, mailbox,
-equipmentCatalog, subcontractors, workers, ai.
+**Migradas (17 ficheros de ruta + middleware):** auth, suppliers, notifications, plans, ferrapp,
+admin, branches, library, budgets, materials, supplierMaterials, workLogs, certifications,
+settings, projects, expenses, mailbox + middlewares/auth.js. **Pendientes (4):** equipmentCatalog,
+subcontractors, workers, ai.
 
 ### `[ ]` FASE 3 — Storage y Realtime locales
 - `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).
