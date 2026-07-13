@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
 import { callAI } from '../services/ai-service.js'
+import { extractMaterials } from '../services/extraction.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -483,38 +484,27 @@ ${libraryData}`
 //  EXTRACCIÓN DE MATERIALES — desde texto de archivo (Excel/PDF)
 // ================================================================
 
-// POST /api/ai/extract-materials — Extrae materiales y precios de texto de lista de proveedor
-// Uses Haiku for much lower cost (~10x cheaper than Sonnet)
-router.post('/extract-materials', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const { text, filename } = body
-    const content = truncateData(text, 15000)
-    return `Eres un experto en materiales de construcción. Analiza este contenido extraído de un archivo de lista de precios de proveedor.
+// POST /api/ai/extract-materials — Extrae materiales y precios de texto de lista de proveedor.
+// Capa 1 (código): pre-limpieza + normalización de números + validación.
+// Capa 2 (LLM local): solo convierte el texto borroso en JSON.
+router.post('/extract-materials', async (req, res, next) => {
+  try {
+    const { text, filename } = req.body
+    if (!text) return res.status(400).json({ error: 'Texto requerido para la extracción' })
 
-Tu tarea es extraer TODOS los materiales con sus precios unitarios de coste.
-Formato del archivo original: ${filename || 'desconocido'}
-
-REGLAS ESTRICTAS:
-- Extrae SOLO filas que tengan material real + precio numérico válido
-- Ignora completamente: cabeceras de columna, totales, subtotales, notas, encabezados de sección
-- "unit_price" debe ser el PRECIO DE COSTE unitario (sin IVA si se indica; si no se indica, usa el precio directo)
-- "unit" debe ser unidad estándar de construcción: ud, m, m2, m3, kg, l, ml, h, t, etc.
-- Si hay múltiples hojas o secciones separadas por "=== HOJA:", extrae de TODAS
-- "code" es opcional, incluye SOLO si hay referencia/código explícito en el archivo
-- Normaliza los nombres: elimina caracteres raros, mantén la descripción técnica clara
-- Si el precio tiene separadores de miles (1.200,50 o 1,200.50) normalízalo a número decimal correcto
-
-Responde SOLO con un array JSON válido (sin texto adicional):
-[
-  {"name": "Descripción clara del material", "unit": "ud", "unit_price": 12.50, "code": "REF001"}
-]
-
-Si un campo "code" no existe en la fuente, omítelo del objeto.
-Si no encuentras materiales con precio válido, responde: []
-
-CONTENIDO DEL ARCHIVO:
-${content}`
-  }, { model: 'claude-haiku-4-5-20251001' })
+    const materials = await extractMaterials(text, {
+      filename,
+      callAI,
+      aiContext: {
+        organizationId: req.user.organization_id,
+        userId: req.user.id,
+        operation: 'extract-materials',
+      },
+    })
+    res.json(materials)
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
