@@ -1262,50 +1262,39 @@ export async function parseBudgetFromText(rawText, useAI = true, organizationId 
 }
 
 /**
- * Parse budget using Vision OCR (sends PDF as document to AI)
- * Uses the multimodal capabilities of Anthropic/Gemini to read the PDF directly
+ * Parse budget from a scanned PDF using LOCAL OCR (100% local, sin nube).
+ *   PDF -> imágenes (pdftoppm) -> texto (tesseract, español) -> parseBudgetFromText
+ * Reutiliza todo el pipeline (algorítmico + LLM local). Mantiene el nombre para
+ * no cambiar la ruta que la llama. (Antes: Vision OCR de Gemini/Anthropic.)
  */
 export async function parseBudgetWithVision(pdfBase64, organizationId, userId) {
   const logs = []
-  logs.push('Intentando OCR con Vision AI...')
+  const { ocrPdfToText, ocrAvailable } = await import('./local-ocr.js')
 
-  const prompt = {
-    text: PDF_EXTRACTION_PROMPT + `\n\nIMPORTANTE: Analiza el documento PDF adjunto visualmente. Extrae TODOS los capítulos, partidas y mediciones que puedas ver. El documento es un presupuesto de construcción español.\n\nResponde SOLO con el JSON, sin explicaciones.`,
-    images: [{ mimeType: 'application/pdf', data: pdfBase64 }]
+  if (!(await ocrAvailable())) {
+    logs.push('⚠️ OCR local no disponible (falta tesseract/poppler en el entorno).')
+    return { chapters: [], logs }
   }
 
-  const aiResult = await callAI(prompt, {
-    maxTokens: 8192,
-    organizationId,
-    userId,
-  })
-
-  let chapters = []
-  if (aiResult.chapters && Array.isArray(aiResult.chapters)) {
-    chapters = aiResult.chapters
-  } else if (Array.isArray(aiResult)) {
-    chapters = aiResult
+  logs.push('🔍 OCR local (Tesseract, español)...')
+  let ocrText = ''
+  try {
+    ocrText = await ocrPdfToText(pdfBase64, { lang: 'spa' })
+  } catch (err) {
+    logs.push(`⚠️ OCR falló: ${err.message}`)
+    return { chapters: [], logs }
   }
 
-  // Normalizar estructura
-  for (const ch of chapters) {
-    if (!ch.items) ch.items = ch.partidas || []
-    for (const item of ch.items) {
-      if (!item.unit_price && item.price) item.unit_price = item.price
-      if (!item.measurements) item.measurements = item.mediciones || []
-      delete item.partidas
-      delete item.mediciones
-      delete item.price
-    }
-    delete ch.partidas
+  const chars = ocrText.trim().length
+  logs.push(`OCR: ${chars} caracteres extraídos`)
+  if (chars === 0) {
+    logs.push('⚠️ El OCR no extrajo texto legible del PDF.')
+    return { chapters: [], logs }
   }
 
-  const { chapters: cleaned } = validateAndClean(chapters)
-  const totalItems = cleaned.reduce((s, c) => s + c.items.length, 0)
-  const totalMeasurements = cleaned.reduce((s, c) => s + c.items.reduce((s2, i) => s2 + (i.measurements?.length || 0), 0), 0)
-  logs.push(`Vision OCR: ${cleaned.length} capitulos, ${totalItems} partidas, ${totalMeasurements} mediciones`)
-
-  return { chapters: cleaned, logs }
+  // Reusar el pipeline de texto (algorítmico + LLM local de refuerzo).
+  const result = await parseBudgetFromText(ocrText, true, organizationId, userId)
+  return { chapters: result.chapters, logs: [...logs, ...result.logs] }
 }
 
 export default parseBudgetFromText
