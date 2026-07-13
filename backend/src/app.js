@@ -25,6 +25,7 @@ import branchRoutes from './routes/branches.js'
 import mailboxRoutes from './routes/mailbox.js'
 import notificationRoutes from './routes/notifications.js'
 import ferrappRoutes from './routes/ferrapp.js'
+import filesRoutes from './routes/files.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -122,6 +123,7 @@ app.use('/api/branches', branchRoutes)
 app.use('/api/mailbox', mailboxRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/ferrapp', ferrappRoutes)
+app.use('/api/files', filesRoutes)
 
 // Error handler
 app.use((err, req, res, next) => {

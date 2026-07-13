@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 
 const JWT_SECRET = process.env.JWT_SECRET
 

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 import { createNotification } from '../services/notificationService.js'
 import {
   notifyBranchesChange,

@@ -58,8 +58,15 @@ npm run dev      # abre http://localhost:3000
 ```
 El frontend habla con el backend en `http://localhost:5000` (ya configurado por defecto).
 
-## 6. Notas
-- **De momento el backend sigue usando Supabase (nube)** con `backend/.env`. Esto es
-  temporal: en la Fase 2 lo apuntaremos a la MariaDB local. Por eso ahora mismo se
-  necesita internet para que el backend funcione del todo.
+## 6. Editar el backend (Fase 2 en curso)
+Al cambiar código de `backend/`, recompila e reinicia solo ese contenedor:
+```bash
+docker compose up -d --build backend
+```
+El rebuild es rápido (Docker cachea `npm install` si no cambió `package.json`).
+
+## 7. Notas
+- **Migración en curso (Fase 2):** las rutas se pasan de Supabase (nube) a la MariaDB
+  local una a una. Ya migrada: `auth.js` (login/registro). Las rutas aún NO migradas
+  siguen usando Supabase, así que de momento se necesita internet para esas.
 - Credenciales de MariaDB = solo desarrollo local. No son secretos de producción.

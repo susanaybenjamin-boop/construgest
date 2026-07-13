@@ -10,14 +10,26 @@
 > - **`database/init/`**: `01_schema.sql` (59 tablas) + `02_seed.sql` (org + usuario
 >   `admin@construgest.local` / `construgest`). Todo verificado en ejecución.
 >
-> **PRÓXIMA SESIÓN — empezar por aquí (FASE 2):**
+> **FASE 2 COMPLETA (rutas de dominio) — 20 de ~21 ficheros migrados** a `../db/local.js` y
+> verificados. Solo queda `ai.js` (+ servicios IA/realtime), que pertenece a Fase 3/4.
+> El shim (`backend/src/db/local.js`) ya maneja: select/insert/update/delete/upsert, eq/neq/gt/
+> gte/lt/lte/is/in/like/ilike/or/not, order/limit/range/single/maybeSingle, RETURNING (insert/
+> delete), update&upsert+select vía re-SELECT, normalización fechas ISO→DATETIME y objetos→JSON,
+> selects anidados `alias:tabla(...)` (en select Y en mutación insert/update/delete/upsert+select),
+> columnas reservadas entrecomilladas, **storage en disco** (`db/storage.js` + `/api/files`) y
+> **`.rpc(nombre, params)`** (despacha a `db/rpc.js`). Migrar ruta = cambiar su import.
+>
+> **PRÓXIMA SESIÓN — empezar por aquí (Fase 2 de rutas HECHA):**
 > 1. Leer esta cabecera + `CLAUDE.md`. Arrancar: `docker compose up -d`.
-> 2. **DATA-0:** crear el cliente MariaDB (`mysql2`) en `backend/src/db/` + un ayudante que
->    imite el patrón de consulta que hoy usa Supabase (para migrar las 588 llamadas sin
->    reescribir cada una a mano). Apuntar el backend a la MariaDB local (ya tiene las envs
->    DB_HOST=mariadb… en docker-compose).
-> 3. **DATA-n:** migrar la primera ruta (empezar por `auth.js`, es pequeña y clave) y
->    VERIFICAR el login real con `curl` contra el backend. Una ruta = un slice = un commit.
+>    Tras editar backend: `docker compose up -d --build backend`.
+> 2. **Merge `feat/benjamin` → `develop`** (`--no-ff`): toda la capa de datos de rutas está
+>    migrada y probada en ejecución.
+> 3. **Fase 3 — Realtime → polling/WebSocket** y migrar los servicios que aún usan Supabase:
+>    `services/ai-service.js`, `notificationService.js`, `realtimeBroadcast.js`,
+>    `mcp-ai-tracker.js` + la ruta `ai.js`. Para las cuotas de IA hay que reimplementar
+>    `mcp_check_quota` / `mcp_check_and_record_usage` en `db/rpc.js` (aún NO están; requieren
+>    las tablas `mcp_ai_quotas`/`mcp_ai_user_quotas`/`mcp_ai_consumption`).
+> 4. Fase 4 (IA) y Fase 5 (empaquetado `.msi`).
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -62,10 +74,67 @@ prefijo (ver `CLAUDE.md` §6).
 
 **➡️ FASE 1 COMPLETA.** Merge `feat/benjamin` → `develop`.
 
-### `[ ]` FASE 2 — Capa de datos MariaDB (backend), ruta por ruta
-- `[ ]` **DATA-0** cliente MariaDB (`mysql2`) + ayudante para no reescribir 588 llamadas a mano.
-- `[ ]` **DATA-n** migrar cada ruta de `backend/src/routes/` (una por slice), verificando con `curl`.
-- `[ ]` reimplementar las 25 funciones RPC en Node.
+### `[~]` FASE 2 — Capa de datos MariaDB (backend), ruta por ruta
+- `[x]` **DATA-0** cliente `mysql2` (`backend/src/db/mariadb.js`, pool con typeCast TINYINT→bool y
+  timezone UTC) + **shim compatible con Supabase** (`backend/src/db/local.js`): `.from/.select/
+  .insert/.update/.delete/.eq/.neq/.gt/.gte/.lt/.lte/.is/.in/.like/.ilike/.order/.limit/.single/
+  .maybeSingle`, awaitable, devuelve `{data,error}`, insert/update+select vía RETURNING. Migrar
+  = cambiar el import de una ruta a `../db/local.js` (sin reescribir llamadas).
+- `[x]` **DATA-1** `auth.js` migrado y VERIFICADO con curl: login OK/401/401, register 201
+  (INSERT RETURNING), /me 200. (Shim aún NO soporta: selects anidados `tabla(...)`, `.or()`,
+  `.rpc()`, `.storage` → se amplían cuando una ruta lo pida.)
+- `[x]` **DATA-2** `suppliers.js` migrado y VERIFICADO con curl (CRUD completo: crear/listar/
+  obtener/editar/soft-delete + filtro activos/todos). Al hacerlo se arreglaron **2 bugs
+  sistémicos del shim** (aplican a todas las rutas):
+    · MariaDB NO tiene `UPDATE ... RETURNING` → update+`.select()` se resuelve con un SELECT
+      posterior con los mismos filtros.
+    · Normalización de valores (`normVal`): fechas ISO `...T..Z`/Date → DATETIME MariaDB (UTC),
+      objetos/arrays → JSON. (Antes petaba `Incorrect datetime value`.)
+  Nota: `authMiddleware` es solo-JWT (no toca BD); las funciones de acceso a proyecto de
+  `middlewares/auth.js` SÍ usan Supabase y habrá que migrarlas al tocar budgets/workLogs/etc.
+- `[x]` **DATA-3 (oleada 1)** migradas: `notifications`, `plans`, `ferrapp`, `admin`, `branches`,
+  `library`, `budgets` + las funciones de acceso a proyecto de `middlewares/auth.js`. Shim
+  ampliado con `.upsert` (INSERT..ON DUPLICATE KEY UPDATE), `.or('col.op.val,...')` y
+  `.not(col,'is',null)`. VERIFICADO: endpoints de lectura 200; `.or` (branches invitations,
+  library search), `.upsert` (etiquetas ferrapp), `.not` (library chapters). budgets/plans:
+  la capa de acceso ya va a MariaDB (403 correcto sin proyecto); falta seed de proyecto/
+  presupuesto para verificar sus DATOS a fondo.
+- `[x]` **DATA-3 (oleada 2)** shim: **resolver de selects anidados** `alias:tabla(cols, nested:...)`
+  por FK convencional `alias_id` (recursivo). Migradas: `materials`, `supplierMaterials`,
+  `workLogs`, `certifications`. VERIFICADO con datos reales (supplier-materials devuelve
+  embeds `supplier{}`/`material{}`). Fix: el parser de anidados ahora tolera espacios/saltos
+  de línea antes del `(` (selects multilínea).
+- `[x]` **Seed demo + verificación budgets/workLogs/certifications.** `database/init/03_seed_demo.sql`
+  (proyecto + presupuesto completo + parte + certificación). VERIFICADO con datos reales:
+  budgets `/project/:id` y `/:id/full` (capítulos→partidas→mediciones); workLogs 6 endpoints
+  GET 200; certifications 5 endpoints GET 200 (incl. `/:id/summary` con anidado multilínea).
+- `[x]` **DATA-3 (oleada 3) — STORAGE** hecha y verificada. `db/storage.js` (capa de ficheros en
+  disco compatible con `supabase.storage`: upload/update/download/remove/createSignedUrl(s)) +
+  `routes/files.js` (sirve `/api/files/:bucket/*splat`) + volumen Docker `construgest_files:/data`.
+  Rutas migradas: `settings`, `projects`, `expenses`, `mailbox`. Shim: +`.range()` + entrecomillado
+  de columnas reservadas (key/value/date...). VERIFICADO e2e: subir recibo→disco→URL firmada→
+  recuperar contenido; projects/settings/mailbox 200; sin regresiones.
+- `[x]` **DATA-3 (oleada 4) — RPC** hecha y VERIFICADA con curl. `db/rpc.js` reimplementa en Node
+  las 21 funciones `rpc_*` de equipment/workers/subcontractors/sub_documents (fuente
+  `docs/schema/raw/rpc-functions.postgres.sql`) + `.rpc(nombre,params)` en el shim que despacha ahí.
+  Migradas `equipmentCatalog`, `subcontractors`, `workers`. VERIFICADO e2e (login→CRUD): workers
+  (incl. `certifications` JSON hidratado a array, `is_subcontracted` booleano); subcontractors +
+  documentos PRL + `expiring` (JOIN) + `specialties` (DISTINCT); equipment + `categories` + link de
+  material (insert + select ANIDADO). **Al hacerlo se amplió el shim**: `insert/update/delete/upsert
+  + .select(anidado)` (antes lanzaba "no soportado"); insert/delete vía `RETURNING`, update/upsert
+  vía re-SELECT, y en todos se resuelven los embeds. Sin regresiones en rutas previas.
+  · NOTA (deuda sistémica del shim, no bloqueante): las columnas `DATE` vuelven como Date de mysql2
+    y `res.json` las serializa a ISO con hora (p.ej. `hire_date: "2026-01-15T00:00:00.000Z"`), no
+    `"2026-01-15"` como la nube. Aplica a TODAS las rutas con DATE; si molesta en UI, poner
+    `dateStrings: ['DATE']` en el pool y re-verificar las rutas ya migradas.
+- `[ ]` **Servicios que aún importan Supabase** (Fase 3/4): `services/ai-service.js`,
+  `notificationService.js`, `realtimeBroadcast.js`, `mcp-ai-tracker.js` + ruta `ai.js`. Incluye
+  reimplementar las 2 RPC de cuotas `mcp_check_quota`/`mcp_check_and_record_usage` en `db/rpc.js`.
+
+**Migradas (20 ficheros de ruta + middleware):** auth, suppliers, notifications, plans, ferrapp,
+admin, branches, library, budgets, materials, supplierMaterials, workLogs, certifications,
+settings, projects, expenses, mailbox, equipmentCatalog, subcontractors, workers +
+middlewares/auth.js. **Pendiente (1):** ai.js (+ servicios IA/realtime → Fase 3/4).
 
 ### `[ ]` FASE 3 — Storage y Realtime locales
 - `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).

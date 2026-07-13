@@ -285,7 +285,9 @@
       "mcp__8a6d4ef6-af7e-4b7b-b7eb-8fb786f6f408__list_projects",
       "Bash(cp \"/c/Users/benja/Desktop/MediciÃ³n Vivienda ANAySOFIA _ Ajustado a PEM.bc3\" /tmp/test.bc3)",
       "Bash(cp \"/c/Users/benja/Desktop/Guadalfeo_Ajust.pzh\" /tmp/test.pzh)",
-      "Read(//c/tmp/**)"
+      "Read(//c/tmp/**)",
+      "Read(//c/tmp/**)",
+      "Bash(git push:*)"
     ]
   }
 }
