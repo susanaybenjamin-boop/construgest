@@ -35,6 +35,53 @@ function normVal(v) {
 
 const OP_MAP = { eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=', like: 'LIKE', ilike: 'LIKE' }
 
+// ---- Selects anidados estilo Supabase: "*, alias:tabla(cols, nested:tabla2(...))" ----
+// Convención: el embed `alias:tabla(...)` se resuelve por la FK local `alias_id`
+// (many-to-one / belongs-to). Es como funcionan todos los usos del proyecto.
+function splitTopComma(str) {
+  const out = []; let depth = 0, cur = ''
+  for (const ch of str) {
+    if (ch === '(') depth++
+    else if (ch === ')') depth--
+    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = '' } else cur += ch
+  }
+  if (cur.trim()) out.push(cur.trim())
+  return out
+}
+function parseSelect(str) {
+  const baseCols = []; const embeds = []
+  for (const p of splitTopComma(str)) {
+    if (p.includes('(')) {
+      const m = p.match(/^(\w+):(\w+)\(([\s\S]*)\)$/) || p.match(/^(\w+)\(([\s\S]*)\)$/)
+      if (m.length === 4) embeds.push({ alias: m[1], table: m[2], sel: parseSelect(m[3]) })
+      else embeds.push({ alias: m[1], table: m[1], sel: parseSelect(m[2]) })
+    } else baseCols.push(p)
+  }
+  return { baseCols, embeds }
+}
+function colsForQuery(sel) {
+  if (sel.baseCols.includes('*')) return '*'
+  const cols = new Set(sel.baseCols)
+  cols.add('id')                                   // necesario para mapear al anidar
+  for (const e of sel.embeds) cols.add(e.alias + '_id') // FK para resolver el embed
+  return [...cols].map(qi).join(', ')
+}
+async function attachEmbeds(rows, sel) {
+  if (!rows.length) return
+  for (const e of sel.embeds) {
+    const fk = e.alias + '_id'
+    const ids = [...new Set(rows.map((r) => r[fk]).filter((v) => v != null))]
+    const map = {}
+    if (ids.length) {
+      const [subRows] = await pool.query(
+        `SELECT ${colsForQuery(e.sel)} FROM ${qi(e.table)} WHERE id IN (${ids.map(() => '?').join(',')})`, ids)
+      await attachEmbeds(subRows, e.sel)
+      for (const sr of subRows) map[sr.id] = sr
+    }
+    for (const r of rows) r[e.alias] = map[r[fk]] || null
+  }
+}
+
 class Builder {
   constructor(table) {
     this.table = table
@@ -171,8 +218,22 @@ class Builder {
     return { sql: this._selectTail(`SELECT ${this.cols} FROM ${qi(this.table)}` + this._where(params)), params }
   }
 
+  async _execNested() {
+    const sel = parseSelect(this.cols)
+    const params = []
+    const sql = this._selectTail(`SELECT ${colsForQuery(sel)} FROM ${qi(this.table)}` + this._where(params))
+    const [rows] = await pool.query(sql, params)
+    await attachEmbeds(rows, sel)
+    if (this.single_) {
+      if (!rows.length) return { data: null, error: this.maybe ? null : { code: 'PGRST116', message: 'No rows found' } }
+      return { data: rows[0], error: null }
+    }
+    return { data: rows, error: null }
+  }
+
   async exec() {
     try {
+      if (this.op === 'select' && this.cols.includes('(')) return await this._execNested()
       const { sql, params } = this._sql()
       const [res] = await pool.query(sql, params)
       let rows = Array.isArray(res) ? res : null // OkPacket (insert/update/upsert sin RETURNING) => null
