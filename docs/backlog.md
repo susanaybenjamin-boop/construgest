@@ -204,10 +204,17 @@ el catálogo propio. Mejora con el uso, local y sin internet.
   · PENDIENTE Fase 5: en el `.msi` Windows hay que empaquetar tesseract+poppler (o WASM); ahora solo
     están en la imagen Docker Linux.
 - `[ ]` **AI-4:** bucle de correcciones (tabla local + few-shot + fuzzy-match de catálogo).
-- `[ ]` **AI-5:** eliminar maquinaria de coste/cuotas (mcp-ai-tracker, cons_ai_pricing,
-  cons_ai_consumption, quotas). **Ya NO se reimplementan las RPC `mcp_check_quota`/
-  `mcp_check_and_record_usage`** (sobran al ser local y gratis).
-- `[ ]` **AI-6:** eliminar chat (`/api/ai/chat` + UI del chat).
+- `[~]` **AI-5 (limpieza del motor) HECHO; queda el panel admin.**
+  · `[x]` `ai-service.js` reescrito a **local puro** (730→~185 líneas): fuera SDKs de nube
+    (Anthropic/Groq/Gemini), claves por org, pricing, logging de consumo, cuotas y el import de
+    Supabase. Solo queda caché + `tryLocal` (Ollama) + `parseAIResponse`. VERIFICADO: arranca
+    limpio, extract-materials sigue OK, sin regresiones. (Las deps npm de los SDK se dejan porque
+    `settings.js` aún las usa para probar claves → se quitan con la limpieza de settings.)
+  · `[ ]` **Follow-up:** desmantelar el panel admin de IA (`routes/admin.js` usa `mcp-ai-tracker` +
+    `cons_ai_consumption`/`cons_ai_pricing`/quotas, todo Supabase) + su frontend, y borrar
+    `services/mcp-ai-tracker.js`. Al ser IA local/gratis ese panel entero sobra.
+- `[x]` **AI-6 (quitar chat) HECHO.** Eliminado `POST /api/ai/chat`. No había UI de chat en el
+  frontend (0 referencias). VERIFICADO: `/api/ai/chat` → 404, resto de la IA intacto.
 
 ### `[ ]` FASE 5 — Empaquetado autocontenido (LO ÚLTIMO)
 - `[ ]` instalable Windows: Node + Next + MariaDB embebida **+ Ollama + modelo 3B**, "doble

@@ -508,40 +508,6 @@ router.post('/extract-materials', async (req, res, next) => {
 })
 
 // ================================================================
-//  CHAT LIBRE — Asistente general de construcción
-// ================================================================
-
-// POST /api/ai/chat — Chat libre con contexto de proyecto
-router.post('/chat', async (req, res, next) => {
-  try {
-    const { message, context } = req.body
-    if (!message) return res.status(400).json({ error: 'Mensaje requerido' })
-
-    const contextSection = context ? `\nCONTEXTO DEL PROYECTO:\n${truncateData(context, 4000)}\n` : ''
-
-    const prompt = `Eres un asistente experto en construcción, presupuestos de obra y gestión de proyectos en España.
-Responde de forma clara, concisa y profesional en español.
-Si te preguntan sobre datos específicos, utiliza el contexto proporcionado.
-${contextSection}
-PREGUNTA DEL USUARIO:
-${message}`
-
-    const result = await callAI(prompt, { organizationId: req.user.organization_id, userId: req.user.id })
-
-    // For chat, return raw text if it's not JSON
-    if (typeof result === 'string') {
-      res.json({ response: result })
-    } else if (result.raw_response) {
-      res.json({ response: result.raw_response })
-    } else {
-      res.json(result)
-    }
-  } catch (err) {
-    next(err)
-  }
-})
-
-// ================================================================
 //  IMPORTACIÓN DE PRESUPUESTO PDF — Parser híbrido
 // ================================================================
 
