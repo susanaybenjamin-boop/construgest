@@ -39,15 +39,24 @@ export function normalizeReference(rows = [], source = 'biblioteca') {
  * @param {Array} reference  filas de referencia ya normalizadas
  * @returns {Array} items enriquecidos con { ref_price, ref_name, ref_source, similarity } (o ref_price:null)
  */
+// La biblioteca propia MANDA sobre las bases públicas (precios reales del
+// usuario). A igualdad de similitud, gana la fuente de mayor rango y, dentro de
+// la misma fuente, la más usada.
+function sourceRank(src) { return src === 'biblioteca' ? 1 : 0 }
+
 export function lookupPrices(items, reference, { threshold = DEFAULT_THRESHOLD } = {}) {
   return items.map((it) => {
     let best = null, bestSim = 0
     for (const r of reference) {
       if (normUnit(it.unit) !== normUnit(r.unit)) continue
       const sim = jaccard(it.name, r.name)
-      // A igualdad de similitud, prefiere la referencia más usada (más fiable).
-      if (sim > bestSim || (sim === bestSim && best && r.usage_count > best.usage_count)) {
+      if (sim > bestSim) {
         bestSim = sim; best = r
+      } else if (sim === bestSim && best) {
+        // Desempate: primero por fuente (biblioteca manda), luego por uso.
+        const better = sourceRank(r.source) > sourceRank(best.source)
+          || (sourceRank(r.source) === sourceRank(best.source) && r.usage_count > best.usage_count)
+        if (better) best = r
       }
     }
     if (best && bestSim >= threshold) {

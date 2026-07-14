@@ -9,6 +9,7 @@ import {
   normalizeReference,
   findSimilar,
 } from '../services/price-reference.js'
+import { loadPublicPriceBases } from '../services/price-base.js'
 import {
   analyzeBudget,
   buildSummaryPrompt,
@@ -27,8 +28,10 @@ router.use(authMiddleware)
 
 /**
  * Carga la referencia de precios de una organización.
- * Fuente 1: biblioteca propia (`cons_saved_partidas`). Fuente 2 (pendiente): base
- * pública BC3, que se concatenaría aquí como respaldo.
+ * Fuente 1: biblioteca propia (`cons_saved_partidas`) → MANDA (precios reales).
+ * Fuente 2: bases públicas BC3 del directorio `data/price-bases` (respaldo,
+ * enchufable). Se concatenan; en `lookupPrices` la biblioteca gana a igualdad
+ * de similitud (ver source priority en price-reference.js).
  */
 async function loadPriceReference(orgId) {
   const { data, error } = await supabase
@@ -36,7 +39,9 @@ async function loadPriceReference(orgId) {
     .select('name, unit, unit_price, cost_price, usage_count, source')
     .eq('organization_id', orgId)
   if (error) throw error
-  return normalizeReference(data || [], 'biblioteca')
+  const biblioteca = normalizeReference(data || [], 'biblioteca')
+  const publicas = loadPublicPriceBases()
+  return [...biblioteca, ...publicas]
 }
 
 // ================================================================
