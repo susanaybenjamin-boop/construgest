@@ -6,6 +6,8 @@ export interface VersionInfo {
   latest: string | null
   updateAvailable: boolean
   releaseUrl: string | null
+  downloadUrl: string | null
+  assetName: string | null
   notes: string | null
   publishedAt: string | null
   checkedRemote: boolean

@@ -3,6 +3,8 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   // Server Node autónomo (.next/standalone) para empaquetar en el .msi (Fase 5).
   output: 'standalone',
+  // Sin el overlay de dev tools de Next (no debe salir en la app empaquetada).
+  devIndicators: false,
   // Fija la raíz en esta carpeta: sin esto, si aparece un package-lock.json en un
   // directorio superior, Next lo toma como workspace root y anida el standalone
   // (server.js quedaría en standalone/frontend/), rompiendo el empaquetado.
