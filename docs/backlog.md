@@ -154,9 +154,16 @@ admin, branches, library, budgets, materials, supplierMaterials, workLogs, certi
 settings, projects, expenses, mailbox, equipmentCatalog, subcontractors, workers +
 middlewares/auth.js. **Pendiente (1):** ai.js (+ servicios IA/realtime → Fase 3/4).
 
-### `[ ]` FASE 3 — Storage y Realtime locales
-- `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).
-- `[ ]` **RT-1** Realtime (9 tablas) → polling o WebSocket propio.
+### `[~]` FASE 3 — Storage y Realtime locales
+- `[x]` **ST-1** Storage local hecho en Fase 2 (DATA-3 oleada 3): `db/storage.js` + `routes/files.js`
+  + volumen Docker `construgest_files`. Ficheros en disco, URLs firmadas locales.
+- `[x]` **RT-1** Realtime local = **WebSocket propio** (`services/realtimeHub.js`) montado en `/ws`
+  sobre el http.Server de Express. `realtimeBroadcast.js` y `notificationService.js` publican al hub
+  (mismos topics: `budget:{id}`, `org:{id}:projects|branches`, `user:{id}`). Auth por JWT en la
+  conexión; suscripción restringida (user:{id} solo el propio, org:{id}:* solo su org); heartbeat.
+  VERIFICADO e2e: WS autenticado recibe `change` al crear proyecto; token inválido → cierre 4001.
+  **Falta (otra sesión): wire del frontend** (`lib/realtime.ts` + `realtimeNotificationStore.ts`
+  + `lib/supabase.ts`) al nuevo WS.
 
 ### `[~]` FASE 4 — IA LOCAL (decidido 2026-07-13)
 **Objetivo:** IA **100% local, sin internet** (coherente con autocontenido). Portátil i5,

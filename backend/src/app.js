@@ -1,7 +1,9 @@
 import 'dotenv/config'
+import { createServer } from 'http'
 import express from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import { initRealtime } from './services/realtimeHub.js'
 
 // Route imports
 import authRoutes from './routes/auth.js'
@@ -133,7 +135,10 @@ app.use((err, req, res, next) => {
   })
 })
 
-app.listen(PORT, () => {
+// http.Server explícito para poder montar el WebSocket (Realtime local) encima.
+const server = createServer(app)
+initRealtime(server)
+server.listen(PORT, () => {
   console.log(`ConstruGest API running on port ${PORT}`)
 })
 
