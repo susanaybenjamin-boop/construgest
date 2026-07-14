@@ -153,7 +153,27 @@ async function applySchema() {
   }
 }
 
-/** Arranca MariaDB bundleada (inicializando la 1ª vez); si no está, la asume externa. */
+/** ¿Existe ya una base de datos con ese nombre? (root, sin marcadores frágiles). */
+function databaseExists(name) {
+  return new Promise((resolve) => {
+    const c = spawn(clientBin, [
+      '--host=127.0.0.1', `--port=${PORTS.mariadb}`, '--user=root', '-N', '-B',
+      '-e', `SHOW DATABASES LIKE '${name}'`,
+    ], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let out = ''
+    c.stdout.on('data', (d) => { out += d })
+    c.on('close', () => resolve(out.trim() === name))
+    c.on('error', () => resolve(false))
+  })
+}
+
+/**
+ * Arranca MariaDB bundleada; si no está, la asume externa. La inicialización es
+ * IDEMPOTENTE y resistente a interrupciones:
+ *  - install-db solo si no hay tablas de sistema (`mysql/`). install-db exige un
+ *    datadir vacío/nuevo, así que si hay restos de un intento fallido se limpian.
+ *  - el esquema se aplica solo si la BD `construgest` aún no existe.
+ */
 async function startMariaDB() {
   if (!fs.existsSync(paths.mysqld)) {
     log('MariaDB no bundleada → se asume una externa en :' + PORTS.mariadb + ' (dev: Docker)')
@@ -163,12 +183,16 @@ async function startMariaDB() {
     throw new Error('Faltan binarios de MariaDB (install-db / cliente) en runtime/mariadb/bin')
   }
 
-  const marker = path.join(paths.dataDir, '.construgest-initialized')
-  const firstRun = !fs.existsSync(marker)
-
-  if (firstRun) {
-    log('Inicializando datadir de MariaDB (1ª vez)…')
+  const systemDir = path.join(paths.dataDir, 'mysql') // tablas de sistema de MariaDB
+  if (!fs.existsSync(systemDir)) {
+    // Datadir sin inicializar. install-db no acepta un dir con contenido → si hay
+    // restos de un arranque anterior fallido, se borran (no hay datos reales).
+    if (fs.existsSync(paths.dataDir)) {
+      log('Datadir sin inicializar con restos → limpiando')
+      fs.rmSync(paths.dataDir, { recursive: true, force: true })
+    }
     fs.mkdirSync(paths.dataDir, { recursive: true })
+    log('Inicializando datadir de MariaDB (1ª vez)…')
     await runToEnd(installDbBin, [`--datadir=${paths.dataDir}`])
   }
 
@@ -184,10 +208,13 @@ async function startMariaDB() {
 
   await waitForTcp(PORTS.mariadb)
 
-  if (firstRun) {
+  // Esquema idempotente: solo si la BD no existe todavía.
+  if (!(await databaseExists(DB.name))) {
+    log('Aplicando esquema (BD nueva)…')
     await applySchema()
-    fs.writeFileSync(marker, new Date().toISOString())
     log('MariaDB inicializada y esquema aplicado')
+  } else {
+    log('MariaDB lista (BD ya existente)')
   }
 }
 
