@@ -14,9 +14,22 @@
 > en mutación), storage en disco y `.rpc()`. (`ai.js` no va a MariaDB: la IA se reescribió a local.)
 >
 > **✅ BACKEND TERMINADO Y 100% LOCAL (2026-07-14).** Cero dependencia de nube en runtime:
-> Realtime = WebSocket propio (`services/realtimeHub.js`, ruta `/ws`); notificaciones en MariaDB;
-> panel admin de IA y claves-cloud eliminados; deps de nube fuera (queda solo el `/installer` viejo
-> de `settings.js`, que se rehará en Fase 5). Verificado e2e. **Próximo gran bloque: conectar la UI.**
+> Realtime = WebSocket propio (`services/realtimeHub.js`, ruta `/ws`); notificaciones en MariaDB.
+>
+> **✅ UI CONECTADA + LIMPIEZA NUBE + RELEASE (2026-07-14, mergeado a `develop` `f693566`).**
+> - **UI-1..3 + UI-2:** Realtime WS del frontend; 5 skills IA cableadas (certificaciones, gastos,
+>   materiales, compare-budgets, find-similar); limpieza AI-5 (panel admin IA + claves cloud fuera).
+> - **CLEAN-CLOUD:** eliminado el `/installer` legacy y todas las refs muertas de nube (vercel/
+>   onrender/Supabase/AI-cloud/Vision en código y `.env`).
+> - **RELEASE + auto-aviso:** `GET /api/version` compara con GitHub Releases; banner "nueva versión"
+>   + "Acerca de" en Ajustes; `scripts/release.sh` + `docs/RELEASING.md`. **1ª release `v0.1.0`
+>   publicada** (main + tag + GitHub Release). Para el aviso en repo PRIVADO hace falta `GITHUB_TOKEN`
+>   en `backend/.env` (o hacer el repo público). El auto-update REAL (descargar/aplicar) es Fase 5.
+> - **2 bugs preexistentes arreglados:** `projectIdFromBudget` (comparativa 500) y DECIMAL→Number
+>   en el pool MariaDB (editor de presupuesto crasheaba con mediciones).
+> - **BC3-2 + AI-4:** 2ª fuente de precios BC3 (enchufable, falta el fichero real de Andalucía) y
+>   autoaprendizaje (correcciones → few-shot en extracción de materiales).
+>   **Todo verificado e2e con Ollama local.**
 >
 > **🗑️ MÓDULO FERRALLA ELIMINADO (2026-07-14) — no encajaba en el producto.** Borrado
 > completo y verificado e2e: frontend (`app/ferrapp`, `components/ferrapp`, `lib/ferrapp`,
