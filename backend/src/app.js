@@ -73,11 +73,12 @@ app.use(helmet({
 // tras uno (nginx/traefik) para que el rate limiter use la IP real del cliente.
 app.set('trust proxy', 1)
 
-// Rate limit global: protege la API entera. Ventana de 1 min, 300 req/IP.
-// Un dashboard activo cabe holgado. Ajustar si vemos falsos positivos.
+// Rate limit global: backstop anti-bucle-descontrolado. App LOCAL de un solo
+// usuario → el límite es alto (una importación de presupuesto hace cientos de
+// llamadas legítimas seguidas). Configurable con RATE_LIMIT.
 const globalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 300,
+  limit: Number(process.env.RATE_LIMIT) || 6000,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   message: { error: 'Demasiadas peticiones. Intenta de nuevo en un minuto.' },
