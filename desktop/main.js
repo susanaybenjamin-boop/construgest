@@ -39,7 +39,16 @@ const paths = {
   storageDir: path.join(app.getPath('userData'), 'storage'),
 }
 
-function log(...a) { console.log('[construgest]', ...a) }
+// Log a fichero (userData/logs/construgest.log) para diagnosticar la app
+// empaquetada: sin esto, el stdout/stderr de los procesos hijo no se ve.
+let logStream = null
+try {
+  const logDir = path.join(app.getPath('userData'), 'logs')
+  fs.mkdirSync(logDir, { recursive: true })
+  logStream = fs.createWriteStream(path.join(logDir, 'construgest.log'), { flags: 'a' })
+} catch { /* sin log a fichero */ }
+function writeLog(s) { if (logStream) { try { logStream.write(s) } catch { /* ignore */ } } }
+function log(...a) { const line = '[construgest] ' + a.join(' '); console.log(line); writeLog(line + '\n') }
 function firstExisting(candidates) { return candidates.find((p) => fs.existsSync(p)) || null }
 
 // Nombres de binario varían por versión de MariaDB en Windows.
@@ -124,8 +133,8 @@ function spawnNode(entry, extraEnv) {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const tag = path.basename(entry)
-  child.stdout.on('data', (d) => process.stdout.write(`  ${tag} | ${d}`))
-  child.stderr.on('data', (d) => process.stderr.write(`  ${tag} | ${d}`))
+  child.stdout.on('data', (d) => { process.stdout.write(`  ${tag} | ${d}`); writeLog(`  ${tag} | ${d}`) })
+  child.stderr.on('data', (d) => { process.stderr.write(`  ${tag} | ${d}`); writeLog(`  ${tag} | ${d}`) })
   children.push(child)
   return child
 }
@@ -202,8 +211,8 @@ async function startMariaDB() {
     `--port=${PORTS.mariadb}`,
     '--bind-address=127.0.0.1',
   ], { stdio: ['ignore', 'pipe', 'pipe'] })
-  child.stdout.on('data', (d) => process.stdout.write(`  mariadb | ${d}`))
-  child.stderr.on('data', (d) => process.stderr.write(`  mariadb | ${d}`))
+  child.stdout.on('data', (d) => { process.stdout.write(`  mariadb | ${d}`); writeLog(`  mariadb | ${d}`) })
+  child.stderr.on('data', (d) => { process.stderr.write(`  mariadb | ${d}`); writeLog(`  mariadb | ${d}`) })
   children.push(child)
 
   await waitForTcp(PORTS.mariadb)
@@ -228,8 +237,8 @@ function startOllama() {
   }
   log('Arrancando Ollama bundleado…')
   const child = spawn(paths.ollama, ['serve'], { stdio: ['ignore', 'pipe', 'pipe'] })
-  child.stdout.on('data', (d) => process.stdout.write(`  ollama | ${d}`))
-  child.stderr.on('data', (d) => process.stderr.write(`  ollama | ${d}`))
+  child.stdout.on('data', (d) => { process.stdout.write(`  ollama | ${d}`); writeLog(`  ollama | ${d}`) })
+  child.stderr.on('data', (d) => { process.stderr.write(`  ollama | ${d}`); writeLog(`  ollama | ${d}`) })
   children.push(child)
 }
 
