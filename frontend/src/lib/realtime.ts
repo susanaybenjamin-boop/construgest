@@ -1,16 +1,12 @@
-import { supabase } from './supabase'
-import type { RealtimeChannel } from '@supabase/supabase-js'
+import { subscribeTopic } from './realtimeClient'
 
 // ─────────────────────────────────────────────────────────────
-// Suscripciones Realtime con BROADCAST.
+// Suscripciones Realtime sobre el WebSocket propio (hub local del
+// backend, ver services/realtimeHub.js). Sustituye al Realtime de
+// Supabase: el backend publica un evento en cada mutación y aquí
+// se traduce a un callback (con debounce para agrupar ráfagas).
 //
-// La app no usa Supabase Auth (auth propia con JWT del backend),
-// por lo que las RLS bloquean `postgres_changes` para el cliente
-// anon. En su lugar usamos canales `broadcast`: el backend emite
-// eventos en cada mutación (ver services/realtimeBroadcast.js)
-// y el cliente los escucha aquí. No depende de RLS.
-//
-// Canales:
+// Topics:
 //   budget:{budgetId}            → cambios en un presupuesto.
 //   org:{orgId}:projects         → cambios en proyectos de una org.
 //   org:{orgId}:branches         → invitaciones / vínculos / shares.
@@ -19,7 +15,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 const DEBOUNCE_MS = 400
 
 // ─── Budget channel ──────────────────────────────────────────
-let activeChannel: RealtimeChannel | null = null
+let budgetUnsub: (() => void) | null = null
 let activeBudgetId: string | null = null
 let budgetDebounce: ReturnType<typeof setTimeout> | null = null
 let budgetCallback: (() => void) | null = null
@@ -33,7 +29,7 @@ function scheduleBudget() {
 }
 
 export function subscribeToBudget(budgetId: string, onChange: () => void) {
-  if (activeBudgetId === budgetId && activeChannel) {
+  if (activeBudgetId === budgetId && budgetUnsub) {
     budgetCallback = onChange
     return
   }
@@ -41,11 +37,7 @@ export function subscribeToBudget(budgetId: string, onChange: () => void) {
 
   budgetCallback = onChange
   activeBudgetId = budgetId
-
-  activeChannel = supabase
-    .channel(`budget:${budgetId}`, { config: { broadcast: { self: false } } })
-    .on('broadcast', { event: 'change' }, scheduleBudget)
-    .subscribe()
+  budgetUnsub = subscribeTopic(`budget:${budgetId}`, scheduleBudget)
 }
 
 export function unsubscribeFromBudget() {
@@ -53,16 +45,16 @@ export function unsubscribeFromBudget() {
     clearTimeout(budgetDebounce)
     budgetDebounce = null
   }
-  if (activeChannel) {
-    supabase.removeChannel(activeChannel)
-    activeChannel = null
+  if (budgetUnsub) {
+    budgetUnsub()
+    budgetUnsub = null
   }
   activeBudgetId = null
   budgetCallback = null
 }
 
 // ─── Projects channel ────────────────────────────────────────
-let projectsChannel: RealtimeChannel | null = null
+let projectsUnsub: (() => void) | null = null
 let projectsOrgId: string | null = null
 let projectsDebounce: ReturnType<typeof setTimeout> | null = null
 let projectsCallback: (() => void) | null = null
@@ -77,18 +69,14 @@ function scheduleProjects() {
 
 export function subscribeToProjects(orgId: string, onChange: () => void) {
   if (!orgId) return
-  if (projectsOrgId === orgId && projectsChannel) {
+  if (projectsOrgId === orgId && projectsUnsub) {
     projectsCallback = onChange
     return
   }
   unsubscribeFromProjects()
   projectsCallback = onChange
   projectsOrgId = orgId
-
-  projectsChannel = supabase
-    .channel(`org:${orgId}:projects`, { config: { broadcast: { self: false } } })
-    .on('broadcast', { event: 'change' }, scheduleProjects)
-    .subscribe()
+  projectsUnsub = subscribeTopic(`org:${orgId}:projects`, scheduleProjects)
 }
 
 export function unsubscribeFromProjects() {
@@ -96,16 +84,16 @@ export function unsubscribeFromProjects() {
     clearTimeout(projectsDebounce)
     projectsDebounce = null
   }
-  if (projectsChannel) {
-    supabase.removeChannel(projectsChannel)
-    projectsChannel = null
+  if (projectsUnsub) {
+    projectsUnsub()
+    projectsUnsub = null
   }
   projectsOrgId = null
   projectsCallback = null
 }
 
 // ─── Branches channel ────────────────────────────────────────
-let branchesChannel: RealtimeChannel | null = null
+let branchesUnsub: (() => void) | null = null
 let branchesOrgId: string | null = null
 let branchesDebounce: ReturnType<typeof setTimeout> | null = null
 let branchesCallback: (() => void) | null = null
@@ -120,18 +108,14 @@ function scheduleBranches() {
 
 export function subscribeToBranches(orgId: string, onChange: () => void) {
   if (!orgId) return
-  if (branchesOrgId === orgId && branchesChannel) {
+  if (branchesOrgId === orgId && branchesUnsub) {
     branchesCallback = onChange
     return
   }
   unsubscribeFromBranches()
   branchesCallback = onChange
   branchesOrgId = orgId
-
-  branchesChannel = supabase
-    .channel(`org:${orgId}:branches`, { config: { broadcast: { self: false } } })
-    .on('broadcast', { event: 'change' }, scheduleBranches)
-    .subscribe()
+  branchesUnsub = subscribeTopic(`org:${orgId}:branches`, scheduleBranches)
 }
 
 export function unsubscribeFromBranches() {
@@ -139,9 +123,9 @@ export function unsubscribeFromBranches() {
     clearTimeout(branchesDebounce)
     branchesDebounce = null
   }
-  if (branchesChannel) {
-    supabase.removeChannel(branchesChannel)
-    branchesChannel = null
+  if (branchesUnsub) {
+    branchesUnsub()
+    branchesUnsub = null
   }
   branchesOrgId = null
   branchesCallback = null
