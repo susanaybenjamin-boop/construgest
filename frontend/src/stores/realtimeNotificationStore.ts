@@ -1,13 +1,12 @@
 import { create } from 'zustand'
 import api from '@/lib/api'
-import { supabase } from '@/lib/supabase'
+import { subscribeTopic } from '@/lib/realtimeClient'
 import type { AppNotification } from '@/types'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface RealtimeNotificationState {
   notifications: AppNotification[]
   unreadCount: number
-  channel: RealtimeChannel | null
+  unsub: (() => void) | null
 
   loadNotifications: () => Promise<void>
   loadUnreadCount: () => Promise<void>
@@ -21,7 +20,7 @@ interface RealtimeNotificationState {
 export const useRealtimeNotificationStore = create<RealtimeNotificationState>((set, get) => ({
   notifications: [],
   unreadCount: 0,
-  channel: null,
+  unsub: null,
 
   loadNotifications: async () => {
     try {
@@ -61,27 +60,25 @@ export const useRealtimeNotificationStore = create<RealtimeNotificationState>((s
   },
 
   subscribeRealtime: (userId) => {
-    const existing = get().channel
-    if (existing) return
+    if (get().unsub) return
 
-    const channel = supabase.channel(`user:${userId}`)
-      .on('broadcast', { event: 'notification' }, ({ payload }) => {
-        const notification = payload as AppNotification
-        set((s) => ({
-          notifications: [notification, ...s.notifications],
-          unreadCount: s.unreadCount + 1,
-        }))
-      })
-      .subscribe()
+    const unsub = subscribeTopic(`user:${userId}`, (event, payload) => {
+      if (event !== 'notification') return
+      const notification = payload as AppNotification
+      set((s) => ({
+        notifications: [notification, ...s.notifications],
+        unreadCount: s.unreadCount + 1,
+      }))
+    })
 
-    set({ channel })
+    set({ unsub })
   },
 
   unsubscribeRealtime: () => {
-    const channel = get().channel
-    if (channel) {
-      supabase.removeChannel(channel)
-      set({ channel: null })
+    const unsub = get().unsub
+    if (unsub) {
+      unsub()
+      set({ unsub: null })
     }
   },
 }))

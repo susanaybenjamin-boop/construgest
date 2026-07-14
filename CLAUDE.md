@@ -14,7 +14,7 @@ lecciones duras de BENJAGEST). Síguelas salvo que él pida lo contrario.
 ## 0. Qué es esto y hacia dónde va
 
 - **Construgest**: app de gestión de construcción (presupuestos, certificaciones,
-  obras, materiales, proveedores, subcontratas, partes de trabajo, ferralla, IA).
+  obras, materiales, proveedores, subcontratas, partes de trabajo, IA).
 - **Stack ACTUAL (nube):** backend Node/Express + frontend Next.js 16 / React 19 /
   Tailwind + **Supabase** (Postgres, Storage, RPC, Realtime). IA: Anthropic/Groq/Gemini.
   Login propio (bcrypt + JWT), NO Supabase Auth.
@@ -26,8 +26,9 @@ lecciones duras de BENJAGEST). Síguelas salvo que él pida lo contrario.
 
 ### 0.1. La BD de la nube está COMPARTIDA
 El proyecto Supabase "APP360" aloja tablas de VARIAS apps. **Solo migramos
-`cons_*` + `ferrapp_*` + `mcp_*`** (ver [`docs/schema/README.md`](docs/schema/README.md)).
-Todo lo `*_180` y las tablas sueltas son de otras apps → **no se tocan**.
+`cons_*` + `mcp_*`** (ver [`docs/schema/README.md`](docs/schema/README.md)). Todo lo
+`*_180` y las tablas sueltas son de otras apps → **no se tocan**. (El módulo
+"ferralla"/`ferrapp_*` se ELIMINÓ el 2026-07-14: no encajaba en el producto.)
 
 ---
 

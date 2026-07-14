@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import {
   Building2, LayoutDashboard, Library, Truck, Settings,
-  LogOut, Loader2, HardHat, Users, GitBranch, Mail, Brain, Scissors,
+  LogOut, Loader2, HardHat, Users, GitBranch, Mail, Brain,
   Trash2,
 } from 'lucide-react'
 import NotificationBell from '@/components/ui/NotificationBell'
@@ -29,7 +29,6 @@ const navItems = [
   { key: 'settings', label: 'Configuración', icon: Settings, href: '/admin/settings' },
   { key: 'users', label: 'Usuarios', icon: Users, href: '/admin/users', superAdminOnly: true },
   { key: 'mcp', label: 'Control IA', icon: Brain, href: '/admin/mcp', superAdminOnly: true },
-  { key: 'ferrapp', label: 'Ferralla', icon: Scissors, href: '/ferrapp' },
   { key: 'trash', label: 'Papelera', icon: Trash2, href: '/admin/trash' },
 ]
 

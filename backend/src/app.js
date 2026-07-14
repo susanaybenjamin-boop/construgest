@@ -26,7 +26,6 @@ import adminRoutes from './routes/admin.js'
 import branchRoutes from './routes/branches.js'
 import mailboxRoutes from './routes/mailbox.js'
 import notificationRoutes from './routes/notifications.js'
-import ferrappRoutes from './routes/ferrapp.js'
 import filesRoutes from './routes/files.js'
 
 const app = express()
@@ -124,7 +123,6 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/branches', branchRoutes)
 app.use('/api/mailbox', mailboxRoutes)
 app.use('/api/notifications', notificationRoutes)
-app.use('/api/ferrapp', ferrappRoutes)
 app.use('/api/files', filesRoutes)
 
 // Error handler
