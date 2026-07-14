@@ -4,6 +4,7 @@ import express from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import { initRealtime } from './services/realtimeHub.js'
+import { getVersionStatus, getCurrentVersion } from './services/version.js'
 
 // Route imports
 import authRoutes from './routes/auth.js'
@@ -98,6 +99,14 @@ app.get('/', (req, res) => {
 })
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+// Versión actual + comprobación de actualizaciones (GitHub Releases). Público.
+app.get('/api/version', async (req, res) => {
+  try {
+    res.json(await getVersionStatus())
+  } catch {
+    res.json({ current: getCurrentVersion(), latest: null, updateAvailable: false, checkedRemote: false })
+  }
 })
 
 // Routes
