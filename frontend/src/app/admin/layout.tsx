@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import NotificationBell from '@/components/ui/NotificationBell'
+import UpdateBanner from '@/components/ui/UpdateBanner'
 import { useRealtimeNotificationStore } from '@/stores/realtimeNotificationStore'
 import { useMailboxStore } from '@/stores/mailboxStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -180,6 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <main className="flex-1 ml-56 min-w-0 overflow-x-hidden">
         <div className="p-6 lg:p-8">
+          <UpdateBanner />
           {children}
         </div>
       </main>

@@ -17,8 +17,59 @@ import localApi from '@/lib/localApi'
 import { DecimalInput } from '@/components/ui/DecimalInput'
 import { FolderPicker } from '@/components/ui/FolderPicker'
 import { useProjectStore } from '@/stores/projectStore'
+import { useVersionStore } from '@/stores/versionStore'
 
 type Tab = 'company' | 'defaults' | 'print' | 'appearance' | 'pdf_styles' | 'account'
+
+// Tarjeta "Acerca de": versión instalada + comprobación de actualizaciones.
+function AboutCard() {
+  const { info, loading, load } = useVersionStore()
+  useEffect(() => { load() }, [load])
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <Info className="w-4 h-4" /> Acerca de
+      </h3>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-500">Versión instalada</p>
+          <p className="text-lg font-bold text-gray-900">v{info?.current ?? '—'}</p>
+        </div>
+        <button
+          onClick={() => load(true)}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Comprobar
+        </button>
+      </div>
+      {info && (
+        <div className="mt-4 pt-4 border-t border-gray-100 text-sm">
+          {!info.checkedRemote ? (
+            <p className="text-gray-400">
+              No se pudo comprobar si hay actualizaciones (sin conexión, o repositorio privado sin token).
+            </p>
+          ) : info.updateAvailable ? (
+            <p className="text-blue-700 flex items-center gap-2 flex-wrap">
+              Nueva versión <strong>v{info.latest}</strong> disponible.
+              {info.releaseUrl && (
+                <a href={info.releaseUrl} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                  Ver novedades
+                </a>
+              )}
+            </p>
+          ) : (
+            <p className="text-green-600 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Estás en la última versión.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function AdminSettingsPage() {
   const { t, i18n } = useTranslation()
@@ -938,6 +989,9 @@ export default function AdminSettingsPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Acerca de / Versión */}
+                <AboutCard />
               </div>
             )}
           </div>
