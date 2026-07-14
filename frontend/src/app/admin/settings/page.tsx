@@ -938,30 +938,6 @@ export default function AdminSettingsPage() {
                     </button>
                   </div>
                 </div>
-
-                {/* Desktop App */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4" />
-                    Aplicación de Escritorio
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Instala la app de escritorio para sincronizar automáticamente tus proyectos en tu disco local.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || 'https://construgest-web.onrender.com/api'}/settings/installer`}
-                      download
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm font-medium text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar Instalador
-                    </a>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-3">
-                    Ejecuta el archivo descargado una sola vez. Queda instalado en Windows y puedes borrar el archivo de Descargas.
-                  </p>
-                </div>
               </div>
             )}
           </div>

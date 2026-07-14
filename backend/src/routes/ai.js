@@ -510,8 +510,8 @@ router.get('/corrections', async (req, res, next) => {
 // ================================================================
 
 // POST /api/ai/parse-budget-pdf — Parse budget structure from PDF
-// Modo dual: si hay pdfBase64 y el usuario tiene IA activa -> Gemini Vision OCR
-//             si no -> texto de pdfjs-dist + parser algoritmico + fallback IA
+// Modo dual: 1) texto de pdfjs-dist + parser algorítmico + LLM local;
+//            2) fallback OCR LOCAL (tesseract/poppler) si el PDF es escaneado.
 router.post('/parse-budget-pdf', async (req, res, next) => {
   try {
     const { text, pdfBase64 } = req.body

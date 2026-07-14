@@ -31,9 +31,10 @@ import filesRoutes from './routes/files.js'
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// CORS - manual implementation for Express 5 compatibility
+// CORS - manual implementation for Express 5 compatibility.
+// App autohospedada en local: se permite cualquier localhost (el frontend Next
+// corre en :3000) y, opcionalmente, un FRONTEND_URL configurado.
 const ALLOWED_ORIGINS = [
-  'https://construgest-web.vercel.app',
   'http://localhost:3000',
   process.env.FRONTEND_URL,
 ].filter(Boolean)
@@ -42,11 +43,8 @@ app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
-  } else if (origin) {
-    // Allow any vercel preview deploys
-    if (origin.endsWith('.vercel.app') || origin.startsWith('http://localhost')) {
-      res.setHeader('Access-Control-Allow-Origin', origin)
-    }
+  } else if (origin && origin.startsWith('http://localhost')) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
@@ -70,8 +68,8 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }))
 
-// Detrás de Render/Vercel hay proxy, así que confiamos en la cadena de IPs
-// para que el rate limiter use la IP del cliente y no la del proxy.
+// En local no hay proxy inverso, pero dejamos trust proxy por si se despliega
+// tras uno (nginx/traefik) para que el rate limiter use la IP real del cliente.
 app.set('trust proxy', 1)
 
 // Rate limit global: protege la API entera. Ventana de 1 min, 300 req/IP.
