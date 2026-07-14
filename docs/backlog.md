@@ -200,12 +200,24 @@ el catálogo propio. Mejora con el uso, local y sin internet.
   · `[x]` **Extracción (`extract-materials`)** HECHA y verificada (ver `services/extraction.js`):
     parser determinista Capa 1 (code/precio/unidad por regex, normaliza nº ES, no pierde filas) +
     LLM de refuerzo fusionado por precio. 5/5 consistente. Robusto a caída del LLM.
-  · `[ ]` **Skills de ANÁLISIS de presupuestos** (16). HALLAZGO verificado: el 3B **parrotea los
-    placeholders del ejemplo y ALUCINA números** (analyze-expenses devolvió `budget_total:200000`
-    copiado del ejemplo; varianza mal). Las de array (suggest-optimizations…) devuelven `[]` por la
-    frase de fallback. → **No basta afinar prompts: hay que CALCULAR en código (Capa 1)** (varianzas,
-    totales, duplicados, outliers de precio) y dejar al LLM solo el texto narrativo. Rediseño por
-    skill = el grueso del trabajo restante.
+  · `[x]` **MOTOR determinista compartido** `services/budget-analytics.js` (Capa 1): recibe el
+    presupuesto (shape del frontend) y calcula TODO sin IA — totales/capítulo, %, métricas,
+    incidencias (sin valorar, sin cantidad, capítulos vacíos, duplicados por Jaccard, descripciones
+    vagas, descuadre) y sugerencias. Verificado con datos reales del `Presupuesto_v1`.
+  · `[x]` **`detect-issues`** reescrita: 100% motor (SIN LLM) → determinista e instantánea.
+    VERIFICADO e2e (curl): detecta 02.04 sin valorar + capítulo 06 vacío.
+  · `[x]` **`analyze-budget`** reescrita: cifras del motor + LLM local SOLO para el resumen
+    (`{"resumen":...}`, con fallback sin IA). VERIFICADO e2e: total/riesgo/confianza exactos,
+    resumen usa solo cifras reales (0% alucinación), ~22s. optimizations=[] a propósito (necesita
+    base de precios). **PRINCIPIO (Benjamin):** una skill sin TOOLS/datos es prosa vacía → cada
+    skill se apoya en su tool (motor, base de precios empaquetable, catálogo, OCR).
+  · `[ ]` **Resto de skills sobre el motor:** `suggest-optimizations`, `compare-prices`,
+    `estimate-contingency`, `executive-report` (reusar `budget-analytics`), + `compare-budgets`
+    (nueva, pantalla budget-comparison), `find-similar` (biblioteca), `analyze-materials`,
+    `analyze-expenses`, `analyze-certifications`. **Cortar** las sin pantalla: estimate-timeline,
+    analyze-schedule, analyze-plans, analyze-annotations, detect-errors, validate-specifications.
+  · `[ ]` **TOOL pendiente:** base de precios de referencia (empaquetable) para las skills de
+    optimización/mercado/contingencia — sin ella devuelven [] a propósito.
 - `[x]` **AI-3 (OCR local) HECHO y VERIFICADO e2e.** `services/local-ocr.js` (pdftoppm→PNG→tesseract
   `spa`). `parseBudgetWithVision` reescrita: Vision-nube → **OCR local** + `parseBudgetFromText`
   (reusa algorítmico + LLM local). Ruta `parse-budget-pdf`: **texto primero** (rápido), OCR fallback

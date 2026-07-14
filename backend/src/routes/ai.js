@@ -2,6 +2,12 @@ import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
 import { callAI } from '../services/ai-service.js'
 import { extractMaterials } from '../services/extraction.js'
+import {
+  analyzeBudget,
+  buildSummaryPrompt,
+  buildSuggestions,
+  fallbackSummary,
+} from '../services/budget-analytics.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -40,33 +46,37 @@ async function handleAIAnalysis(req, res, next, buildPrompt, aiOptions = {}) {
 //  PRESUPUESTOS — 8 skills
 // ================================================================
 
-// POST /api/ai/analyze-budget — Análisis comprehensivo de presupuesto
-router.post('/analyze-budget', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 10000)
-    return `Eres un experto en presupuestos de construcción. Analiza este presupuesto.
+// POST /api/ai/analyze-budget — Análisis comprehensivo de presupuesto.
+// CAPA 1 (código): totales, %, incidencias, sugerencias → 0% alucinación.
+// CAPA 2 (LLM local): SOLO redacta el resumen ejecutivo con las cifras ya dadas.
+router.post('/analyze-budget', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
 
-Responde SOLO con JSON válido en este formato exacto:
-{
-  "summary": "Resumen ejecutivo del presupuesto en 2-3 frases",
-  "total_cost": 0.0,
-  "estimated_savings": 0.0,
-  "confidence_score": 80.0,
-  "risk_level": "medium",
-  "suggestions": [
-    {"id": "s1", "title": "Título", "description": "Detalle de la sugerencia", "impact": "high", "savings": 0.0, "implementation": "Cómo implementar", "risk": "low"}
-  ],
-  "warnings": [
-    {"id": "w1", "severity": "warning", "message": "Problema detectado", "affected_items": ["01.01"], "recommendation": "Solución propuesta"}
-  ],
-  "optimizations": [
-    {"item_code": "01.01", "item_name": "Nombre", "current_price": 100, "suggested_price": 85, "savings": 15, "reason": "Motivo", "confidence": 0.8}
-  ]
-}
+    // El LLM solo escribe la prosa. Si falla o está caído, resumen de reserva.
+    let summary = fallbackSummary(a)
+    try {
+      const r = await callAI(buildSummaryPrompt(a), { maxTokens: 512, temperature: 0.2 })
+      const text = (r?.resumen || r?.summary || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) summary = text
+    } catch (err) {
+      console.warn('[analyze-budget] LLM falló, resumen de reserva:', err.message)
+    }
 
-PRESUPUESTO:
-${data}`
-  })
+    res.json({
+      summary,
+      total_cost: a.budget_total,
+      estimated_savings: 0,          // el ahorro real necesita catálogo/mercado (compare-prices)
+      confidence_score: a.confidence_score,
+      risk_level: a.risk_level,
+      suggestions: buildSuggestions(a),
+      warnings: a.issues,
+      optimizations: [],             // se rellenan en compare-prices con precios de referencia
+    })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /api/ai/suggest-optimizations — Optimizaciones de costes
@@ -87,25 +97,17 @@ ${data}`
   })
 })
 
-// POST /api/ai/detect-issues — Detección de problemas e inconsistencias
+// POST /api/ai/detect-issues — Detección de problemas e inconsistencias.
+// 100% determinista (sin LLM): duplicados, partidas sin valorar/sin cantidad,
+// capítulos vacíos, descripciones vagas y descuadres. Consistente e instantáneo.
 router.post('/detect-issues', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 10000)
-    return `Eres un auditor experto en construcción. Detecta problemas en este presupuesto.
-
-Busca: duplicados, partidas faltantes, precios anómalos, inconsistencias, especificaciones vagas.
-
-Responde SOLO con un array JSON:
-[
-  {"id": "w1", "severity": "critical", "message": "Descripción del problema", "affected_items": ["01.01"], "recommendation": "Cómo solucionarlo"}
-]
-
-severity puede ser: "critical", "warning", "info"
-Si no hay problemas, responde: []
-
-PRESUPUESTO:
-${data}`
-  })
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    res.json(a.issues)   // ya en el shape {id,severity,message,affected_items,recommendation}
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /api/ai/estimate-timeline — Estimación de cronograma
