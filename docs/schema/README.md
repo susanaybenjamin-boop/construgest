@@ -11,7 +11,7 @@ subconjunto. Aquí se ha extraído **exclusivamente** lo de Construgest:
 | Bloque | Prefijo | Nº tablas | Qué es |
 |---|---|---|---|
 | Construgest | `cons_*` | 52 | Núcleo de la app |
-| Ferrapp | `ferrapp_*` | 2 | Submódulo de ferralla |
+| ~~Ferrapp~~ | ~~`ferrapp_*`~~ | ~~2~~ | **ELIMINADO 2026-07-14** — el módulo de ferralla se quitó (no encajaba en el producto). Esta fila queda como registro de la extracción original. |
 | IA / cuotas | `mcp_*` | 6 (1 vista) | Seguimiento de consumo de IA |
 
 Todo lo demás (`*_180` = app fiscal/contable tipo CONTENDO, y tablas sueltas de otra app)

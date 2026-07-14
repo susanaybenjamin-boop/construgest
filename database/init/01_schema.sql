@@ -60,8 +60,6 @@ DROP TABLE IF EXISTS
   `cons_work_log_materials`,
   `cons_work_logs`,
   `cons_workers`,
-  `ferrapp_etiquetas_custom`,
-  `ferrapp_proyectos`,
   `mcp_ai_consumption`,
   `mcp_ai_pricing`,
   `mcp_ai_provider_credits`,
@@ -907,32 +905,6 @@ CREATE TABLE `cons_workers` (
   CONSTRAINT `cons_workers_status_check` CHECK (status IN ('active', 'inactive', 'on_leave'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `ferrapp_etiquetas_custom` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `categoria` VARCHAR(255) NOT NULL,
-  `etiqueta` VARCHAR(255) NOT NULL,
-  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  `organization_id` CHAR(36),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `ferrapp_etiquetas_custom_categoria_etiqueta_key` (`categoria`, `etiqueta`),
-  UNIQUE KEY `ferrapp_etiquetas_unique_org` (`organization_id`, `categoria`, `etiqueta`),
-  CONSTRAINT `ferrapp_etiquetas_custom_organization_id_fkey` FOREIGN KEY (organization_id) REFERENCES cons_organizations(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `ferrapp_proyectos` (
-  `id` VARCHAR(255) NOT NULL,
-  `nombre` TEXT NOT NULL,
-  `data` JSON NOT NULL,
-  `fecha_modificacion` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  `deleted` TINYINT(1) NOT NULL DEFAULT 0,
-  `device_id` TEXT,
-  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  `organization_id` CHAR(36),
-  `created_by` CHAR(36),
-  PRIMARY KEY (`id`),
-  CONSTRAINT `ferrapp_proyectos_organization_id_fkey` FOREIGN KEY (organization_id) REFERENCES cons_organizations(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE `mcp_ai_consumption` (
   `id` CHAR(36) NOT NULL DEFAULT (UUID()),
   `app_id` VARCHAR(255) NOT NULL,
@@ -1092,11 +1064,6 @@ CREATE INDEX `idx_workers_org` ON `cons_workers` (`organization_id`);
 CREATE INDEX `idx_workers_role` ON `cons_workers` (`organization_id`, `role`);
 CREATE INDEX `idx_workers_status` ON `cons_workers` (`organization_id`, `status`);
 CREATE INDEX `idx_workers_subcontractor` ON `cons_workers` (`subcontractor_id`);
-CREATE INDEX `idx_ferrapp_etiquetas_cat` ON `ferrapp_etiquetas_custom` (`categoria`);
-CREATE INDEX `idx_ferrapp_etiquetas_org` ON `ferrapp_etiquetas_custom` (`organization_id`);
-CREATE INDEX `idx_ferrapp_proyectos_active` ON `ferrapp_proyectos` (`deleted`);
-CREATE INDEX `idx_ferrapp_proyectos_fecha` ON `ferrapp_proyectos` (`fecha_modificacion`);
-CREATE INDEX `idx_ferrapp_proyectos_org` ON `ferrapp_proyectos` (`organization_id`);
 CREATE INDEX `idx_mcp_consumption_app_org` ON `mcp_ai_consumption` (`app_id`, `org_id`);
 CREATE INDEX `idx_mcp_consumption_app_org_month` ON `mcp_ai_consumption` (`app_id`, `org_id`, `created_at`);
 CREATE INDEX `idx_mcp_consumption_created` ON `mcp_ai_consumption` (`created_at`);

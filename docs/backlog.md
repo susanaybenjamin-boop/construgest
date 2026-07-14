@@ -18,6 +18,12 @@
 > panel admin de IA y claves-cloud eliminados; deps de nube fuera (queda solo el `/installer` viejo
 > de `settings.js`, que se rehará en Fase 5). Verificado e2e. **Próximo gran bloque: conectar la UI.**
 >
+> **🗑️ MÓDULO FERRALLA ELIMINADO (2026-07-14) — no encajaba en el producto.** Borrado
+> completo y verificado e2e: frontend (`app/ferrapp`, `components/ferrapp`, `lib/ferrapp`,
+> `stores/ferrappStore.ts`, nav + tema `.ferrapp-theme`), backend (`routes/ferrapp.js` +
+> mount) y tablas `ferrapp_*` del schema (57 tablas ahora, `down -v && up -d` OK). Se
+> MANTIENEN los términos de oficio "Ferrallista" (rol) y "Ferralla" (especialidad subcontrata).
+>
 > **FASE 4 (IA LOCAL) MUY AVANZADA — la IA ya es 100% local, sin nube ni Supabase.**
 > - **Motor IA:** `services/ai-service.js` local puro (Ollama, `qwen2.5:3b`); caché; `num_predict≤2048`.
 > - **Extracción/OCR** (`extract-materials`, `parse-budget-pdf`): Capa 1 determinista + LLM/OCR local.
@@ -36,11 +42,16 @@
 > **PRÓXIMA SESIÓN — empezar por aquí:**
 > 1. Leer esta cabecera + `CLAUDE.md`. **Entorno:** Ollama en el host con `qwen2.5:3b`
 >    (`ollama pull qwen2.5:3b`). Arrancar `docker compose up -d`; tras editar backend
->    `docker compose up -d --build backend`. Login e2e: `admin@construgest.local` / `construgest`.
-> 2. **CONECTAR LA UI (bloque grande de la próxima sesión):**
->    a) **Realtime WS:** cambiar `frontend/src/lib/realtime.ts` + `realtimeNotificationStore.ts`
->       + `lib/supabase.ts` para conectar al WS propio `ws://<host>/ws?token=<jwt>` (subscribe a los
->       mismos topics: budget/org:projects/org:branches/user). Contrato en `services/realtimeHub.js`.
+>    `docker compose up -d --build backend`. Frontend: `preview_start name=frontend` (:3000).
+>    Login e2e: `admin@construgest.local` / `construgest`.
+> 2. **CONECTAR LA UI (bloque grande, EN CURSO):**
+>    a) **✅ UI-1 Realtime WS HECHO (2026-07-14, commit `a305e94`).** Nuevo cliente WS nativo
+>       `frontend/src/lib/realtimeClient.ts` (singleton, reconexión backoff, re-suscripción,
+>       heartbeat) hablando con el hub `/ws`. `realtime.ts` + `realtimeNotificationStore.ts`
+>       migrados a `subscribeTopic()`; `authStore.logout()` cierra el socket. Borrado
+>       `lib/supabase.ts` + dep `@supabase/supabase-js` + vars `NEXT_PUBLIC_SUPABASE_*`.
+>       VERIFICADO e2e: WS conecta con JWT real (ready+pong) y rename de proyecto por backend →
+>       la lista del panel se refresca sola (org:projects change). **Falta merge a develop.**
 >    b) **Skills IA no cableadas:** `compare-budgets` (pantalla budget-comparison), `find-similar`
 >       (al crear partida), `analyze-materials` (materiales), `analyze-expenses`/`analyze-certifications`.
 >       El backend ya devuelve los shapes; falta UI + invalidar React Query.
