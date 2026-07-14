@@ -19,6 +19,10 @@ Electron (main.js)
   probado sirviendo `/login` 200 sin `next dev` ni Docker).
 - ✅ **F5-2 (andamiaje):** `main.js` orquesta el arranque (spawn + health-check +
   ventana) y `package.json` trae la config de `electron-builder` → target `msi`.
+- ✅ **F5-2b (init logic):** `main.js` inicializa MariaDB la 1ª vez
+  (`mariadb-install-db` → crea BD/usuario → aplica `database/init/*.sql`) y
+  descarga el modelo Ollama si falta. La secuencia de aplicar el esquema se
+  probó contra MariaDB (58 tablas creadas de un tirón).
 - ⏳ **Pendiente (necesita máquina Windows):** F5-3 bundlear binarios
   (`runtime/README.md`) y F5-4 construir el `.msi`.
 
