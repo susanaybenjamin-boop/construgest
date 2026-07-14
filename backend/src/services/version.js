@@ -64,12 +64,16 @@ async function fetchLatestRelease() {
     clearTimeout(t)
     if (res.ok) {
       const r = await res.json()
+      // Asset del instalador (.msi) para la autoactualización.
+      const msi = (r.assets || []).find((a) => /\.msi$/i.test(a.name || ''))
       data = {
         version: String(r.tag_name || '').replace(/^v/i, ''),
         tag: r.tag_name || '',
         url: r.html_url || '',
         notes: r.body || '',
         publishedAt: r.published_at || '',
+        downloadUrl: msi?.browser_download_url || null,
+        assetName: msi?.name || null,
       }
     } else {
       console.warn(`[version] GitHub releases -> HTTP ${res.status} (repo privado sin token?)`)
@@ -95,6 +99,8 @@ export async function getVersionStatus() {
     latest: latest?.version || null,
     updateAvailable,
     releaseUrl: latest?.url || null,
+    downloadUrl: latest?.downloadUrl || null,
+    assetName: latest?.assetName || null,
     notes: latest?.notes || null,
     publishedAt: latest?.publishedAt || null,
     checkedRemote: latest !== null,

@@ -1,3 +1,10 @@
-// Preload mínimo. De momento la app es 100% web (habla con el backend por HTTP),
-// así que no expone API de Electron. Si en el futuro hiciera falta (p.ej. elegir
-// carpeta nativa, notificaciones del SO), se añade aquí con contextBridge.
+// Puente seguro entre el frontend (web) y el shell de Electron.
+// Expone `window.construgest`: sirve para que el frontend detecte que corre
+// dentro de la app de escritorio y para lanzar la autoactualización.
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('construgest', {
+  isDesktop: true,
+  // Descarga el .msi indicado y lanza el instalador (la app se cierra).
+  installUpdate: (downloadUrl) => ipcRenderer.invoke('update:install', downloadUrl),
+})

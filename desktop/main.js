@@ -12,9 +12,10 @@
 // host). Backend y frontend se ejecutan con el propio Node de Electron
 // (ELECTRON_RUN_AS_NODE) → no hace falta bundlear Node aparte.
 // ============================================================================
-const { app, BrowserWindow, dialog, shell } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron')
 const { spawn } = require('child_process')
 const http = require('http')
+const https = require('https')
 const net = require('net')
 const path = require('path')
 const fs = require('fs')
@@ -312,6 +313,40 @@ function createWindow() {
   win.once('ready-to-show', () => win.show())
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
 }
+
+// ── Autoactualización: descargar el .msi de la release y lanzar el instalador ─
+
+/** Descarga una URL a un fichero, siguiendo redirecciones (GitHub → CDN). */
+function downloadFile(url, dest, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirects > 5) return reject(new Error('demasiadas redirecciones'))
+    https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume()
+        return resolve(downloadFile(res.headers.location, dest, redirects + 1))
+      }
+      if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)) }
+      const f = fs.createWriteStream(dest)
+      res.pipe(f)
+      f.on('finish', () => f.close(() => resolve(dest)))
+      f.on('error', reject)
+    }).on('error', reject)
+  })
+}
+
+// El frontend (dentro de Electron) pide actualizar: descarga el .msi y lanza el
+// instalador (major-upgrade por UpgradeCode) y cierra la app para liberar ficheros.
+ipcMain.handle('update:install', async (_e, url) => {
+  if (!url) throw new Error('sin URL de descarga')
+  const dest = path.join(app.getPath('temp'), 'ConstruGest-update.msi')
+  log('Descargando actualización…', url)
+  await downloadFile(url, dest)
+  log('Lanzando instalador…')
+  const child = spawn('msiexec', ['/i', dest], { detached: true, stdio: 'ignore' })
+  child.unref()
+  setTimeout(() => { shutdown(); app.quit() }, 800)
+  return { started: true }
+})
 
 app.whenReady().then(async () => {
   try {
