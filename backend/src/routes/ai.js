@@ -1,7 +1,13 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
+import supabase from '../db/local.js'
 import { callAI } from '../services/ai-service.js'
 import { extractMaterials } from '../services/extraction.js'
+import {
+  comparePrices,
+  suggestOptimizations,
+  normalizeReference,
+} from '../services/price-reference.js'
 import {
   analyzeBudget,
   buildSummaryPrompt,
@@ -24,6 +30,20 @@ function truncateData(data, maxChars = 10000) {
   if (str.length <= maxChars) return str
   console.warn(`[AI] Datos truncados de ${str.length} a ${maxChars} chars`)
   return str.substring(0, maxChars) + '...(datos truncados)'
+}
+
+/**
+ * Carga la referencia de precios de una organización.
+ * Fuente 1: biblioteca propia (`cons_saved_partidas`). Fuente 2 (pendiente): base
+ * pública BC3, que se concatenaría aquí como respaldo.
+ */
+async function loadPriceReference(orgId) {
+  const { data, error } = await supabase
+    .from('cons_saved_partidas')
+    .select('name, unit, unit_price, cost_price, usage_count, source')
+    .eq('organization_id', orgId)
+  if (error) throw error
+  return normalizeReference(data || [], 'biblioteca')
 }
 
 /** Generic AI analysis handler — supports single or multi-field data */
@@ -110,22 +130,19 @@ router.post('/compare-budgets', async (req, res, next) => {
   }
 })
 
-// POST /api/ai/suggest-optimizations — Optimizaciones de costes
-router.post('/suggest-optimizations', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 10000)
-    return `Eres experto en optimización de costes de construcción. Analiza precios y sugiere optimizaciones.
-
-Responde SOLO con un array JSON:
-[
-  {"item_code": "01.01", "item_name": "Nombre partida", "current_price": 100, "suggested_price": 85, "savings": 15, "reason": "Precio negociable con proveedores locales", "confidence": 0.8}
-]
-
-Si no hay optimizaciones posibles, responde: []
-
-PRESUPUESTO:
-${data}`
-  })
+// POST /api/ai/suggest-optimizations — Optimizaciones de costes.
+// TOOL: precios de referencia (biblioteca del org). Marca las partidas cuyo precio
+// supera su referencia >10%; savings = (precio − referencia) × cantidad. Sin
+// referencia (biblioteca vacía) devuelve [] a propósito. 100% determinista.
+router.post('/suggest-optimizations', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    const reference = await loadPriceReference(req.user.organization_id)
+    res.json(suggestOptimizations(a.items_flat, reference))
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /api/ai/detect-issues — Detección de problemas e inconsistencias.
@@ -191,29 +208,51 @@ router.post('/executive-report', async (req, res, next) => {
   }
 })
 
-// POST /api/ai/compare-prices — Comparación con precios de mercado
-router.post('/compare-prices', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    const projectType = body.project_type || 'obra de construcción'
-    return `Compara este presupuesto de construcción con precios de mercado para: ${projectType}.
+// POST /api/ai/compare-prices — Comparación con precios de referencia.
+// TOOL: biblioteca del org. Empareja cada partida con su referencia y la clasifica
+// (overpriced/within_range/underpriced). El LLM SOLO redacta la valoración general.
+router.post('/compare-prices', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const projectType = req.body.project_type || 'obra de construcción'
+    const a = analyzeBudget(req.body.data)
+    const reference = await loadPriceReference(req.user.organization_id)
+    const c = comparePrices(a.items_flat, reference)
 
-Responde SOLO con JSON válido:
-{
-  "project_type": "${projectType}",
-  "market_analysis": [
-    {"item_code": "01.01", "item_name": "Nombre", "market_price_avg": 100, "quoted_price": 95, "status": "within_range", "opportunity": "Sin acción necesaria"}
-  ],
-  "overall_assessment": "Valoración general del presupuesto vs mercado",
-  "negotiation_potential": 5000,
-  "indice_competitividad": 85
-}
+    const over = c.market_analysis.filter((m) => m.status === 'overpriced').length
+    let overall_assessment = c.matched_count === 0
+      ? 'No hay referencia de precios en tu biblioteca para estas partidas todavía. Guarda partidas con precio para poder comparar.'
+      : `${c.matched_count} de ${c.total_count} partidas tienen referencia; ${over} por encima. Margen de negociación estimado: ${c.negotiation_potential} €.`
 
-status puede ser: "within_range", "overpriced", "underpriced"
+    // El LLM solo redacta la valoración (con las cifras ya dadas), si hay datos.
+    if (c.matched_count > 0) {
+      try {
+        const top = c.market_analysis.filter((m) => m.status === 'overpriced').slice(0, 6)
+          .map((m) => `- ${m.item_name}: ${m.quoted_price} € vs ref ${m.market_price_avg} € (+${m.diff_pct}%)`).join('\n') || '- (ninguna por encima)'
+        const prompt = `Valora en 2-3 frases (español) este presupuesto frente a los precios de referencia.
+NO inventes cifras: usa solo estos datos.
+Partidas con referencia: ${c.matched_count}/${c.total_count} · por encima: ${over} · margen negociación: ${c.negotiation_potential} €
+Más caras que la referencia:
+${top}
+Responde SOLO con este JSON: {"valoracion": "tu valoración aquí"}`
+        const r = await callAI(prompt, { maxTokens: 400, temperature: 0.2 })
+        const text = (r?.valoracion || r?.raw_response || '').toString().trim()
+        if (text && text.length >= 20) overall_assessment = text
+      } catch (err) {
+        console.warn('[compare-prices] LLM falló, valoración de reserva:', err.message)
+      }
+    }
 
-PRESUPUESTO:
-${data}`
-  })
+    res.json({
+      project_type: projectType,
+      market_analysis: c.market_analysis,
+      overall_assessment,
+      negotiation_potential: c.negotiation_potential,
+      indice_competitividad: c.indice_competitividad,
+    })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /api/ai/validate-specifications — Validar especificaciones técnicas

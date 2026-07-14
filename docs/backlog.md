@@ -221,9 +221,14 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     en cada lado. LLM solo el resumen. Probado con Presupuesto_v1 ↔ Vivienda Ogijares (Presto):
     revela que Construgest tiene precios muy altos (limpieza 185 € vs 4,47 €). **Falta: wire del
     frontend** (pantalla budget-comparison) — slice aparte.
-  · `[ ]` **Dependen de la TOOL base de precios / biblioteca:** `suggest-optimizations`,
-    `compare-prices`, `analyze-materials`, `find-similar`. Sin la tool devuelven [] a propósito.
-    DECISIÓN PENDIENTE de Benjamin: ¿referencia = su biblioteca propia o base de precios externa?
+  · `[x]` **TOOL de precios `services/price-reference.js`** + `suggest-optimizations` y
+    `compare-prices` reescritas. DECISIÓN: referencia = **biblioteca propia (manda) + base
+    pública BC3 (respaldo, enchufable)**. Empareja partida→referencia por nombre (Jaccard)+unidad.
+    VERIFICADO e2e: sembradas 3 partidas en biblioteca vía API → suggest-optimizations calcula
+    ahorros exactos ((185−4,47)×18=3.249,54), compare-prices clasifica overpriced + margen
+    negociación 3.687 €; biblioteca vacía → [] (honesto). **PANTALLA DE IA: las 6 skills reescritas.**
+  · `[ ]` **Falta la 2ª fuente de la tool:** base pública BC3 (Benjamin consigue el fichero) →
+    concatenar en `loadPriceReference()`. También `analyze-materials` y `find-similar` sobre esta tool.
   · `[ ]` **Económicas:** `analyze-expenses`, `analyze-certifications` (motor + datos de gastos/certis).
   · `[ ]` **Cortar** las sin pantalla: estimate-timeline, analyze-schedule, analyze-plans,
     analyze-annotations, detect-errors, validate-specifications.
