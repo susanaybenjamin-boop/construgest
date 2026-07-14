@@ -31,8 +31,11 @@ function Invoke-Robocopy($src, $dst, $extra) {
   $global:LASTEXITCODE = 0
 }
 
-Write-Host "==> 1/4  Build del frontend (standalone)"
+Write-Host "==> 1/4  Build del frontend (standalone, limpio)"
 Push-Location (Join-Path $Root "frontend")
+# Build LIMPIO: si un `next dev` estuvo usando .next, contamina el standalone
+# (aparece el overlay de dev tools). Se borra antes de compilar producción.
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
 Invoke-Checked "npm" @("run","build")
 Copy-Item -Recurse -Force ".next\static"  ".next\standalone\.next\static"
 Copy-Item -Recurse -Force "public"        ".next\standalone\public"
