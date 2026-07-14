@@ -1,6 +1,6 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-13
+> ## 📍 ESTADO ACTUAL — 2026-07-14
 >
 > **FASE 0 y FASE 1 COMPLETAS.** Entorno local Docker + MariaDB con esquema y seed.
 > - Repo GitHub **privado** `susanaybenjamin-boop/construgest`. Ramas: trabajo en
@@ -14,29 +14,34 @@
 > en mutación), storage en disco y `.rpc()`. (`ai.js` no va a MariaDB: la IA se reescribió a local.)
 >
 > **FASE 4 (IA LOCAL) MUY AVANZADA — la IA ya es 100% local, sin nube ni Supabase.**
-> - **Motor:** `services/ai-service.js` reescrito a local puro (Ollama, `qwen2.5:3b`). `callAI()`
->   igual que antes pero solo local; caché en memoria; `tryLocal` con `num_predict≤2048`.
-> - **Extracción** (`extract-materials`): Capa 1 determinista (regex code/precio/unidad, normaliza
->   nº ES) + LLM de refuerzo (`services/extraction.js`). Fiable y consistente.
-> - **OCR** (`parse-budget-pdf`): 100% local, `services/local-ocr.js` (pdftoppm+tesseract `spa`);
->   texto-primero, OCR-fallback. Tesseract+poppler instalados en la imagen (Dockerfile).
-> - **Chat eliminado.** Sin cuotas/pricing/consumo en el motor.
+> - **Motor IA:** `services/ai-service.js` local puro (Ollama, `qwen2.5:3b`); caché; `num_predict≤2048`.
+> - **Extracción/OCR** (`extract-materials`, `parse-budget-pdf`): Capa 1 determinista + LLM/OCR local.
+> - **AI-2 (ANÁLISIS) COMPLETO — 13 skills reescritas** con arquitectura de 3 capas (código calcula,
+>   LLM solo prosa → **0% cifras del modelo**), verificadas e2e con curl:
+>   · Motor determinista compartido `services/budget-analytics.js` (totales, %, incidencias,
+>     duplicados por Jaccard, sugerencias) + `fuzzyJaccard` (tolerante a abreviaturas).
+>   · Pantalla IA (6): analyze-budget, detect-issues, estimate-contingency, executive-report,
+>     suggest-optimizations, compare-prices. · Nuevas: compare-budgets (`budget-compare.js`),
+>     find-similar, analyze-materials (`materials-analytics.js`), analyze-expenses
+>     (`expense-analytics.js`), analyze-certifications (`certification-analytics.js`).
+>   · **TOOL de precios** `services/price-reference.js` = biblioteca propia (manda) + base pública
+>     BC3 (respaldo, enchufable, PENDIENTE el fichero). · CORTADAS 6 skills sin pantalla.
+> - **Chat eliminado.**
 >
 > **PRÓXIMA SESIÓN — empezar por aquí:**
-> 1. Leer esta cabecera + `CLAUDE.md`. **Requisito nuevo del entorno:** tener **Ollama corriendo en
->    el host** con el modelo `qwen2.5:3b` (`ollama pull qwen2.5:3b`). Arrancar: `docker compose up -d`.
->    Tras editar backend: `docker compose up -d --build backend`.
-> 2. **Análisis de presupuestos (AI-2, el grueso):** el 3B alucina números → rediseñar las ~16 skills
->    de `routes/ai.js` para **CALCULAR en código** (Capa 1: varianzas, totales, duplicados, outliers)
->    y dejar al LLM solo el texto narrativo. Empezar por `analyze-budget`/`suggest-optimizations`.
->    Receta de prompt (probada): sin frase "responde []"; ejemplos realistas (no placeholders);
->    códigos por regex.
-> 3. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + fuzzy-match de catálogo.
-> 4. **Follow-up limpieza (AI-5):** desmantelar el panel admin de IA (`routes/admin.js` +
->    `services/mcp-ai-tracker.js` + frontend) y la UI de claves-cloud en `settings.js` (aún usan
->    Supabase/SDKs de nube). Al ser IA local/gratis, sobra.
-> 5. **Fase 3** (Realtime → polling; `notificationService`/`realtimeBroadcast`) y **Fase 5**
->    (empaquetado `.msi`: MariaDB + Node + Next + **Ollama+modelo** + **tesseract+poppler**).
+> 1. Leer esta cabecera + `CLAUDE.md`. **Entorno:** Ollama en el host con `qwen2.5:3b`
+>    (`ollama pull qwen2.5:3b`). Arrancar `docker compose up -d`; tras editar backend
+>    `docker compose up -d --build backend`. Login e2e: `admin@construgest.local` / `construgest`.
+> 2. **WIRE AL FRONTEND** de las skills nuevas/no cableadas: `compare-budgets` (pantalla
+>    budget-comparison), `find-similar` (al crear partida), `analyze-materials` (pantalla
+>    materiales), `analyze-expenses`/`analyze-certifications` (nuevas tarjetas o sus pantallas).
+>    El backend ya devuelve los shapes; falta la UI + invalidar React Query.
+> 3. **2ª fuente de la TOOL de precios:** conseguir base pública BC3 (p.ej. Andalucía) y
+>    concatenarla en `loadPriceReference()` de `routes/ai.js`.
+> 4. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + `find-similar` ya es la base.
+> 5. **Follow-up AI-5:** desmantelar panel admin de IA (`routes/admin.js` + `mcp-ai-tracker.js` +
+>    frontend) y UI de claves-cloud en `settings.js`. **Fase 3** (Realtime→polling) y **Fase 5**
+>    (empaquetado `.msi` + Ollama/modelo + tesseract/poppler + base BC3).
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
