@@ -7,6 +7,7 @@ import { useNotificationStore } from '@/stores/notificationStore'
 import api from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
 import { DecimalInput } from '@/components/ui/DecimalInput'
+import AiInsightPanel from '@/components/ai/AiInsightPanel'
 import type { Supplier, SupplierMaterial, Material, ComparisonRow, ComparisonData } from '@/types'
 import {
   Building2, Plus, Search, Star, Phone, Mail, MapPin, Globe,
@@ -742,6 +743,13 @@ function PriceComparisonTab() {
 
   return (
     <div className="space-y-4">
+      {/* Análisis IA (local): duplicados, alertas de precio y mejor proveedor */}
+      <AiInsightPanel
+        title="Análisis de materiales (IA)"
+        description="Duplicados, alertas de precio y en qué proveedor comprar más barato."
+        endpoint="/ai/analyze-materials"
+      />
+
       {/* Toolbar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">

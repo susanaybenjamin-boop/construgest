@@ -34,7 +34,9 @@ const PROSE_KEYS = new Set([
   'completion_estimate', 'justification', 'overall_assessment',
 ])
 const PCT_RE = /(pct|percentage|percent|progress|similarity|difference)/i
-const EUR_RE = /(amount|total|spent|budget|price|savings|variance|certified|pending)/i
+// OJO: no incluir "total" — captura recuentos como total_items. Las claves
+// monetarias ya matchean por spent/budget/price/etc.
+const EUR_RE = /(amount|spent|budget|price|savings|variance|certified|pending|avg_per_cert)/i
 const SKIP_KEYS = new Set(['id', 'organization_id', 'project_id', 'budget_id', 'chapter_id'])
 
 // Traducción de las claves que devuelven los servicios de análisis (backend en
