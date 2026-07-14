@@ -369,49 +369,66 @@ export default function ImportBudgetDialog({
     const total = chaptersToImport.length + totalItems + (totalMeas > 0 ? totalItems : 0)
     setImportProgress({ current: 0, total, phase: 'Creando capítulos...' })
 
+    // Extrae el mensaje de error REAL del servidor (para no ocultarlo).
+    const errMsg = (e: unknown): string => {
+      const r = (e as { response?: { data?: { error?: string } }; message?: string })
+      return r?.response?.data?.error || r?.message || 'error desconocido'
+    }
+
+    const failures: string[] = []
+    let okChapters = 0
+    let okItems = 0
+
     try {
       let progress = 0
 
       for (let ci = 0; ci < chaptersToImport.length; ci++) {
         const chapter = chaptersToImport[ci]
 
-        // Create chapter
-        const { data: createdChapter } = await api.post(`/budgets/${budgetId}/chapters`, {
-          code: chapter.code,
-          name: chapter.name,
-          sort_order: ci + 1,
-        })
+        // Crear capítulo (si falla, se salta con sus partidas, no tumba el resto)
+        let createdChapter
+        try {
+          const resp = await api.post(`/budgets/${budgetId}/chapters`, {
+            code: chapter.code, name: chapter.name, sort_order: ci + 1,
+          })
+          createdChapter = resp.data
+          okChapters++
+        } catch (e) {
+          failures.push(`Capítulo ${chapter.code}: ${errMsg(e)}`)
+          continue
+        }
 
         progress++
         setImportProgress({ current: progress, total, phase: `Capítulo ${chapter.code}...` })
 
-        // Create items for this chapter
-        const itemsToImport = chapter.items.filter(i =>
-          selectedItems.has(`${chapter.code}::${i.code}`)
-        )
+        const itemsToImport = chapter.items.filter(i => selectedItems.has(`${chapter.code}::${i.code}`))
 
         for (let ii = 0; ii < itemsToImport.length; ii++) {
           const item = itemsToImport[ii]
 
-          const { data: createdItem } = await api.post(`/budgets/chapters/${createdChapter.id}/items`, {
-            code: item.code,
-            name: item.name,
-            description: item.description || null,
-            unit: item.unit || 'ud',
-            quantity: item.quantity || 0,
-            unit_price: item.unit_price || 0,
-            cost_price: 0,
-            sort_order: ii + 1,
-          })
+          // Crear partida (resiliente: registra el error y sigue)
+          let createdItem
+          try {
+            const resp = await api.post(`/budgets/chapters/${createdChapter.id}/items`, {
+              code: item.code,
+              name: item.name,
+              description: item.description || null,
+              unit: item.unit || 'ud',
+              quantity: item.quantity || 0,
+              unit_price: item.unit_price || 0,
+              cost_price: 0,
+              sort_order: ii + 1,
+            })
+            createdItem = resp.data
+            okItems++
+          } catch (e) {
+            failures.push(`Partida ${item.code}: ${errMsg(e)}`)
+            continue
+          }
 
           progress++
-          setImportProgress({
-            current: progress,
-            total,
-            phase: `${item.code} ${item.name.substring(0, 30)}...`
-          })
+          setImportProgress({ current: progress, total, phase: `${item.code} ${item.name.substring(0, 30)}...` })
 
-          // Import measurements for this item (bulk)
           if (item.measurements && item.measurements.length > 0) {
             try {
               await api.post(`/budgets/items/${createdItem.id}/measurements/bulk`, {
@@ -425,32 +442,30 @@ export default function ImportBudgetDialog({
                   sort_order: idx + 1,
                 }))
               })
-            } catch {
-              // Non-critical — log but continue
-              console.warn(`Failed to import measurements for ${item.code}`)
+            } catch (e) {
+              failures.push(`Mediciones de ${item.code}: ${errMsg(e)}`)
             }
             progress++
-            setImportProgress({
-              current: progress,
-              total,
-              phase: `Mediciones de ${item.code}...`
-            })
+            setImportProgress({ current: progress, total, phase: `Mediciones de ${item.code}...` })
           }
         }
       }
 
       await loadFullBudget(budgetId)
-
-      // Auto-renumber chapters sequentially (01, 02, 03...) and then renumber all item codes
       setImportProgress({ current: progress, total, phase: 'Renumerando capítulos...' })
       await autoRenumberChapters()
 
-      const measMsg = totalMeas > 0 ? ` y ${totalMeas} mediciones` : ''
-      addToast('success', `Importados ${chaptersToImport.length} capítulos, ${totalItems} partidas${measMsg}`)
+      if (failures.length === 0) {
+        const measMsg = totalMeas > 0 ? ` y ${totalMeas} mediciones` : ''
+        addToast('success', `Importados ${okChapters} capítulos, ${okItems} partidas${measMsg}`)
+      } else {
+        console.error('[import] fallos:', failures)
+        addToast('warning', `Importado parcial: ${okItems} partidas OK, ${failures.length} con error. Ej.: ${failures[0]}`)
+      }
       onImportComplete()
       handleClose()
-    } catch {
-      addToast('error', 'Error durante la importación')
+    } catch (e) {
+      addToast('error', `Error durante la importación: ${errMsg(e)}`)
       setStep('preview')
     } finally {
       setImporting(false)
