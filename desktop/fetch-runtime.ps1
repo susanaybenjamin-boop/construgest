@@ -17,7 +17,8 @@
 # ============================================================================
 param(
   [string]$MariaVer  = "11.4.5",
-  [string]$OllamaVer = "v0.32.0"
+  [string]$OllamaVer = "v0.32.0",
+  [switch]$KeepGpu           # conservar las libs CUDA/ROCm (solo si el equipo tiene GPU NVIDIA/AMD)
 )
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # descargas mucho más rápidas
@@ -48,6 +49,18 @@ Download "https://github.com/ollama/ollama/releases/download/$OllamaVer/ollama-w
 Write-Host "  Extrayendo…"
 Remove-Item -Recurse -Force (Join-Path $Runtime "ollama") -ErrorAction SilentlyContinue
 Expand-Archive -Path $ozip -DestinationPath (Join-Path $Runtime "ollama") -Force
+
+# El zip trae ~1.85 GB de libs de GPU (CUDA/ROCm) que un equipo sin GPU no usa.
+# Objetivo del proyecto: portátil i5 SIN GPU → se recortan (baja el .msi ~1.8 GB).
+if (-not $KeepGpu) {
+  $libDir = Join-Path $Runtime "ollama\lib\ollama"
+  if (Test-Path $libDir) {
+    Get-ChildItem $libDir -Directory | Where-Object { $_.Name -match 'cuda|rocm' } | ForEach-Object {
+      Write-Host "  quitando libs de GPU: $($_.Name)"
+      Remove-Item -Recurse -Force $_.FullName
+    }
+  }
+}
 
 # ── Verificación ────────────────────────────────────────────────────────────
 $mysqld = Join-Path $Runtime "mariadb\bin\mysqld.exe"
