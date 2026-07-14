@@ -10,6 +10,7 @@ import {
   findSimilar,
 } from '../services/price-reference.js'
 import { loadPublicPriceBases } from '../services/price-base.js'
+import { recordCorrection, getRecentCorrections, fewShotFor, CORRECTION_SKILLS } from '../services/ai-corrections.js'
 import {
   analyzeBudget,
   buildSummaryPrompt,
@@ -448,9 +449,13 @@ router.post('/extract-materials', async (req, res, next) => {
     const { text, filename } = req.body
     if (!text) return res.status(400).json({ error: 'Texto requerido para la extracción' })
 
+    // AI-4: few-shot con las correcciones previas del usuario para esta skill.
+    const fewShot = await fewShotFor(req.user.organization_id, 'extract-materials')
+
     const materials = await extractMaterials(text, {
       filename,
       callAI,
+      fewShot,
       aiContext: {
         organizationId: req.user.organization_id,
         userId: req.user.id,
@@ -458,6 +463,43 @@ router.post('/extract-materials', async (req, res, next) => {
       },
     })
     res.json(materials)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ================================================================
+//  AUTOAPRENDIZAJE (AI-4) — correcciones del usuario → few-shot
+// ================================================================
+
+// POST /api/ai/corrections — registra una corrección del usuario.
+// body: { skill, context?, wrong?, corrected }. `corrected` = lo que quedó bien.
+router.post('/corrections', async (req, res, next) => {
+  try {
+    const { skill, context, wrong, corrected } = req.body || {}
+    if (!skill || !CORRECTION_SKILLS.has(skill)) {
+      return res.status(400).json({ error: 'skill no válida' })
+    }
+    if (corrected == null) return res.status(400).json({ error: 'Falta el dato corregido' })
+
+    const saved = await recordCorrection({
+      orgId: req.user.organization_id, skill, context, wrong, corrected,
+    })
+    res.status(201).json(saved)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/ai/corrections?skill=extract-materials — últimas correcciones (debug/UI).
+router.get('/corrections', async (req, res, next) => {
+  try {
+    const skill = req.query.skill
+    if (!skill || !CORRECTION_SKILLS.has(skill)) {
+      return res.status(400).json({ error: 'skill no válida' })
+    }
+    const limit = Math.min(Number(req.query.limit) || 20, 100)
+    res.json(await getRecentCorrections(req.user.organization_id, skill, limit))
   } catch (err) {
     next(err)
   }
