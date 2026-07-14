@@ -45,6 +45,9 @@ function safeParse(raw) {
   try { return JSON.parse(raw) } catch { return {} }
 }
 
+// Helpers de matching reutilizables por otras skills (compare-budgets, find-similar…).
+export const _match = { normName, nameTokens, jaccard, normUnit }
+
 /**
  * Núcleo del análisis. Devuelve todos los hechos calculados en código.
  * Ningún número de aquí procede del LLM.

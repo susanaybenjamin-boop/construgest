@@ -215,8 +215,12 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     + LLM solo justificación. VERIFICADO e2e (17% = 12 base +3 sin valorar +2 concentración).
   · `[x]` **`executive-report`** reescrita: estructura (título/desglose/métricas/riesgos) del motor
     + LLM solo resumen/conclusiones/próximos pasos. VERIFICADO e2e, prosa 100% grounded.
-  · `[ ]` **Autónomas pendientes (solo motor, sin tool externa):** `compare-budgets` (nueva,
-    pantalla budget-comparison: Presto importado ↔ tu presupuesto).
+  · `[x]` **`compare-budgets` (backend) HECHA y VERIFICADA e2e.** `services/budget-compare.js`:
+    empareja partidas de 2 presupuestos por nombre (Jaccard) + misma unidad (los códigos NO
+    coinciden: Construgest 02.01 vs Presto 03WSS80000), calcula diffs de precio/importe, qué falta
+    en cada lado. LLM solo el resumen. Probado con Presupuesto_v1 ↔ Vivienda Ogijares (Presto):
+    revela que Construgest tiene precios muy altos (limpieza 185 € vs 4,47 €). **Falta: wire del
+    frontend** (pantalla budget-comparison) — slice aparte.
   · `[ ]` **Dependen de la TOOL base de precios / biblioteca:** `suggest-optimizations`,
     `compare-prices`, `analyze-materials`, `find-similar`. Sin la tool devuelven [] a propósito.
     DECISIÓN PENDIENTE de Benjamin: ¿referencia = su biblioteca propia o base de precios externa?

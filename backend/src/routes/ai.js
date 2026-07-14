@@ -83,6 +83,33 @@ router.post('/analyze-budget', async (req, res, next) => {
   }
 })
 
+// POST /api/ai/compare-budgets — Concilia dos presupuestos del mismo proyecto
+// (p.ej. el de Construgest vs uno importado de Presto). Empareja por nombre+unidad,
+// calcula diferencias de precio/importe y qué falta en cada lado. LLM solo el resumen.
+router.post('/compare-budgets', async (req, res, next) => {
+  try {
+    const a = req.body?.budget_a ?? req.body?.data_a ?? req.body?.a
+    const b = req.body?.budget_b ?? req.body?.data_b ?? req.body?.b
+    if (!a || !b) return res.status(400).json({ error: 'Se requieren dos presupuestos (budget_a, budget_b)' })
+
+    const { compareBudgets, buildComparePrompt, fallbackCompareSummary } = await import('../services/budget-compare.js')
+    const result = compareBudgets(a, b, { labelA: req.body?.label_a, labelB: req.body?.label_b })
+
+    let summary = fallbackCompareSummary(result)
+    try {
+      const r = await callAI(buildComparePrompt(result), { maxTokens: 500, temperature: 0.2 })
+      const text = (r?.resumen || r?.summary || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) summary = text
+    } catch (err) {
+      console.warn('[compare-budgets] LLM falló, resumen de reserva:', err.message)
+    }
+
+    res.json({ ...result, summary })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // POST /api/ai/suggest-optimizations — Optimizaciones de costes
 router.post('/suggest-optimizations', (req, res, next) => {
   handleAIAnalysis(req, res, next, (body) => {
