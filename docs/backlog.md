@@ -1,6 +1,6 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-13
+> ## 📍 ESTADO ACTUAL — 2026-07-14
 >
 > **FASE 0 y FASE 1 COMPLETAS.** Entorno local Docker + MariaDB con esquema y seed.
 > - Repo GitHub **privado** `susanaybenjamin-boop/construgest`. Ramas: trabajo en
@@ -13,30 +13,45 @@
 > select/insert/update/delete/upsert, todos los filtros, RETURNING, selects anidados (en select y
 > en mutación), storage en disco y `.rpc()`. (`ai.js` no va a MariaDB: la IA se reescribió a local.)
 >
+> **✅ BACKEND TERMINADO Y 100% LOCAL (2026-07-14).** Cero dependencia de nube en runtime:
+> Realtime = WebSocket propio (`services/realtimeHub.js`, ruta `/ws`); notificaciones en MariaDB;
+> panel admin de IA y claves-cloud eliminados; deps de nube fuera (queda solo el `/installer` viejo
+> de `settings.js`, que se rehará en Fase 5). Verificado e2e. **Próximo gran bloque: conectar la UI.**
+>
 > **FASE 4 (IA LOCAL) MUY AVANZADA — la IA ya es 100% local, sin nube ni Supabase.**
-> - **Motor:** `services/ai-service.js` reescrito a local puro (Ollama, `qwen2.5:3b`). `callAI()`
->   igual que antes pero solo local; caché en memoria; `tryLocal` con `num_predict≤2048`.
-> - **Extracción** (`extract-materials`): Capa 1 determinista (regex code/precio/unidad, normaliza
->   nº ES) + LLM de refuerzo (`services/extraction.js`). Fiable y consistente.
-> - **OCR** (`parse-budget-pdf`): 100% local, `services/local-ocr.js` (pdftoppm+tesseract `spa`);
->   texto-primero, OCR-fallback. Tesseract+poppler instalados en la imagen (Dockerfile).
-> - **Chat eliminado.** Sin cuotas/pricing/consumo en el motor.
+> - **Motor IA:** `services/ai-service.js` local puro (Ollama, `qwen2.5:3b`); caché; `num_predict≤2048`.
+> - **Extracción/OCR** (`extract-materials`, `parse-budget-pdf`): Capa 1 determinista + LLM/OCR local.
+> - **AI-2 (ANÁLISIS) COMPLETO — 13 skills reescritas** con arquitectura de 3 capas (código calcula,
+>   LLM solo prosa → **0% cifras del modelo**), verificadas e2e con curl:
+>   · Motor determinista compartido `services/budget-analytics.js` (totales, %, incidencias,
+>     duplicados por Jaccard, sugerencias) + `fuzzyJaccard` (tolerante a abreviaturas).
+>   · Pantalla IA (6): analyze-budget, detect-issues, estimate-contingency, executive-report,
+>     suggest-optimizations, compare-prices. · Nuevas: compare-budgets (`budget-compare.js`),
+>     find-similar, analyze-materials (`materials-analytics.js`), analyze-expenses
+>     (`expense-analytics.js`), analyze-certifications (`certification-analytics.js`).
+>   · **TOOL de precios** `services/price-reference.js` = biblioteca propia (manda) + base pública
+>     BC3 (respaldo, enchufable, PENDIENTE el fichero). · CORTADAS 6 skills sin pantalla.
+> - **Chat eliminado.**
 >
 > **PRÓXIMA SESIÓN — empezar por aquí:**
-> 1. Leer esta cabecera + `CLAUDE.md`. **Requisito nuevo del entorno:** tener **Ollama corriendo en
->    el host** con el modelo `qwen2.5:3b` (`ollama pull qwen2.5:3b`). Arrancar: `docker compose up -d`.
->    Tras editar backend: `docker compose up -d --build backend`.
-> 2. **Análisis de presupuestos (AI-2, el grueso):** el 3B alucina números → rediseñar las ~16 skills
->    de `routes/ai.js` para **CALCULAR en código** (Capa 1: varianzas, totales, duplicados, outliers)
->    y dejar al LLM solo el texto narrativo. Empezar por `analyze-budget`/`suggest-optimizations`.
->    Receta de prompt (probada): sin frase "responde []"; ejemplos realistas (no placeholders);
->    códigos por regex.
-> 3. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + fuzzy-match de catálogo.
-> 4. **Follow-up limpieza (AI-5):** desmantelar el panel admin de IA (`routes/admin.js` +
->    `services/mcp-ai-tracker.js` + frontend) y la UI de claves-cloud en `settings.js` (aún usan
->    Supabase/SDKs de nube). Al ser IA local/gratis, sobra.
-> 5. **Fase 3** (Realtime → polling; `notificationService`/`realtimeBroadcast`) y **Fase 5**
->    (empaquetado `.msi`: MariaDB + Node + Next + **Ollama+modelo** + **tesseract+poppler**).
+> 1. Leer esta cabecera + `CLAUDE.md`. **Entorno:** Ollama en el host con `qwen2.5:3b`
+>    (`ollama pull qwen2.5:3b`). Arrancar `docker compose up -d`; tras editar backend
+>    `docker compose up -d --build backend`. Login e2e: `admin@construgest.local` / `construgest`.
+> 2. **CONECTAR LA UI (bloque grande de la próxima sesión):**
+>    a) **Realtime WS:** cambiar `frontend/src/lib/realtime.ts` + `realtimeNotificationStore.ts`
+>       + `lib/supabase.ts` para conectar al WS propio `ws://<host>/ws?token=<jwt>` (subscribe a los
+>       mismos topics: budget/org:projects/org:branches/user). Contrato en `services/realtimeHub.js`.
+>    b) **Skills IA no cableadas:** `compare-budgets` (pantalla budget-comparison), `find-similar`
+>       (al crear partida), `analyze-materials` (materiales), `analyze-expenses`/`analyze-certifications`.
+>       El backend ya devuelve los shapes; falta UI + invalidar React Query.
+>    c) **Limpieza frontend AI-5:** quitar el panel admin de IA (consumo/cuotas) y la pestaña de
+>       claves-cloud en Ajustes (el backend ya no las sirve → darían 404).
+> 3. **2ª fuente de la TOOL de precios:** conseguir base pública BC3 (p.ej. Andalucía) y
+>    concatenarla en `loadPriceReference()` de `routes/ai.js`.
+> 4. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + `find-similar` ya es la base.
+> 5. **Follow-up AI-5:** desmantelar panel admin de IA (`routes/admin.js` + `mcp-ai-tracker.js` +
+>    frontend) y UI de claves-cloud en `settings.js`. **Fase 3** (Realtime→polling) y **Fase 5**
+>    (empaquetado `.msi` + Ollama/modelo + tesseract/poppler + base BC3).
 >
 > **Recordatorio de las 3 reglas nº1 (detalle en `CLAUDE.md`):**
 > ① ¿lo he VISTO funcionar? · ② no asumir, leer/grep antes de tocar · ③ pantalla por
@@ -149,9 +164,16 @@ admin, branches, library, budgets, materials, supplierMaterials, workLogs, certi
 settings, projects, expenses, mailbox, equipmentCatalog, subcontractors, workers +
 middlewares/auth.js. **Pendiente (1):** ai.js (+ servicios IA/realtime → Fase 3/4).
 
-### `[ ]` FASE 3 — Storage y Realtime locales
-- `[ ]` **ST-1** ficheros (`construgest-files`) → disco local (reusar `localApi`/`syncService`).
-- `[ ]` **RT-1** Realtime (9 tablas) → polling o WebSocket propio.
+### `[x]` FASE 3 — Storage y Realtime locales (backend)
+- `[x]` **ST-1** Storage local hecho en Fase 2 (DATA-3 oleada 3): `db/storage.js` + `routes/files.js`
+  + volumen Docker `construgest_files`. Ficheros en disco, URLs firmadas locales.
+- `[x]` **RT-1** Realtime local = **WebSocket propio** (`services/realtimeHub.js`) montado en `/ws`
+  sobre el http.Server de Express. `realtimeBroadcast.js` y `notificationService.js` publican al hub
+  (mismos topics: `budget:{id}`, `org:{id}:projects|branches`, `user:{id}`). Auth por JWT en la
+  conexión; suscripción restringida (user:{id} solo el propio, org:{id}:* solo su org); heartbeat.
+  VERIFICADO e2e: WS autenticado recibe `change` al crear proyecto; token inválido → cierre 4001.
+  **Falta (otra sesión): wire del frontend** (`lib/realtime.ts` + `realtimeNotificationStore.ts`
+  + `lib/supabase.ts`) al nuevo WS.
 
 ### `[~]` FASE 4 — IA LOCAL (decidido 2026-07-13)
 **Objetivo:** IA **100% local, sin internet** (coherente con autocontenido). Portátil i5,
@@ -200,12 +222,56 @@ el catálogo propio. Mejora con el uso, local y sin internet.
   · `[x]` **Extracción (`extract-materials`)** HECHA y verificada (ver `services/extraction.js`):
     parser determinista Capa 1 (code/precio/unidad por regex, normaliza nº ES, no pierde filas) +
     LLM de refuerzo fusionado por precio. 5/5 consistente. Robusto a caída del LLM.
-  · `[ ]` **Skills de ANÁLISIS de presupuestos** (16). HALLAZGO verificado: el 3B **parrotea los
-    placeholders del ejemplo y ALUCINA números** (analyze-expenses devolvió `budget_total:200000`
-    copiado del ejemplo; varianza mal). Las de array (suggest-optimizations…) devuelven `[]` por la
-    frase de fallback. → **No basta afinar prompts: hay que CALCULAR en código (Capa 1)** (varianzas,
-    totales, duplicados, outliers de precio) y dejar al LLM solo el texto narrativo. Rediseño por
-    skill = el grueso del trabajo restante.
+  · `[x]` **MOTOR determinista compartido** `services/budget-analytics.js` (Capa 1): recibe el
+    presupuesto (shape del frontend) y calcula TODO sin IA — totales/capítulo, %, métricas,
+    incidencias (sin valorar, sin cantidad, capítulos vacíos, duplicados por Jaccard, descripciones
+    vagas, descuadre) y sugerencias. Verificado con datos reales del `Presupuesto_v1`.
+  · `[x]` **`detect-issues`** reescrita: 100% motor (SIN LLM) → determinista e instantánea.
+    VERIFICADO e2e (curl): detecta 02.04 sin valorar + capítulo 06 vacío.
+  · `[x]` **`analyze-budget`** reescrita: cifras del motor + LLM local SOLO para el resumen
+    (`{"resumen":...}`, con fallback sin IA). VERIFICADO e2e: total/riesgo/confianza exactos,
+    resumen usa solo cifras reales (0% alucinación), ~22s. optimizations=[] a propósito (necesita
+    base de precios). **PRINCIPIO (Benjamin):** una skill sin TOOLS/datos es prosa vacía → cada
+    skill se apoya en su tool (motor, base de precios empaquetable, catálogo, OCR).
+  · `[x]` **`estimate-contingency`** reescrita: % por reglas (complejidad + incertidumbre del motor)
+    + LLM solo justificación. VERIFICADO e2e (17% = 12 base +3 sin valorar +2 concentración).
+  · `[x]` **`executive-report`** reescrita: estructura (título/desglose/métricas/riesgos) del motor
+    + LLM solo resumen/conclusiones/próximos pasos. VERIFICADO e2e, prosa 100% grounded.
+  · `[x]` **`compare-budgets` (backend) HECHA y VERIFICADA e2e.** `services/budget-compare.js`:
+    empareja partidas de 2 presupuestos por nombre (Jaccard) + misma unidad (los códigos NO
+    coinciden: Construgest 02.01 vs Presto 03WSS80000), calcula diffs de precio/importe, qué falta
+    en cada lado. LLM solo el resumen. Probado con Presupuesto_v1 ↔ Vivienda Ogijares (Presto):
+    revela que Construgest tiene precios muy altos (limpieza 185 € vs 4,47 €). **Falta: wire del
+    frontend** (pantalla budget-comparison) — slice aparte.
+  · `[x]` **TOOL de precios `services/price-reference.js`** + `suggest-optimizations` y
+    `compare-prices` reescritas. DECISIÓN: referencia = **biblioteca propia (manda) + base
+    pública BC3 (respaldo, enchufable)**. Empareja partida→referencia por nombre (Jaccard)+unidad.
+    VERIFICADO e2e: sembradas 3 partidas en biblioteca vía API → suggest-optimizations calcula
+    ahorros exactos ((185−4,47)×18=3.249,54), compare-prices clasifica overpriced + margen
+    negociación 3.687 €; biblioteca vacía → [] (honesto). **PANTALLA DE IA: las 6 skills reescritas.**
+  · `[x]` **`find-similar`** reescrita (lookup determinista contra biblioteca, base de AI-4) y
+    **`analyze-materials`** reescrita (`services/materials-analytics.js`: duplicados a agrupar +
+    dónde pagas más que el proveedor más barato + optimización por proveedor, todo desde
+    `cons_materials`/`cons_supplier_materials`). VERIFICADO e2e sembrando datos vía API.
+  · `[x]` **`fuzzyJaccard`** (matching tolerante a abreviaturas: "HORM. ARM."≈"HORMIGON ARMADO")
+    en `budget-analytics._match`; usado en price-reference/compare-budgets/find-similar/materials
+    (cross-fuente). El Jaccard estricto se mantiene para duplicados dentro de un presupuesto.
+  · `[x]` **BUG corregido en `compare-budgets`:** la ruta pisaba el objeto `summary` (conteos) con
+    la prosa del LLM → separado en `summary` (conteos) + `assessment` (prosa).
+  · `[ ]` **Falta la 2ª fuente de la tool de precios:** base pública BC3 (Benjamin consigue el
+    fichero) → concatenar en `loadPriceReference()`.
+  · `[x]` **Económicas HECHAS y verificadas.** `analyze-expenses` (`services/expense-analytics.js`:
+    gastos vs presupuesto por capítulo, sobrecostes, gastos sin asignar; carga
+    `cons_project_expenses` + importes presupuestados). `analyze-certifications`
+    (`services/certification-analytics.js`: avance acumulado %, pendiente, ritmo, estimación de
+    cierre, riesgo; reusa el cálculo del endpoint overview vía `buildOverview`). Ambas: LLM solo
+    prosa. Verificadas con test unitario (datos representativos) + smoke e2e contra el proyecto demo.
+  · `[x]` **CORTADAS** las 6 sin pantalla (estimate-timeline, analyze-schedule, analyze-plans,
+    analyze-annotations, detect-errors, validate-specifications) + los helpers muertos
+    `handleAIAnalysis`/`truncateData`. VERIFICADO: dan 404; las vivas siguen 200; arranque limpio.
+    **`ai.js` queda con 13 endpoints, todos Capa 1 + LLM solo prosa (0% cifras del modelo).**
+  · `[ ]` **TOOL pendiente:** base de precios de referencia (empaquetable) para las skills de
+    optimización/mercado/contingencia — sin ella devuelven [] a propósito.
 - `[x]` **AI-3 (OCR local) HECHO y VERIFICADO e2e.** `services/local-ocr.js` (pdftoppm→PNG→tesseract
   `spa`). `parseBudgetWithVision` reescrita: Vision-nube → **OCR local** + `parseBudgetFromText`
   (reusa algorítmico + LLM local). Ruta `parse-budget-pdf`: **texto primero** (rápido), OCR fallback
@@ -222,9 +288,12 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     Supabase. Solo queda caché + `tryLocal` (Ollama) + `parseAIResponse`. VERIFICADO: arranca
     limpio, extract-materials sigue OK, sin regresiones. (Las deps npm de los SDK se dejan porque
     `settings.js` aún las usa para probar claves → se quitan con la limpieza de settings.)
-  · `[ ]` **Follow-up:** desmantelar el panel admin de IA (`routes/admin.js` usa `mcp-ai-tracker` +
-    `cons_ai_consumption`/`cons_ai_pricing`/quotas, todo Supabase) + su frontend, y borrar
-    `services/mcp-ai-tracker.js`. Al ser IA local/gratis ese panel entero sobra.
+  · `[x]` **Follow-up (backend) HECHO.** AI-5a: `admin.js` reescrito a solo gestión de usuarios
+    (fuera `/ai-consumption`, `/provider-credits`, todo `/mcp/*` y el `mcpTracker`; borrado
+    `services/mcp-ai-tracker.js`, −978 líneas). AI-5b: `settings.js` sin `verify-ai-key` /
+    `ai-consumption` / sección `ai` de claves; borrado `db/supabase.js`; quitados 4 deps de nube
+    (@anthropic-ai/sdk, @google/generative-ai, groq-sdk, @supabase/supabase-js). **Backend SIN
+    dependencia de nube en runtime.** Falta (otra sesión): frontend del panel admin IA + settings-IA.
 - `[x]` **AI-6 (quitar chat) HECHO.** Eliminado `POST /api/ai/chat`. No había UI de chat en el
   frontend (0 referencias). VERIFICADO: `/api/ai/chat` → 404, resto de la IA intacto.
 

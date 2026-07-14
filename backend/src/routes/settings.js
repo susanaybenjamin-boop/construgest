@@ -277,19 +277,8 @@ const logoUpload = multer({
   },
 })
 
-// ── API Key helpers ──
-const API_KEY_FIELDS = ['anthropic_api_key', 'groq_api_key', 'gemini_api_key']
-
-function maskApiKey(value) {
-  if (!value || typeof value !== 'string' || value.length < 12) return '••••••••'
-  return value.substring(0, 8) + '••••' + value.substring(value.length - 4)
-}
-
-function isMaskedValue(value) {
-  return typeof value === 'string' && value.includes('••••')
-}
-
-// Group keys by section
+// Agrupación de settings por sección. (La sección "ai" de claves cloud se eliminó:
+// la IA es 100% local, sin claves ni proveedores externos que configurar.)
 const SECTIONS = {
   company: [
     'company_name', 'company_cif', 'company_address', 'company_city',
@@ -298,10 +287,6 @@ const SECTIONS = {
     'company_professional_number', 'company_logo_url',
   ],
   defaults: ['tax_rate', 'overhead_pct', 'profit_pct', 'currency', 'default_folder_path'],
-  ai: [
-    'anthropic_enabled', 'groq_enabled', 'gemini_enabled', 'default_provider',
-    'anthropic_api_key', 'groq_api_key', 'gemini_api_key',
-  ],
   appearance: ['theme', 'language'],
   print: [
     'default_format', 'default_orientation',
@@ -336,23 +321,12 @@ router.get('/organization/:orgId', async (req, res, next) => {
       result[section] = {}
       for (const key of keys) {
         if (flat[key] !== undefined) {
-          // Parse booleans and numbers (but NOT api keys)
+          // Parse booleans and numbers
           let val = flat[key]
-          if (!API_KEY_FIELDS.includes(key)) {
-            if (val === 'true') val = true
-            else if (val === 'false') val = false
-            else if (!isNaN(Number(val)) && val !== '') val = Number(val)
-          }
+          if (val === 'true') val = true
+          else if (val === 'false') val = false
+          else if (!isNaN(Number(val)) && val !== '') val = Number(val)
           result[section][key] = val
-        }
-      }
-    }
-
-    // Mask API keys before returning
-    if (result.ai) {
-      for (const field of API_KEY_FIELDS) {
-        if (result.ai[field]) {
-          result.ai[field] = maskApiKey(result.ai[field])
         }
       }
     }
@@ -376,10 +350,6 @@ router.put('/organization/:orgId', async (req, res, next) => {
       if (!sectionData) continue
       for (const key of keys) {
         if (sectionData[key] !== undefined) {
-          // Skip API key fields that still contain the masked value (user didn't change them)
-          if (API_KEY_FIELDS.includes(key) && isMaskedValue(sectionData[key])) {
-            continue
-          }
           pairs.push({ key, value: String(sectionData[key]) })
         }
       }
@@ -409,71 +379,6 @@ router.put('/organization/:orgId', async (req, res, next) => {
     res.json({ success: true })
   } catch (err) {
     next(err)
-  }
-})
-
-// POST /api/settings/verify-ai-key — Test if an API key is valid
-router.post('/verify-ai-key', async (req, res, next) => {
-  try {
-    const { provider, api_key } = req.body
-    if (!provider || !api_key) {
-      return res.status(400).json({ error: 'Provider and api_key are required' })
-    }
-
-    let valid = false
-    let message = ''
-
-    if (provider === 'anthropic') {
-      const { default: Anthropic } = await import('@anthropic-ai/sdk')
-      const client = new Anthropic({ apiKey: api_key })
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Say "ok"' }],
-      })
-      valid = !!response.content[0]?.text
-      message = valid ? 'Anthropic API key válida ✓' : 'Sin respuesta del modelo'
-    } else if (provider === 'groq') {
-      const { default: Groq } = await import('groq-sdk')
-      const client = new Groq({ apiKey: api_key })
-      const response = await client.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: 'Say "ok"' }],
-        max_tokens: 10,
-      })
-      valid = !!response.choices[0]?.message?.content
-      message = valid ? 'Groq API key válida ✓' : 'Sin respuesta del modelo'
-    } else if (provider === 'gemini') {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai')
-      const client = new GoogleGenerativeAI(api_key)
-      // Try multiple models in case one is unavailable
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
-      let lastErr = null
-      for (const modelName of modelsToTry) {
-        try {
-          const model = client.getGenerativeModel({ model: modelName })
-          const result = await model.generateContent('Say "ok"')
-          const text = result.response.text()
-          if (text) {
-            valid = true
-            message = `Gemini API key válida ✓ (modelo: ${modelName})`
-            break
-          }
-        } catch (e) {
-          lastErr = e
-          continue
-        }
-      }
-      if (!valid) {
-        message = lastErr?.message || 'Sin respuesta del modelo'
-      }
-    } else {
-      return res.status(400).json({ error: `Proveedor desconocido: ${provider}` })
-    }
-
-    res.json({ valid, message })
-  } catch (err) {
-    res.json({ valid: false, message: err.message })
   }
 })
 
@@ -572,56 +477,6 @@ router.delete('/logo', async (req, res, next) => {
     await upsertSetting(orgId, 'company_logo_path', '')
 
     res.json({ success: true })
-  } catch (err) {
-    next(err)
-  }
-})
-
-// GET /api/settings/ai-consumption - Get AI consumption stats for the organization
-router.get('/ai-consumption', async (req, res, next) => {
-  try {
-    const orgId = req.user.organization_id
-    const period = req.query.period || 'month' // 'month', 'week', 'all'
-
-    let since = new Date()
-    if (period === 'month') since.setDate(since.getDate() - 30)
-    else if (period === 'week') since.setDate(since.getDate() - 7)
-    else since = new Date('2020-01-01')
-
-    const { data, error } = await supabase
-      .from('cons_ai_consumption')
-      .select('provider, model, input_tokens, output_tokens, estimated_cost, key_source, operation, created_at')
-      .eq('organization_id', orgId)
-      .gte('created_at', since.toISOString())
-      .order('created_at', { ascending: false })
-      .limit(500)
-
-    if (error) throw error
-
-    // Aggregate by provider
-    const byProvider = {}
-    let totalInput = 0, totalOutput = 0, totalCost = 0
-    for (const row of (data || [])) {
-      const key = row.provider
-      if (!byProvider[key]) byProvider[key] = { provider: key, calls: 0, input_tokens: 0, output_tokens: 0, estimated_cost: 0 }
-      byProvider[key].calls++
-      byProvider[key].input_tokens += row.input_tokens || 0
-      byProvider[key].output_tokens += row.output_tokens || 0
-      byProvider[key].estimated_cost += parseFloat(row.estimated_cost) || 0
-      totalInput += row.input_tokens || 0
-      totalOutput += row.output_tokens || 0
-      totalCost += parseFloat(row.estimated_cost) || 0
-    }
-
-    res.json({
-      period,
-      total_calls: (data || []).length,
-      total_input_tokens: totalInput,
-      total_output_tokens: totalOutput,
-      total_estimated_cost: Math.round(totalCost * 1000000) / 1000000,
-      by_provider: Object.values(byProvider),
-      recent: (data || []).slice(0, 20),
-    })
   } catch (err) {
     next(err)
   }
