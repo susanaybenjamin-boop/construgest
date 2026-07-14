@@ -238,7 +238,12 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     la prosa del LLM → separado en `summary` (conteos) + `assessment` (prosa).
   · `[ ]` **Falta la 2ª fuente de la tool de precios:** base pública BC3 (Benjamin consigue el
     fichero) → concatenar en `loadPriceReference()`.
-  · `[ ]` **Económicas:** `analyze-expenses`, `analyze-certifications` (motor + datos de gastos/certis).
+  · `[x]` **Económicas HECHAS y verificadas.** `analyze-expenses` (`services/expense-analytics.js`:
+    gastos vs presupuesto por capítulo, sobrecostes, gastos sin asignar; carga
+    `cons_project_expenses` + importes presupuestados). `analyze-certifications`
+    (`services/certification-analytics.js`: avance acumulado %, pendiente, ritmo, estimación de
+    cierre, riesgo; reusa el cálculo del endpoint overview vía `buildOverview`). Ambas: LLM solo
+    prosa. Verificadas con test unitario (datos representativos) + smoke e2e contra el proyecto demo.
   · `[ ]` **Cortar** las sin pantalla: estimate-timeline, analyze-schedule, analyze-plans,
     analyze-annotations, detect-errors, validate-specifications.
   · `[ ]` **TOOL pendiente:** base de precios de referencia (empaquetable) para las skills de

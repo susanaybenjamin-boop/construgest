@@ -429,64 +429,131 @@ ${data}`
 //  CERTIFICACIONES — análisis de progreso y facturación
 // ================================================================
 
-// POST /api/ai/analyze-certifications — Análisis de certificaciones
-router.post('/analyze-certifications', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en certificaciones y facturación de obras. Analiza el progreso.
+// POST /api/ai/analyze-certifications — Avance de obra certificado.
+// TOOL: certificaciones del proyecto valoradas (mismo cálculo que el endpoint
+// overview). Determinista: avance %, pendiente, ritmo, riesgo. LLM solo el resumen.
+router.post('/analyze-certifications', async (req, res, next) => {
+  try {
+    const projectId = req.body?.project_id
+    if (!projectId) return res.status(400).json({ error: 'Se requiere project_id' })
 
-Responde SOLO con JSON válido:
-{
-  "summary": "Resumen del estado de certificaciones",
-  "total_progress": 65.5,
-  "completed_units": 150,
-  "pending_units": 80,
-  "completion_estimate": "Estimado completar en 3 meses",
-  "critical_path": ["Estructura", "Acabados"],
-  "recommendations": ["Recomendación para acelerar certificación"],
-  "risk_assessment": "Valoración general de riesgos del avance"
-}
+    const { data: budgets } = await supabase
+      .from('cons_budgets').select('id').eq('project_id', projectId)
+    const budgetIds = (budgets || []).map((b) => b.id)
 
-CERTIFICACIONES:
-${data}`
-  })
+    const { analyzeCertifications, buildOverview, buildCertificationsPrompt, fallbackCertificationsSummary } =
+      await import('../services/certification-analytics.js')
+
+    let overview = []
+    if (budgetIds.length) {
+      const { data: certs } = await supabase
+        .from('cons_certifications').select('id, budget_id, number, name, status').in('budget_id', budgetIds)
+      const certIds = (certs || []).map((c) => c.id)
+
+      let items = []
+      if (certIds.length) {
+        const { data } = await supabase
+          .from('cons_certification_items').select('certification_id, budget_item_id, certified_quantity').in('certification_id', certIds)
+        items = data || []
+      }
+      // Precios de las partidas certificadas.
+      const itemIds = [...new Set(items.map((i) => i.budget_item_id))]
+      const priceMap = {}
+      if (itemIds.length) {
+        const { data: prices } = await supabase
+          .from('cons_budget_items').select('id, unit_price').in('id', itemIds)
+        for (const p of (prices || [])) priceMap[p.id] = Number(p.unit_price) || 0
+      }
+      // Total presupuestado por presupuesto (capítulos + partidas activas).
+      const budgetTotals = {}
+      for (const bId of budgetIds) {
+        const { data: chs } = await supabase
+          .from('cons_chapters').select('id').eq('budget_id', bId).eq('is_active', true)
+        const chIds = (chs || []).map((c) => c.id)
+        let total = 0
+        if (chIds.length) {
+          const { data: bis } = await supabase
+            .from('cons_budget_items').select('quantity, unit_price').in('chapter_id', chIds).eq('is_active', true)
+          total = (bis || []).reduce((s, x) => s + Number(x.quantity) * Number(x.unit_price), 0)
+        }
+        budgetTotals[bId] = total
+      }
+      overview = buildOverview(certs || [], items, priceMap, budgetTotals)
+    }
+
+    const a = analyzeCertifications(overview)
+    let summary = fallbackCertificationsSummary(a)
+    if (overview.length) {
+      try {
+        const r = await callAI(buildCertificationsPrompt(a), { maxTokens: 400, temperature: 0.2 })
+        if (r?.resumen) summary = String(r.resumen)
+      } catch (err) {
+        console.warn('[analyze-certifications] LLM falló, resumen de reserva:', err.message)
+      }
+    }
+
+    res.json({ summary, recommendations: [], ...a })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
 //  GASTOS — control económico
 // ================================================================
 
-// POST /api/ai/analyze-expenses — Análisis de gastos vs presupuesto
-router.post('/analyze-expenses', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const expensesData = truncateData(body.data || body.expenses, 6000)
-    const budgetData = body.budget ? truncateData(body.budget, 6000) : ''
+// POST /api/ai/analyze-expenses — Gastos reales vs presupuesto.
+// TOOL: cons_project_expenses (enlazados a capítulo) + importes presupuestados por
+// capítulo. Determinista: desviación por capítulo, total, anomalías. LLM solo prosa.
+router.post('/analyze-expenses', async (req, res, next) => {
+  try {
+    const projectId = req.body?.project_id
+    if (!projectId) return res.status(400).json({ error: 'Se requiere project_id' })
 
-    const budgetSection = budgetData ? `\n\nPRESUPUESTO:\n${budgetData}` : ''
+    // Gastos del proyecto.
+    const { data: expenses, error: expErr } = await supabase
+      .from('cons_project_expenses')
+      .select('budget_chapter_id, amount, concept, supplier_name')
+      .eq('project_id', projectId)
+    if (expErr) throw expErr
 
-    return `Eres un especialista en control de costos de obras. Compara gastos vs presupuesto.
+    // Presupuesto del proyecto (aprobado si hay, si no el primero) → capítulos activos + importe.
+    const { data: budgets } = await supabase
+      .from('cons_budgets').select('id, status').eq('project_id', projectId)
+    const budget = (budgets || []).find((b) => b.status === 'approved') || (budgets || [])[0]
+    let chapters = []
+    if (budget) {
+      const { data: chs } = await supabase
+        .from('cons_chapters').select('id, code, name').eq('budget_id', budget.id).eq('is_active', true)
+      const chIds = (chs || []).map((c) => c.id)
+      let items = []
+      if (chIds.length) {
+        const { data } = await supabase
+          .from('cons_budget_items').select('chapter_id, quantity, unit_price').in('chapter_id', chIds).eq('is_active', true)
+        items = data || []
+      }
+      const budgetedByCh = {}
+      for (const it of items) budgetedByCh[it.chapter_id] = (budgetedByCh[it.chapter_id] || 0) + Number(it.quantity) * Number(it.unit_price)
+      chapters = (chs || []).map((c) => ({ id: c.id, code: c.code, name: c.name, budgeted: budgetedByCh[c.id] || 0 }))
+    }
 
-Responde SOLO con JSON válido:
-{
-  "summary": "Resumen del control de gastos",
-  "total_spent": 150000.0,
-  "budget_total": 200000.0,
-  "variance_percentage": -25.0,
-  "budget_variance": -50000.0,
-  "anomalies_found": 3,
-  "risk_level": "medium",
-  "expense_anomalies": ["Anomalía: gasto X supera presupuesto en Y%"],
-  "optimization_opportunities": ["Oportunidad de ahorro identificada"],
-  "trend_analysis": "Análisis de la tendencia de gasto"
-}
+    const { analyzeExpenses, buildExpensesPrompt, fallbackExpensesSummary } = await import('../services/expense-analytics.js')
+    const a = analyzeExpenses(expenses || [], chapters)
 
-risk_level puede ser: "low", "medium", "high"
-variance_percentage y budget_variance negativos = por debajo del presupuesto (bien)
-variance_percentage y budget_variance positivos = por encima del presupuesto (mal)
+    let summary = fallbackExpensesSummary(a)
+    let trend_analysis = ''
+    try {
+      const r = await callAI(buildExpensesPrompt(a), { maxTokens: 500, temperature: 0.2 })
+      if (r?.resumen) summary = String(r.resumen)
+      if (r?.tendencia) trend_analysis = String(r.tendencia)
+    } catch (err) {
+      console.warn('[analyze-expenses] LLM falló, resumen de reserva:', err.message)
+    }
 
-GASTOS:
-${expensesData}${budgetSection}`
-  })
+    res.json({ summary, trend_analysis, optimization_opportunities: [], ...a })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
