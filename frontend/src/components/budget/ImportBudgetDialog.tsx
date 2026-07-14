@@ -451,9 +451,16 @@ export default function ImportBudgetDialog({
         }
       }
 
-      await loadFullBudget(budgetId)
-      setImportProgress({ current: progress, total, phase: 'Renumerando capítulos...' })
-      await autoRenumberChapters()
+      // Post-proceso (recargar + renumerar a 01,02,03…). Es COSMÉTICO: los datos
+      // ya están guardados, así que si falla no se muestra error ni se pierde la
+      // importación — solo la renumeración automática.
+      try {
+        await loadFullBudget(budgetId)
+        setImportProgress({ current: progress, total, phase: 'Renumerando capítulos...' })
+        await autoRenumberChapters()
+      } catch (e) {
+        console.warn('[import] renumerado automático falló (los datos están guardados):', errMsg(e))
+      }
 
       if (failures.length === 0) {
         const measMsg = totalMeas > 0 ? ` y ${totalMeas} mediciones` : ''
