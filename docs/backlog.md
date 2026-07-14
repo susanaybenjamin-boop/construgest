@@ -343,9 +343,22 @@ el catálogo propio. Mejora con el uso, local y sin internet.
 - `[x]` **AI-6 (quitar chat) HECHO.** Eliminado `POST /api/ai/chat`. No había UI de chat en el
   frontend (0 referencias). VERIFICADO: `/api/ai/chat` → 404, resto de la IA intacto.
 
-### `[ ]` FASE 5 — Empaquetado autocontenido (LO ÚLTIMO)
-- `[ ]` instalable Windows: Node + Next + MariaDB embebida **+ Ollama + modelo 3B**, "doble
-  clic". El instalador despliega Ollama y hace `pull` del modelo. `.msi` SOLO aquí.
+### `[~]` FASE 5 — Empaquetado autocontenido (EN CURSO)
+Arquitectura decidida: **nativo sin Docker + ventana Electron**, `.msi` con **WiX v3**
+(como Benjagest). Todo en `desktop/`.
+- `[x]` **F5-1** correr nativo sin Docker: backend + frontend (`output:'standalone'`) como
+  procesos Node. VERIFICADO (`node server.js` sirve /login 200).
+- `[x]` **F5-2/2b** shell Electron (`desktop/main.js`): arranca MariaDB (init la 1ª vez:
+  `mariadb-install-db` → crea BD/usuario → aplica `database/init/*.sql`) + Ollama (pull del
+  modelo si falta) + backend + frontend con el Node de Electron, health-checks y ventana.
+  VERIFICADO lo que no necesita el binario (secuencia de esquema → 58 tablas; check de modelo).
+- `[x]` **F5-4** `.msi` con WiX (`installer/Product.wxs` + `build-msi.ps1`): heat+candle+light
+  empaquetan Electron+backend+frontend+database. VERIFICADO: genera
+  `desktop/dist/ConstruGest-0.1.0.msi` (304 MB, MSI válido) con el payload correcto. Fix de
+  paso: `outputFileTracingRoot` para que el standalone no se anide.
+- `[ ]` **F5-3** colocar binarios nativos en `desktop/runtime/` (MariaDB portable, Ollama+modelo,
+  tesseract/poppler) para un `.msi` 100% autocontenido. Guía en `desktop/runtime/README.md`.
+- `[ ]` Probar el `.msi` instalado en una máquina limpia (instalar + arrancar la ventana).
 
 ---
 
