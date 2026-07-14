@@ -51,7 +51,8 @@
 >       migrados a `subscribeTopic()`; `authStore.logout()` cierra el socket. Borrado
 >       `lib/supabase.ts` + dep `@supabase/supabase-js` + vars `NEXT_PUBLIC_SUPABASE_*`.
 >       VERIFICADO e2e: WS conecta con JWT real (ready+pong) y rename de proyecto por backend →
->       la lista del panel se refresca sola (org:projects change). **Falta merge a develop.**
+>       la lista del panel se refresca sola (org:projects change).
+>       **UI-1 + FERRA mergeados a `develop` (merge `83679d9`, 2026-07-14).**
 >    b) **Skills IA no cableadas:** `compare-budgets` (pantalla budget-comparison), `find-similar`
 >       (al crear partida), `analyze-materials` (materiales), `analyze-expenses`/`analyze-certifications`.
 >       El backend ya devuelve los shapes; falta UI + invalidar React Query.
