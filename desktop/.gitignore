@@ -1,8 +1,9 @@
 node_modules/
+build/
 dist/
+installer/AppFiles.wxs
 # Binarios bundleados (grandes, no van a git — se descargan por máquina; ver runtime/README.md)
 runtime/mariadb/
 runtime/ollama/
 runtime/tesseract/
 runtime/poppler/
-build/icon.ico

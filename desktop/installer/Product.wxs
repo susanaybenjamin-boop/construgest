@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Instalador .msi de ConstruGest (WiX v3, estilo Benjagest).
+
+  Empaqueta el shell de Electron (renombrado ConstruGest.exe) con nuestro código
+  en resources/app y los servicios (backend, frontend standalone, database/init y
+  runtime/) en resources/. Los ficheros concretos los cosecha `heat` en
+  AppFiles.wxs (ComponentGroup AppFiles → INSTALLFOLDER). Ver build-msi.ps1.
+
+  UpgradeCode FIJO: no cambiar entre versiones (así los .msi se actualizan en
+  vez de instalarse en paralelo).
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="ConstruGest"
+           Language="3082"
+           Version="$(var.Version)"
+           Manufacturer="Construgest"
+           UpgradeCode="00C6A462-CF33-4871-9A62-BB7541FDEA27">
+
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Description="ConstruGest — gestión de construcción (local)" />
+
+    <MajorUpgrade DowngradeErrorMessage="Ya hay una versión más reciente de ConstruGest instalada." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Icono del programa (usa el del ejecutable empaquetado). -->
+    <Icon Id="AppIcon.exe" SourceFile="$(var.StageDir)\ConstruGest.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
+
+    <Feature Id="MainFeature" Title="ConstruGest" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="AppShortcuts" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="ConstruGest" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="AppMenuFolder" Name="ConstruGest" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <!-- Accesos directos (menú inicio + escritorio). -->
+    <DirectoryRef Id="AppMenuFolder">
+      <Component Id="AppShortcuts" Guid="*">
+        <Shortcut Id="StartMenuShortcut" Name="ConstruGest"
+                  Target="[INSTALLFOLDER]ConstruGest.exe"
+                  WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.exe" />
+        <Shortcut Id="DesktopShortcut" Directory="DesktopFolder" Name="ConstruGest"
+                  Target="[INSTALLFOLDER]ConstruGest.exe"
+                  WorkingDirectory="INSTALLFOLDER" Icon="AppIcon.exe" />
+        <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Construgest\ConstruGest"
+                       Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- UI estándar de selección de carpeta. -->
+    <UIRef Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+  </Product>
+</Wix>
