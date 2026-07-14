@@ -25,14 +25,6 @@ router.use(authMiddleware)
 
 // ==================== Helpers ==================== //
 
-/** Truncate data string to avoid exceeding model context window */
-function truncateData(data, maxChars = 10000) {
-  const str = (typeof data === 'string' ? data : JSON.stringify(data)) ?? ''
-  if (str.length <= maxChars) return str
-  console.warn(`[AI] Datos truncados de ${str.length} a ${maxChars} chars`)
-  return str.substring(0, maxChars) + '...(datos truncados)'
-}
-
 /**
  * Carga la referencia de precios de una organización.
  * Fuente 1: biblioteca propia (`cons_saved_partidas`). Fuente 2 (pendiente): base
@@ -47,28 +39,8 @@ async function loadPriceReference(orgId) {
   return normalizeReference(data || [], 'biblioteca')
 }
 
-/** Generic AI analysis handler — supports single or multi-field data */
-async function handleAIAnalysis(req, res, next, buildPrompt, aiOptions = {}) {
-  try {
-    const body = req.body
-    // Support both { data: ... } and custom fields
-    if (!body || (Object.keys(body).length === 0)) {
-      return res.status(400).json({ error: 'Datos requeridos para el análisis' })
-    }
-
-    const prompt = typeof buildPrompt === 'string'
-      ? `${buildPrompt}\n\nDATOS:\n${truncateData(body.data)}`
-      : buildPrompt(body)
-
-    const result = await callAI(prompt, { organizationId: req.user.organization_id, userId: req.user.id, ...aiOptions })
-    res.json(result)
-  } catch (err) {
-    next(err)
-  }
-}
-
 // ================================================================
-//  PRESUPUESTOS — 8 skills
+//  PRESUPUESTOS — análisis sobre el motor determinista
 // ================================================================
 
 // POST /api/ai/analyze-budget — Análisis comprehensivo de presupuesto.
@@ -161,27 +133,6 @@ router.post('/detect-issues', (req, res, next) => {
   }
 })
 
-// POST /api/ai/estimate-timeline — Estimación de cronograma
-router.post('/estimate-timeline', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un planificador de obras experto. Estima un cronograma para este presupuesto.
-
-Responde SOLO con JSON válido:
-{
-  "total_duration_weeks": 20,
-  "phases": [
-    {"phase": "Preparación", "duration_weeks": 2, "tasks": ["Excavación", "Desbroce"], "is_critical": true}
-  ],
-  "critical_path": ["Cimentación", "Estructura", "Cubierta"],
-  "recommendations": "Recomendaciones sobre el cronograma"
-}
-
-PRESUPUESTO:
-${data}`
-  })
-})
-
 // POST /api/ai/executive-report — Informe ejecutivo profesional.
 // Estructura (título, desglose, métricas, riesgos) del motor; el LLM SOLO redacta
 // resumen_ejecutivo / conclusiones / proximos_pasos.
@@ -258,29 +209,6 @@ Responde SOLO con este JSON: {"valoracion": "tu valoración aquí"}`
   }
 })
 
-// POST /api/ai/validate-specifications — Validar especificaciones técnicas
-router.post('/validate-specifications', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Valida estas especificaciones técnicas de obra.
-
-Verifica: completitud, compatibilidad de materiales, cumplimiento normativo, viabilidad técnica.
-
-Responde SOLO con JSON válido:
-{
-  "is_complete": true,
-  "issues": [
-    {"spec_id": "s1", "severity": "warning", "issue": "Problema detectado", "solution": "Cómo solucionarlo"}
-  ],
-  "compliance_score": 85,
-  "recommendations": ["Recomendación"]
-}
-
-ESPECIFICACIONES:
-${data}`
-  })
-})
-
 // POST /api/ai/estimate-contingency — Estimación de imprevistos.
 // % por reglas (complejidad + incertidumbre detectada por el motor); el LLM SOLO
 // redacta la justificación.
@@ -345,84 +273,6 @@ router.post('/analyze-materials', async (req, res, next) => {
   } catch (err) {
     next(err)
   }
-})
-
-// POST /api/ai/analyze-plans — Análisis de planos (Texto)
-router.post('/analyze-plans', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en revisión de planos de construcción. Analiza esta información.
-
-Responde SOLO con JSON válido:
-{
-  "summary": "Resumen del análisis de los planos",
-  "scale_detected": "1:100",
-  "measurements_found": 42,
-  "confidence_score": 80.0,
-  "potential_issues": [
-    "Problema o inconsistencia encontrada"
-  ],
-  "recommendations": [
-    "Recomendación para mejorar"
-  ]
-}
-
-INFORMACIÓN DE PLANOS:
-${data}`
-  })
-})
-
-// ================================================================
-//  CRONOGRAMA — análisis avanzado de planificación
-// ================================================================
-
-// POST /api/ai/analyze-schedule — Análisis de cronograma
-router.post('/analyze-schedule', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en planificación de obras. Analiza este cronograma.
-
-Responde SOLO con JSON válido:
-{
-  "total_duration_weeks": 24,
-  "feasibility_score": 75.0,
-  "critical_path": ["Cimentación", "Estructura", "Cubierta"],
-  "bottlenecks": ["Cuello de botella identificado"],
-  "resource_conflicts": ["Conflicto de recursos"],
-  "optimization_recommendations": ["Recomendación de optimización"],
-  "risk_factors": ["Factor de riesgo"]
-}
-
-Usa arrays vacíos [] si no hay datos para un campo.
-
-CRONOGRAMA:
-${data}`
-  })
-})
-
-// ================================================================
-//  ANOTACIONES — análisis de observaciones de obra
-// ================================================================
-
-// POST /api/ai/analyze-annotations — Análisis de anotaciones
-router.post('/analyze-annotations', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en gestión de anotaciones y observaciones de obra. Agrupa y analiza.
-
-Responde SOLO con JSON válido:
-{
-  "total_annotations": 28,
-  "by_type": {"error": 5, "comentario": 12, "mejora": 8, "duda": 3},
-  "grouped_issues": ["Grupo de problemas relacionados (N anotaciones)"],
-  "priority_issues": ["Problema prioritario (severidad)"],
-  "related_annotations": [[0, 5, 8], [2, 7]],
-  "resolution_suggestions": ["Sugerencia de resolución ordenada por prioridad"]
-}
-
-ANOTACIONES:
-${data}`
-  })
 })
 
 // ================================================================
@@ -554,41 +404,6 @@ router.post('/analyze-expenses', async (req, res, next) => {
   } catch (err) {
     next(err)
   }
-})
-
-// ================================================================
-//  DETECCIÓN DE ERRORES — debugging
-// ================================================================
-
-// POST /api/ai/detect-errors — Análisis de logs de error
-router.post('/detect-errors', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const logsData = truncateData(body.data || body.logs, 6000)
-    const contextData = body.context ? truncateData(body.context, 2000) : ''
-
-    const contextSection = contextData ? `\nCONTEXTO:\n${contextData}\n` : ''
-
-    return `Eres un ingeniero experto en debugging. Analiza estos logs de error.
-
-Responde SOLO con un array JSON de errores encontrados:
-[
-  {
-    "error_type": "tipo de error",
-    "severity": "high",
-    "description": "Descripción del error",
-    "affected_area": "Área afectada",
-    "root_cause": "Causa raíz probable",
-    "suggested_fix": "Cómo solucionarlo",
-    "fix_code_snippet": "Código o comando sugerido"
-  }
-]
-
-severity puede ser: "critical", "high", "medium", "low"
-Si no hay errores, responde: []
-${contextSection}
-LOGS:
-${logsData}`
-  })
 })
 
 // ================================================================

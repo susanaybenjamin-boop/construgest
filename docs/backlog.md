@@ -244,8 +244,10 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     (`services/certification-analytics.js`: avance acumulado %, pendiente, ritmo, estimación de
     cierre, riesgo; reusa el cálculo del endpoint overview vía `buildOverview`). Ambas: LLM solo
     prosa. Verificadas con test unitario (datos representativos) + smoke e2e contra el proyecto demo.
-  · `[ ]` **Cortar** las sin pantalla: estimate-timeline, analyze-schedule, analyze-plans,
-    analyze-annotations, detect-errors, validate-specifications.
+  · `[x]` **CORTADAS** las 6 sin pantalla (estimate-timeline, analyze-schedule, analyze-plans,
+    analyze-annotations, detect-errors, validate-specifications) + los helpers muertos
+    `handleAIAnalysis`/`truncateData`. VERIFICADO: dan 404; las vivas siguen 200; arranque limpio.
+    **`ai.js` queda con 13 endpoints, todos Capa 1 + LLM solo prosa (0% cifras del modelo).**
   · `[ ]` **TOOL pendiente:** base de precios de referencia (empaquetable) para las skills de
     optimización/mercado/contingencia — sin ella devuelven [] a propósito.
 - `[x]` **AI-3 (OCR local) HECHO y VERIFICADO e2e.** `services/local-ocr.js` (pdftoppm→PNG→tesseract
