@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { BudgetItem, Measurement } from '@/types'
 import { useBudgetStore } from '@/stores/budgetStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import api from '@/lib/api'
 import type { SavedPartida } from '@/types'
-import { Trash2, Ruler, Copy, GripVertical, Layers, Bookmark, ChevronDown, ChevronRight, Plus, EyeOff, Eye, Infinity as InfinityIcon, CopyPlus, Link2 } from 'lucide-react'
+import { Trash2, Ruler, Copy, GripVertical, Layers, Bookmark, ChevronDown, ChevronRight, Plus, EyeOff, Eye, Infinity as InfinityIcon, CopyPlus, Link2, Sparkles } from 'lucide-react'
 import { formatCurrency, parseLocaleNumber } from '@/lib/utils'
 
 // Standard construction unit options
@@ -60,6 +60,18 @@ const numInputProps = {
   },
 }
 
+// Sugerencia de partida guardada parecida (find-similar, IA local determinista).
+interface SimilarPartida {
+  saved_partida_id: string
+  saved_code: string
+  saved_name: string
+  unit: string
+  unit_price: number
+  usage_count: number
+  similarity_score: number
+  reason: string
+}
+
 export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onToggleExpand, isSelected, onSelect }: Props) {
   const { updateItem, deleteItem, duplicateItem, addMeasurement, updateMeasurement, deleteMeasurement, autoRenumberAll, activeItemId, setActiveItemId } = useBudgetStore()
   const { addToast } = useNotificationStore()
@@ -69,6 +81,38 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
   const [foundDuplicates, setFoundDuplicates] = useState<SavedPartida[]>([])
   const [chapterSelectorOpen, setChapterSelectorOpen] = useState(false)
+
+  // find-similar: sugerencias de partidas guardadas parecidas al teclear el nombre.
+  const [similar, setSimilar] = useState<SimilarPartida[]>([])
+  const [showSimilar, setShowSimilar] = useState(false)
+  const similarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (similarTimer.current) clearTimeout(similarTimer.current) }, [])
+
+  const fetchSimilar = (name: string) => {
+    if (similarTimer.current) clearTimeout(similarTimer.current)
+    const q = name.trim()
+    if (q.length < 4) { setSimilar([]); setShowSimilar(false); return }
+    similarTimer.current = setTimeout(async () => {
+      try {
+        const { data } = await api.post<SimilarPartida[]>('/ai/find-similar', {
+          partida: { name: q, unit: item.unit },
+        })
+        // No ofrecer la propia partida (mismo nombre exacto) como "sugerencia".
+        const list = (data || []).filter((s) => s.saved_name.trim().toLowerCase() !== q.toLowerCase())
+        setSimilar(list)
+        setShowSimilar(list.length > 0)
+      } catch {
+        setSimilar([]); setShowSimilar(false)
+      }
+    }, 400)
+  }
+
+  const applySimilar = async (s: SimilarPartida) => {
+    setShowSimilar(false)
+    setSimilar([])
+    await updateItem(item.id, { name: s.saved_name, unit: s.unit, unit_price: s.unit_price })
+    addToast('success', `Partida reutilizada de la biblioteca (${s.saved_code})`)
+  }
 
   // Controlled state for instant total recalculation
   const [localQty, setLocalQty] = useState(String(item.quantity))
@@ -345,12 +389,44 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
             </button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <input
-                  className="flex-1 px-1 py-0.5 rounded border border-transparent hover:border-gray-300 focus:border-blue-500 outline-none text-gray-800 min-w-0"
-                  defaultValue={item.name}
-                  onKeyDown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
-                  onBlur={(e) => handleBlur('name', e.target.value)}
-                />
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    key={`name-${item.id}-${item.name}`}
+                    className="w-full px-1 py-0.5 rounded border border-transparent hover:border-gray-300 focus:border-blue-500 outline-none text-gray-800 min-w-0"
+                    defaultValue={item.name}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur()
+                      if (e.key === 'Escape') setShowSimilar(false)
+                    }}
+                    onChange={(e) => fetchSimilar(e.target.value)}
+                    onBlur={(e) => handleBlur('name', e.target.value)}
+                  />
+                  {/* Sugerencias de la biblioteca (find-similar, IA local) */}
+                  {showSimilar && similar.length > 0 && (
+                    <div className="absolute z-30 left-0 right-0 top-full mt-0.5 bg-white border border-indigo-200 rounded-lg shadow-lg max-h-64 overflow-auto">
+                      <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-indigo-500 bg-indigo-50/70 flex items-center gap-1 sticky top-0">
+                        <Sparkles className="w-3 h-3" /> Partidas guardadas parecidas
+                      </div>
+                      {similar.map((s) => (
+                        <button
+                          key={s.saved_partida_id}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); applySimilar(s) }}
+                          className="w-full text-left px-2 py-1.5 hover:bg-indigo-50 border-b border-gray-50 last:border-0 flex items-center gap-2"
+                          title={`${s.reason} · usada ${s.usage_count} vez(ces)`}
+                        >
+                          <span className="flex-1 min-w-0">
+                            <span className="block text-xs text-gray-800 truncate">{s.saved_name}</span>
+                            <span className="block text-[10px] text-gray-400">
+                              {s.saved_code} · {s.unit} · {formatCurrency(s.unit_price)}
+                            </span>
+                          </span>
+                          <span className="flex-shrink-0 text-[10px] font-semibold text-indigo-600">{s.similarity_score}%</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {isAux && (
                   <span
                     className="flex-shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold tracking-wide"
