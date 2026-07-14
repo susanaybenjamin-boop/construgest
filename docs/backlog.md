@@ -53,11 +53,24 @@
 >       VERIFICADO e2e: WS conecta con JWT real (ready+pong) y rename de proyecto por backend →
 >       la lista del panel se refresca sola (org:projects change).
 >       **UI-1 + FERRA mergeados a `develop` (merge `83679d9`, 2026-07-14).**
->    b) **Skills IA no cableadas:** `compare-budgets` (pantalla budget-comparison), `find-similar`
->       (al crear partida), `analyze-materials` (materiales), `analyze-expenses`/`analyze-certifications`.
->       El backend ya devuelve los shapes; falta UI + invalidar React Query.
->    c) **Limpieza frontend AI-5:** quitar el panel admin de IA (consumo/cuotas) y la pestaña de
->       claves-cloud en Ajustes (el backend ya no las sirve → darían 404).
+>    b) **✅ UI-2 Skills IA cableadas HECHO (2026-07-14).** Nuevo `components/ai/AiInsightPanel.tsx`
+>       (botón + renderer genérico prosa/métricas/listas, etiquetas ES). Cableadas y VERIFICADAS
+>       e2e con Ollama real: `analyze-certifications` y `analyze-expenses` (pantallas de proyecto),
+>       `analyze-materials` (admin/suppliers→Comparativa de Precios), `compare-budgets` (botón
+>       "Resumen IA" en BudgetComparisonModal) y `find-similar` (dropdown de partidas guardadas al
+>       teclear el nombre en PartidaEditRow → reutiliza nombre/unidad/precio). Commits `dfbc51c`,
+>       `a62d6a9`, `7132397`, `0767c47`.
+>    c) **✅ UI-3 Limpieza AI-5 HECHO (2026-07-14, commit `aa8a5db`).** Borrada la pantalla
+>       `/admin/mcp`; quitados de `/admin/users` los paneles muertos (consumo global, créditos,
+>       toggle IA); quitada la pestaña "Inteligencia Artificial" de Ajustes + objeto `ai` del
+>       settingsStore. Todo lo eliminado llamaba a endpoints cloud que ya daban 404. Verificado e2e.
+>
+>    **⚠️ 2 BUGS PREEXISTENTES ARREGLADOS al verificar UI-2 (Fase 2/DATA):**
+>    · `middlewares/auth.js`: `projectIdFromBudget` nunca se definió → toda `/budgets/comparison/*`
+>      daba 500 y rompía el modal de comparativa (commit `4f74f2b`).
+>    · `db/mariadb.js`: MariaDB devolvía DECIMAL como STRING → el editor de presupuesto crasheaba
+>      (`measurementsTotal.toFixed is not a function`) en partidas con mediciones. Cast DECIMAL→Number
+>      en el pool (commit `259875b`). **OJO:** revisar si algún sitio del backend dependía del string.
 > 3. **2ª fuente de la TOOL de precios:** conseguir base pública BC3 (p.ej. Andalucía) y
 >    concatenarla en `loadPriceReference()` de `routes/ai.js`.
 > 4. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + `find-similar` ya es la base.
