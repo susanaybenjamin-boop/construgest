@@ -13,6 +13,11 @@
 > select/insert/update/delete/upsert, todos los filtros, RETURNING, selects anidados (en select y
 > en mutación), storage en disco y `.rpc()`. (`ai.js` no va a MariaDB: la IA se reescribió a local.)
 >
+> **✅ BACKEND TERMINADO Y 100% LOCAL (2026-07-14).** Cero dependencia de nube en runtime:
+> Realtime = WebSocket propio (`services/realtimeHub.js`, ruta `/ws`); notificaciones en MariaDB;
+> panel admin de IA y claves-cloud eliminados; deps de nube fuera (queda solo el `/installer` viejo
+> de `settings.js`, que se rehará en Fase 5). Verificado e2e. **Próximo gran bloque: conectar la UI.**
+>
 > **FASE 4 (IA LOCAL) MUY AVANZADA — la IA ya es 100% local, sin nube ni Supabase.**
 > - **Motor IA:** `services/ai-service.js` local puro (Ollama, `qwen2.5:3b`); caché; `num_predict≤2048`.
 > - **Extracción/OCR** (`extract-materials`, `parse-budget-pdf`): Capa 1 determinista + LLM/OCR local.
@@ -32,10 +37,15 @@
 > 1. Leer esta cabecera + `CLAUDE.md`. **Entorno:** Ollama en el host con `qwen2.5:3b`
 >    (`ollama pull qwen2.5:3b`). Arrancar `docker compose up -d`; tras editar backend
 >    `docker compose up -d --build backend`. Login e2e: `admin@construgest.local` / `construgest`.
-> 2. **WIRE AL FRONTEND** de las skills nuevas/no cableadas: `compare-budgets` (pantalla
->    budget-comparison), `find-similar` (al crear partida), `analyze-materials` (pantalla
->    materiales), `analyze-expenses`/`analyze-certifications` (nuevas tarjetas o sus pantallas).
->    El backend ya devuelve los shapes; falta la UI + invalidar React Query.
+> 2. **CONECTAR LA UI (bloque grande de la próxima sesión):**
+>    a) **Realtime WS:** cambiar `frontend/src/lib/realtime.ts` + `realtimeNotificationStore.ts`
+>       + `lib/supabase.ts` para conectar al WS propio `ws://<host>/ws?token=<jwt>` (subscribe a los
+>       mismos topics: budget/org:projects/org:branches/user). Contrato en `services/realtimeHub.js`.
+>    b) **Skills IA no cableadas:** `compare-budgets` (pantalla budget-comparison), `find-similar`
+>       (al crear partida), `analyze-materials` (materiales), `analyze-expenses`/`analyze-certifications`.
+>       El backend ya devuelve los shapes; falta UI + invalidar React Query.
+>    c) **Limpieza frontend AI-5:** quitar el panel admin de IA (consumo/cuotas) y la pestaña de
+>       claves-cloud en Ajustes (el backend ya no las sirve → darían 404).
 > 3. **2ª fuente de la TOOL de precios:** conseguir base pública BC3 (p.ej. Andalucía) y
 >    concatenarla en `loadPriceReference()` de `routes/ai.js`.
 > 4. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + `find-similar` ya es la base.
@@ -154,7 +164,7 @@ admin, branches, library, budgets, materials, supplierMaterials, workLogs, certi
 settings, projects, expenses, mailbox, equipmentCatalog, subcontractors, workers +
 middlewares/auth.js. **Pendiente (1):** ai.js (+ servicios IA/realtime → Fase 3/4).
 
-### `[~]` FASE 3 — Storage y Realtime locales
+### `[x]` FASE 3 — Storage y Realtime locales (backend)
 - `[x]` **ST-1** Storage local hecho en Fase 2 (DATA-3 oleada 3): `db/storage.js` + `routes/files.js`
   + volumen Docker `construgest_files`. Ficheros en disco, URLs firmadas locales.
 - `[x]` **RT-1** Realtime local = **WebSocket propio** (`services/realtimeHub.js`) montado en `/ws`
@@ -278,9 +288,12 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     Supabase. Solo queda caché + `tryLocal` (Ollama) + `parseAIResponse`. VERIFICADO: arranca
     limpio, extract-materials sigue OK, sin regresiones. (Las deps npm de los SDK se dejan porque
     `settings.js` aún las usa para probar claves → se quitan con la limpieza de settings.)
-  · `[ ]` **Follow-up:** desmantelar el panel admin de IA (`routes/admin.js` usa `mcp-ai-tracker` +
-    `cons_ai_consumption`/`cons_ai_pricing`/quotas, todo Supabase) + su frontend, y borrar
-    `services/mcp-ai-tracker.js`. Al ser IA local/gratis ese panel entero sobra.
+  · `[x]` **Follow-up (backend) HECHO.** AI-5a: `admin.js` reescrito a solo gestión de usuarios
+    (fuera `/ai-consumption`, `/provider-credits`, todo `/mcp/*` y el `mcpTracker`; borrado
+    `services/mcp-ai-tracker.js`, −978 líneas). AI-5b: `settings.js` sin `verify-ai-key` /
+    `ai-consumption` / sección `ai` de claves; borrado `db/supabase.js`; quitados 4 deps de nube
+    (@anthropic-ai/sdk, @google/generative-ai, groq-sdk, @supabase/supabase-js). **Backend SIN
+    dependencia de nube en runtime.** Falta (otra sesión): frontend del panel admin IA + settings-IA.
 - `[x]` **AI-6 (quitar chat) HECHO.** Eliminado `POST /api/ai/chat`. No había UI de chat en el
   frontend (0 referencias). VERIFICADO: `/api/ai/chat` → 404, resto de la IA intacto.
 
