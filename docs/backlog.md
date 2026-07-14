@@ -14,9 +14,22 @@
 > en mutación), storage en disco y `.rpc()`. (`ai.js` no va a MariaDB: la IA se reescribió a local.)
 >
 > **✅ BACKEND TERMINADO Y 100% LOCAL (2026-07-14).** Cero dependencia de nube en runtime:
-> Realtime = WebSocket propio (`services/realtimeHub.js`, ruta `/ws`); notificaciones en MariaDB;
-> panel admin de IA y claves-cloud eliminados; deps de nube fuera (queda solo el `/installer` viejo
-> de `settings.js`, que se rehará en Fase 5). Verificado e2e. **Próximo gran bloque: conectar la UI.**
+> Realtime = WebSocket propio (`services/realtimeHub.js`, ruta `/ws`); notificaciones en MariaDB.
+>
+> **✅ UI CONECTADA + LIMPIEZA NUBE + RELEASE (2026-07-14, mergeado a `develop` `f693566`).**
+> - **UI-1..3 + UI-2:** Realtime WS del frontend; 5 skills IA cableadas (certificaciones, gastos,
+>   materiales, compare-budgets, find-similar); limpieza AI-5 (panel admin IA + claves cloud fuera).
+> - **CLEAN-CLOUD:** eliminado el `/installer` legacy y todas las refs muertas de nube (vercel/
+>   onrender/Supabase/AI-cloud/Vision en código y `.env`).
+> - **RELEASE + auto-aviso:** `GET /api/version` compara con GitHub Releases; banner "nueva versión"
+>   + "Acerca de" en Ajustes; `scripts/release.sh` + `docs/RELEASING.md`. **1ª release `v0.1.0`
+>   publicada** (main + tag + GitHub Release). Para el aviso en repo PRIVADO hace falta `GITHUB_TOKEN`
+>   en `backend/.env` (o hacer el repo público). El auto-update REAL (descargar/aplicar) es Fase 5.
+> - **2 bugs preexistentes arreglados:** `projectIdFromBudget` (comparativa 500) y DECIMAL→Number
+>   en el pool MariaDB (editor de presupuesto crasheaba con mediciones).
+> - **BC3-2 + AI-4:** 2ª fuente de precios BC3 (enchufable, falta el fichero real de Andalucía) y
+>   autoaprendizaje (correcciones → few-shot en extracción de materiales).
+>   **Todo verificado e2e con Ollama local.**
 >
 > **🗑️ MÓDULO FERRALLA ELIMINADO (2026-07-14) — no encajaba en el producto.** Borrado
 > completo y verificado e2e: frontend (`app/ferrapp`, `components/ferrapp`, `lib/ferrapp`,
@@ -330,9 +343,22 @@ el catálogo propio. Mejora con el uso, local y sin internet.
 - `[x]` **AI-6 (quitar chat) HECHO.** Eliminado `POST /api/ai/chat`. No había UI de chat en el
   frontend (0 referencias). VERIFICADO: `/api/ai/chat` → 404, resto de la IA intacto.
 
-### `[ ]` FASE 5 — Empaquetado autocontenido (LO ÚLTIMO)
-- `[ ]` instalable Windows: Node + Next + MariaDB embebida **+ Ollama + modelo 3B**, "doble
-  clic". El instalador despliega Ollama y hace `pull` del modelo. `.msi` SOLO aquí.
+### `[~]` FASE 5 — Empaquetado autocontenido (EN CURSO)
+Arquitectura decidida: **nativo sin Docker + ventana Electron**, `.msi` con **WiX v3**
+(como Benjagest). Todo en `desktop/`.
+- `[x]` **F5-1** correr nativo sin Docker: backend + frontend (`output:'standalone'`) como
+  procesos Node. VERIFICADO (`node server.js` sirve /login 200).
+- `[x]` **F5-2/2b** shell Electron (`desktop/main.js`): arranca MariaDB (init la 1ª vez:
+  `mariadb-install-db` → crea BD/usuario → aplica `database/init/*.sql`) + Ollama (pull del
+  modelo si falta) + backend + frontend con el Node de Electron, health-checks y ventana.
+  VERIFICADO lo que no necesita el binario (secuencia de esquema → 58 tablas; check de modelo).
+- `[x]` **F5-4** `.msi` con WiX (`installer/Product.wxs` + `build-msi.ps1`): heat+candle+light
+  empaquetan Electron+backend+frontend+database. VERIFICADO: genera
+  `desktop/dist/ConstruGest-0.1.0.msi` (304 MB, MSI válido) con el payload correcto. Fix de
+  paso: `outputFileTracingRoot` para que el standalone no se anide.
+- `[ ]` **F5-3** colocar binarios nativos en `desktop/runtime/` (MariaDB portable, Ollama+modelo,
+  tesseract/poppler) para un `.msi` 100% autocontenido. Guía en `desktop/runtime/README.md`.
+- `[ ]` Probar el `.msi` instalado en una máquina limpia (instalar + arrancar la ventana).
 
 ---
 
