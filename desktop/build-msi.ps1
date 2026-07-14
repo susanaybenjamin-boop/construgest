@@ -41,7 +41,13 @@ Copy-Item -Recurse -Force ".next\static"  ".next\standalone\.next\static"
 Copy-Item -Recurse -Force "public"        ".next\standalone\public"
 Pop-Location
 
-Write-Host "==> 2/4  Runtime de Electron"
+Write-Host "==> 2/4  Dependencias (backend + runtime de Electron)"
+# El backend se empaqueta con SU node_modules → tiene que estar COMPLETO. En dev
+# se usa Docker (que hace su propio npm install), así que el node_modules local
+# puede estar incompleto y romper el backend empaquetado (p.ej. faltar dotenv).
+Push-Location (Join-Path $Root "backend")
+Invoke-Checked "npm" @("install", "--omit=dev", "--no-audit", "--no-fund")
+Pop-Location
 Push-Location $Desktop
 if (-not (Test-Path "node_modules\electron\dist")) { Invoke-Checked "npm" @("install") }
 Pop-Location
