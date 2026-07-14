@@ -7,6 +7,10 @@ import {
   buildSummaryPrompt,
   buildSuggestions,
   fallbackSummary,
+  estimateContingency,
+  buildContingencyPrompt,
+  reportStructure,
+  buildReportPrompt,
 } from '../services/budget-analytics.js'
 
 const router = Router()
@@ -131,34 +135,33 @@ ${data}`
   })
 })
 
-// POST /api/ai/executive-report — Informe ejecutivo profesional
-router.post('/executive-report', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un consultor senior de construcción. Genera un informe ejecutivo profesional.
+// POST /api/ai/executive-report — Informe ejecutivo profesional.
+// Estructura (título, desglose, métricas, riesgos) del motor; el LLM SOLO redacta
+// resumen_ejecutivo / conclusiones / proximos_pasos.
+router.post('/executive-report', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    const base = reportStructure(a)
 
-Incluye estas secciones:
-1. RESUMEN EJECUTIVO (1 párrafo)
-2. DESGLOSE DE COSTOS (por capítulo)
-3. RIESGOS IDENTIFICADOS
-4. OPORTUNIDADES DE AHORRO
-5. RECOMENDACIONES
+    let narrative = { resumen_ejecutivo: fallbackSummary(a), conclusiones: [], proximos_pasos: [] }
+    try {
+      const r = await callAI(buildReportPrompt(a), { maxTokens: 900, temperature: 0.2 })
+      if (r && (r.resumen_ejecutivo || r.conclusiones || r.proximos_pasos)) {
+        narrative = {
+          resumen_ejecutivo: (r.resumen_ejecutivo || narrative.resumen_ejecutivo).toString(),
+          conclusiones: Array.isArray(r.conclusiones) ? r.conclusiones.map(String) : [],
+          proximos_pasos: Array.isArray(r.proximos_pasos) ? r.proximos_pasos.map(String) : [],
+        }
+      }
+    } catch (err) {
+      console.warn('[executive-report] LLM falló, informe con estructura del motor:', err.message)
+    }
 
-Responde SOLO con JSON válido:
-{
-  "titulo": "Informe Ejecutivo - [Nombre proyecto]",
-  "resumen_ejecutivo": "Párrafo con el resumen ejecutivo completo",
-  "desglose_costos": [{"capitulo": "01", "nombre": "Nombre", "importe": 0, "porcentaje": 0}],
-  "riesgos": [{"descripcion": "Riesgo", "probabilidad": "alta|media|baja", "impacto": "alto|medio|bajo"}],
-  "oportunidades_ahorro": [{"descripcion": "Oportunidad", "ahorro_estimado": 0}],
-  "metricas_clave": [{"nombre": "Coste por m²", "valor": "850 €/m²"}],
-  "conclusiones": ["Conclusión"],
-  "proximos_pasos": ["Siguiente paso"]
-}
-
-PRESUPUESTO:
-${data}`
-  })
+    res.json({ ...base, ...narrative })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /api/ai/compare-prices — Comparación con precios de mercado
@@ -209,26 +212,28 @@ ${data}`
   })
 })
 
-// POST /api/ai/estimate-contingency — Estimación de imprevistos
-router.post('/estimate-contingency', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    const complexity = body.project_complexity || 'media'
-    return `Estima un porcentaje de imprevistos para este presupuesto de obra.
-Complejidad del proyecto: ${complexity}.
+// POST /api/ai/estimate-contingency — Estimación de imprevistos.
+// % por reglas (complejidad + incertidumbre detectada por el motor); el LLM SOLO
+// redacta la justificación.
+router.post('/estimate-contingency', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    const c = estimateContingency(a, req.body.project_complexity || 'media')
 
-Responde SOLO con JSON válido:
-{
-  "recommended_contingency_pct": 15,
-  "contingency_amount": 12345,
-  "risk_factors": ["Factor de riesgo 1", "Factor 2"],
-  "contingency_breakdown": {"materials": 5, "labor": 3, "unforeseen": 7},
-  "justification": "Explicación detallada del porcentaje recomendado"
-}
+    let justification = `Contingencia del ${c.recommended_contingency_pct}% sobre ${a.budget_total} €. ${c.risk_factors.join('. ')}.`
+    try {
+      const r = await callAI(buildContingencyPrompt(a, c), { maxTokens: 400, temperature: 0.2 })
+      const text = (r?.justificacion || r?.justification || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) justification = text
+    } catch (err) {
+      console.warn('[estimate-contingency] LLM falló, justificación de reserva:', err.message)
+    }
 
-PRESUPUESTO:
-${data}`
-  })
+    res.json({ ...c, justification })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================

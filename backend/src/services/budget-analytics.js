@@ -302,6 +302,87 @@ export function buildSuggestions(a) {
   return out
 }
 
+// ── estimate-contingency: % de imprevistos por reglas (tool = reglas + señales del motor) ──
+// Base por complejidad + ajuste por incertidumbre detectada (partidas sin valorar,
+// incidencias críticas). El LLM solo redacta la justificación.
+export function estimateContingency(a, complexity = 'media') {
+  const BASE = { baja: 8, media: 12, alta: 18 }
+  let pct = BASE[String(complexity).toLowerCase()] ?? 12
+  const risk_factors = []
+
+  const noPriceRatio = a.metrics.num_items ? a.metrics.items_without_price / a.metrics.num_items : 0
+  if (noPriceRatio > 0.05) {
+    pct += 3
+    risk_factors.push(`${a.metrics.items_without_price} partidas sin valorar: coste final incierto`)
+  }
+  const critical = a.issues.filter((i) => i.severity === 'critical').length
+  if (critical > 0) {
+    pct += 2
+    risk_factors.push(`${critical} incidencia(s) crítica(s) sin resolver`)
+  }
+  if (a.metrics.largest_chapter && a.metrics.largest_chapter.pct >= 50) {
+    pct += 2
+    risk_factors.push(`Coste muy concentrado en "${a.metrics.largest_chapter.name}" (${a.metrics.largest_chapter.pct}%)`)
+  }
+  if (String(complexity).toLowerCase() === 'alta') risk_factors.push('Proyecto marcado de alta complejidad')
+  if (!risk_factors.length) risk_factors.push('Presupuesto completo y sin incidencias graves')
+
+  pct = Math.min(pct, 30)
+  return {
+    recommended_contingency_pct: pct,
+    contingency_amount: Math.round(a.budget_total * (pct / 100) * 100) / 100,
+    risk_factors,
+    // reparto orientativo del colchón
+    contingency_breakdown: { materials: Math.round(pct * 0.4), labor: Math.round(pct * 0.25), unforeseen: pct - Math.round(pct * 0.4) - Math.round(pct * 0.25) },
+  }
+}
+
+export function buildContingencyPrompt(a, c) {
+  return `Eres un jefe de obra. Justifica en 2-3 frases (español) por qué una contingencia del
+${c.recommended_contingency_pct}% (${c.contingency_amount} €) es razonable para este presupuesto.
+NO inventes cifras: usa solo estos datos.
+
+${factsForNarrative(a)}
+Factores de riesgo: ${c.risk_factors.join('; ')}
+
+Responde SOLO con este JSON:
+{"justificacion": "tu justificación aquí"}`
+}
+
+// ── executive-report: estructura del motor + LLM solo para la prosa ──
+export function reportStructure(a) {
+  const m = a.metrics
+  const avg = m.num_items ? Math.round((a.budget_total / m.num_items) * 100) / 100 : 0
+  return {
+    titulo: `Informe Ejecutivo${a.budget_name ? ` — ${a.budget_name}` : ''}`,
+    desglose_costos: a.chapters.slice().sort((x, y) => y.total - x.total)
+      .map((c) => ({ capitulo: c.code, nombre: c.name, importe: c.total, porcentaje: c.pct })),
+    metricas_clave: [
+      { nombre: 'Importe total', valor: `${a.budget_total} €` },
+      { nombre: 'Capítulos', valor: String(m.num_chapters) },
+      { nombre: 'Partidas', valor: String(m.num_items) },
+      { nombre: 'Importe medio/partida', valor: `${avg} €` },
+      ...(m.largest_chapter ? [{ nombre: 'Capítulo de mayor peso', valor: `${m.largest_chapter.name} (${m.largest_chapter.pct}%)` }] : []),
+    ],
+    riesgos: a.issues.map((i) => ({
+      descripcion: i.message,
+      probabilidad: i.severity === 'critical' ? 'alta' : (i.severity === 'warning' ? 'media' : 'baja'),
+      impacto: i.severity === 'critical' ? 'alto' : (i.severity === 'warning' ? 'medio' : 'bajo'),
+    })),
+    oportunidades_ahorro: [],   // requiere base de precios (compare-prices)
+  }
+}
+
+export function buildReportPrompt(a) {
+  return `Eres un consultor senior de construcción. Con estos datos YA CALCULADOS, redacta la parte
+narrativa de un informe ejecutivo en español. NO inventes cifras: usa solo las que aparecen aquí.
+
+${factsForNarrative(a)}
+
+Responde SOLO con este JSON:
+{"resumen_ejecutivo": "un párrafo", "conclusiones": ["conclusión 1", "conclusión 2"], "proximos_pasos": ["paso 1", "paso 2"]}`
+}
+
 /** Resumen de reserva (sin IA) por si el LLM falla o está caído. */
 export function fallbackSummary(a) {
   const big = a.metrics.largest_chapter

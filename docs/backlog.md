@@ -211,11 +211,18 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     resumen usa solo cifras reales (0% alucinación), ~22s. optimizations=[] a propósito (necesita
     base de precios). **PRINCIPIO (Benjamin):** una skill sin TOOLS/datos es prosa vacía → cada
     skill se apoya en su tool (motor, base de precios empaquetable, catálogo, OCR).
-  · `[ ]` **Resto de skills sobre el motor:** `suggest-optimizations`, `compare-prices`,
-    `estimate-contingency`, `executive-report` (reusar `budget-analytics`), + `compare-budgets`
-    (nueva, pantalla budget-comparison), `find-similar` (biblioteca), `analyze-materials`,
-    `analyze-expenses`, `analyze-certifications`. **Cortar** las sin pantalla: estimate-timeline,
-    analyze-schedule, analyze-plans, analyze-annotations, detect-errors, validate-specifications.
+  · `[x]` **`estimate-contingency`** reescrita: % por reglas (complejidad + incertidumbre del motor)
+    + LLM solo justificación. VERIFICADO e2e (17% = 12 base +3 sin valorar +2 concentración).
+  · `[x]` **`executive-report`** reescrita: estructura (título/desglose/métricas/riesgos) del motor
+    + LLM solo resumen/conclusiones/próximos pasos. VERIFICADO e2e, prosa 100% grounded.
+  · `[ ]` **Autónomas pendientes (solo motor, sin tool externa):** `compare-budgets` (nueva,
+    pantalla budget-comparison: Presto importado ↔ tu presupuesto).
+  · `[ ]` **Dependen de la TOOL base de precios / biblioteca:** `suggest-optimizations`,
+    `compare-prices`, `analyze-materials`, `find-similar`. Sin la tool devuelven [] a propósito.
+    DECISIÓN PENDIENTE de Benjamin: ¿referencia = su biblioteca propia o base de precios externa?
+  · `[ ]` **Económicas:** `analyze-expenses`, `analyze-certifications` (motor + datos de gastos/certis).
+  · `[ ]` **Cortar** las sin pantalla: estimate-timeline, analyze-schedule, analyze-plans,
+    analyze-annotations, detect-errors, validate-specifications.
   · `[ ]` **TOOL pendiente:** base de precios de referencia (empaquetable) para las skills de
     optimización/mercado/contingencia — sin ella devuelven [] a propósito.
 - `[x]` **AI-3 (OCR local) HECHO y VERIFICADO e2e.** `services/local-ocr.js` (pdftoppm→PNG→tesseract
