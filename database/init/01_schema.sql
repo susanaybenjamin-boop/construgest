@@ -9,6 +9,7 @@ SET FOREIGN_KEY_CHECKS=0;
 
 DROP TABLE IF EXISTS
   `cons_ai_consumption`,
+  `cons_ai_corrections`,
   `cons_ai_pricing`,
   `cons_ai_provider_credits`,
   `cons_app_settings`,
@@ -79,6 +80,20 @@ CREATE TABLE `cons_ai_consumption` (
   `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
   `user_id` CHAR(36),
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Autoaprendizaje (AI-4): correcciones del usuario a la salida de la IA, que se
+-- inyectan como few-shot en futuras extracciones (100% local, por organización).
+CREATE TABLE `cons_ai_corrections` (
+  `id` CHAR(36) NOT NULL DEFAULT (UUID()),
+  `organization_id` CHAR(36) NOT NULL,
+  `skill` VARCHAR(64) NOT NULL,
+  `context` TEXT,
+  `wrong` JSON,
+  `corrected` JSON NOT NULL,
+  `created_at` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  CONSTRAINT `cons_ai_corrections_organization_id_fkey` FOREIGN KEY (organization_id) REFERENCES cons_organizations(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `cons_ai_pricing` (
@@ -975,6 +990,7 @@ CREATE TABLE `mcp_ai_user_quotas` (
 -- ---------- indices ----------
 CREATE INDEX `idx_ai_consumption_date` ON `cons_ai_consumption` (`created_at`);
 CREATE INDEX `idx_ai_consumption_org` ON `cons_ai_consumption` (`organization_id`);
+CREATE INDEX `idx_ai_corrections_org_skill` ON `cons_ai_corrections` (`organization_id`, `skill`, `created_at`);
 CREATE INDEX `idx_branch_invitations_status` ON `cons_branch_invitations` (`status`);
 CREATE INDEX `idx_branch_invitations_to_email` ON `cons_branch_invitations` (`to_email`);
 CREATE INDEX `idx_branch_links_org_a` ON `cons_branch_links` (`organization_a_id`);

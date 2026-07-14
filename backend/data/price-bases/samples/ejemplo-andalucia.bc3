@@ -1,0 +1,11 @@
+~V|\Base de Costes Ejemplo (muestra, NO cargada)|FIEBDC-3/2016|ANSI|
+~C|ROOT##||BASE DE COSTES EJEMPLO|0|||
+~C|01#||MOVIMIENTO DE TIERRAS|0|||
+~C|01.01|m3|Excavacion en zanja|12.00||1|
+~C|01.02|m3|Relleno de zanja compactado|9.20||1|
+~C|01.03|m3|Transporte de tierras a vertedero|4.75||1|
+~C|02#||CIMENTACIONES|0|||
+~C|02.01|m2|Solera de hormigon HM-20 de 15 cm|18.40||1|
+~C|02.02|kg|Acero corrugado B500S en armaduras|1.35||1|
+~C|MO001|h|Oficial 1a construccion|21.50||1|
+~C|MO002|h|Peon ordinario construccion|18.90||1|

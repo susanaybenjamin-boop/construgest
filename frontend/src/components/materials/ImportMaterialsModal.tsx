@@ -27,6 +27,7 @@ interface ReviewMaterial extends ExtractedMaterial {
   existing_material_id?: string
   existing_name?: string
   similarity_score?: number
+  ai_original?: string   // nombre tal cual lo extrajo la IA (para autoaprendizaje AI-4)
 }
 
 interface SupplierDescription {
@@ -286,6 +287,7 @@ export default function ImportMaterialsModal({
   const applyMatching = (
     materials: ExtractedMaterial[],
     supplierDescs: SupplierDescription[],
+    fromAI = false,
   ): ReviewMaterial[] => {
     return materials.map(mat => {
       const best = findBestMatch(mat.name, existingMaterials, supplierDescs)
@@ -302,7 +304,9 @@ export default function ImportMaterialsModal({
         else if (best.score >= 0.35) action = 'possible'
       }
 
-      return { ...mat, action, existing_material_id, existing_name, similarity_score }
+      // Guarda el nombre original de la IA para detectar correcciones al importar.
+      const ai_original = fromAI ? mat.name : undefined
+      return { ...mat, action, existing_material_id, existing_name, similarity_score, ai_original }
     })
   }
 
@@ -355,7 +359,7 @@ export default function ImportMaterialsModal({
             setExtracting(false)
             return
           }
-          const reviewed = applyMatching(extracted, supplierDescs)
+          const reviewed = applyMatching(extracted, supplierDescs, true)
           setSheetGroups([{
             sheetName: file.name.replace(/\.[^.]+$/, ''),
             materials: reviewed,
@@ -399,7 +403,7 @@ export default function ImportMaterialsModal({
           setExtracting(false)
           return
         }
-        const reviewed = applyMatching(extracted, supplierDescs)
+        const reviewed = applyMatching(extracted, supplierDescs, true)
         setSheetGroups([{
           sheetName: file.name.replace(/\.[^.]+$/, ''),
           materials: reviewed,
@@ -490,6 +494,13 @@ export default function ImportMaterialsModal({
     }))
   }
 
+  const setMaterialName = (groupIdx: number, matIdx: number, name: string) => {
+    setSheetGroups(prev => prev.map((g, i) => {
+      if (i !== groupIdx) return g
+      return { ...g, materials: g.materials.map((m, j) => j === matIdx ? { ...m, name } : m) }
+    }))
+  }
+
   // ── Import ──────────────────────────────────────────────────────────────
 
   const handleImport = async () => {
@@ -551,6 +562,21 @@ export default function ImportMaterialsModal({
         totalCreated += data.created
         totalUpdated += data.updated
         totalSkipped += data.skipped
+      }
+
+      // AI-4 autoaprendizaje: si el usuario corrigió el nombre que extrajo la IA,
+      // lo guardamos como corrección → few-shot en futuras extracciones.
+      const corrections = sheetGroups.flatMap(g =>
+        g.materials
+          .filter(m => m.action !== 'skip' && m.ai_original && m.ai_original.trim() !== m.name.trim())
+          .map(m => ({
+            skill: 'extract-materials',
+            context: m.ai_original,
+            corrected: { name: m.name, unit: m.unit, unit_price: m.unit_price, ...(m.code ? { code: m.code } : {}) },
+          })),
+      )
+      if (corrections.length) {
+        Promise.allSettled(corrections.map(c => api.post('/ai/corrections', c)))
       }
 
       addToast(
@@ -812,7 +838,13 @@ export default function ImportMaterialsModal({
                         {group.materials.map((item, mi) => (
                           <tr key={mi} className={item.action === 'skip' ? 'opacity-40' : ''}>
                             <td className="px-3 py-2">
-                              <div className="font-medium text-gray-900 leading-snug text-xs">{item.name}</div>
+                              <input
+                                type="text"
+                                value={item.name}
+                                onChange={e => setMaterialName(gi, mi, e.target.value)}
+                                title={item.ai_original && item.ai_original !== item.name ? `IA extrajo: "${item.ai_original}"` : undefined}
+                                className="w-full px-1.5 py-1 font-medium text-gray-900 leading-snug text-xs border border-transparent hover:border-gray-300 focus:border-blue-500 rounded outline-none"
+                              />
                               {item.existing_name && item.action !== 'create' && (
                                 <div className="text-xs text-gray-400 mt-0.5 truncate">
                                   ≈ {item.existing_name}

@@ -71,7 +71,9 @@ export function parseCandidateLines(lines) {
 }
 
 // Prompt afinado al modelo pequeño (ejemplo realista, sin frase "responde []").
-export function buildExtractionPrompt(cleanedText, filename) {
+// `fewShot` (opcional) son correcciones aprendidas (AI-4) que se insertan como
+// ejemplos extra para que el modelo repita los arreglos previos del usuario.
+export function buildExtractionPrompt(cleanedText, filename, fewShot = '') {
   return `Extrae los materiales de esta lista de precios de proveedor${filename ? ` (archivo: ${filename})` : ''}.
 
 Para cada linea que tenga un material y un precio, devuelve un objeto con:
@@ -85,7 +87,7 @@ Ejemplo de salida:
   {"code": "CEM-001", "name": "Cemento CEM II/B-L 32,5 R saco 25kg", "unit": "saco", "unit_price": 4.85},
   {"code": "", "name": "Malla electrosoldada 15x15x6", "unit": "ud", "unit_price": 12.30}
 ]
-
+${fewShot}
 Devuelve SOLO el array JSON, un objeto por material. No incluyas cabeceras ni notas.
 
 LISTA:
@@ -148,7 +150,7 @@ export function mergeMaterials(deterministic, llmItems) {
 }
 
 // Orquestador: Capa 1 + (Capa 2 si hay LLM). Robusto a fallo del LLM.
-export async function extractMaterials(text, { filename, callAI, aiContext = {} } = {}) {
+export async function extractMaterials(text, { filename, callAI, aiContext = {}, fewShot = '' } = {}) {
   const lines = precleanLines(text)
   const deterministic = parseCandidateLines(lines)
 
@@ -156,7 +158,7 @@ export async function extractMaterials(text, { filename, callAI, aiContext = {} 
   if (typeof callAI === 'function') {
     try {
       const cleaned = lines.join('\n').slice(0, 15000)
-      const result = await callAI(buildExtractionPrompt(cleaned, filename), aiContext)
+      const result = await callAI(buildExtractionPrompt(cleaned, filename, fewShot), aiContext)
       llmItems = normalizeLlmItems(Array.isArray(result) ? result : (result?.materials || []))
     } catch (err) {
       console.warn('[extraction] LLM falló, se usa solo Capa 1:', err.message)

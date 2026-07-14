@@ -71,9 +71,17 @@
 >    · `db/mariadb.js`: MariaDB devolvía DECIMAL como STRING → el editor de presupuesto crasheaba
 >      (`measurementsTotal.toFixed is not a function`) en partidas con mediciones. Cast DECIMAL→Number
 >      en el pool (commit `259875b`). **OJO:** revisar si algún sitio del backend dependía del string.
-> 3. **2ª fuente de la TOOL de precios:** conseguir base pública BC3 (p.ej. Andalucía) y
->    concatenarla en `loadPriceReference()` de `routes/ai.js`.
-> 4. **AI-4 autoaprendizaje:** tabla local de correcciones + few-shot + `find-similar` ya es la base.
+> 3. **✅ BC3-2 2ª fuente de precios HECHO (2026-07-14, commit `4d52a11`).** Infra enchufable:
+>    `bc3-parser.js:extractPriceRows` + `services/price-base.js` (lee `*.bc3` de
+>    `backend/data/price-bases`, cache) concatenado en `loadPriceReference`; la biblioteca MANDA a
+>    igualdad de similitud. Verificado e2e con muestra. **PENDIENTE:** dejar caer el fichero real
+>    de Andalucía (BCCA) en `backend/data/price-bases/` y `docker compose up -d --build backend`.
+> 4. **✅ AI-4 autoaprendizaje HECHO (2026-07-14, commit `d6329aa`).** Tabla `cons_ai_corrections`
+>    + `services/ai-corrections.js` (few-shot) + inyección en la extracción de materiales + endpoints
+>    `POST/GET /ai/corrections` + captura en el modal de importar (nombre editable → registra
+>    corrección al importar). Verificado e2e: el LLM local aplica el nombre/unidad corregidos.
+>    `find-similar` (partidas) ya era la base. **Nota:** el mismo patrón se puede extender a
+>    `parse-budget` (la skill ya está en `CORRECTION_SKILLS`, falta el punto de captura en el import PDF).
 > 5. **Follow-up AI-5:** desmantelar panel admin de IA (`routes/admin.js` + `mcp-ai-tracker.js` +
 >    frontend) y UI de claves-cloud en `settings.js`. **Fase 3** (Realtime→polling) y **Fase 5**
 >    (empaquetado `.msi` + Ollama/modelo + tesseract/poppler + base BC3).
