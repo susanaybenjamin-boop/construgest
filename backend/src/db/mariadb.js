@@ -20,6 +20,16 @@ const pool = mysql.createPool({
       const v = field.string()
       return v === null ? null : v === '1'
     }
+    // MariaDB/mysql2 devuelve DECIMAL/NEWDECIMAL como STRING (para no perder
+    // precisión). Supabase (Postgres) devolvía numeric como número JS, y todo
+    // el frontend espera números (cantidades, precios, mediciones → aritmética
+    // directa y .toFixed()). Sin esto, p.ej. sum + partial concatena strings y
+    // measurementsTotal.toFixed peta. Convertimos a Number (rango de sobra para
+    // presupuestos de obra).
+    if (field.type === 'NEWDECIMAL' || field.type === 'DECIMAL') {
+      const v = field.string()
+      return v === null ? null : Number(v)
+    }
     return next()
   },
 })

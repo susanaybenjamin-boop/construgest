@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'rea
 import {
   X, ArrowRightLeft, TrendingUp, TrendingDown, Minus,
   Maximize2, Minimize2, RefreshCw, Link2, Unlink, EyeOff, Eye,
-  Wand2, ChevronDown, ChevronRight, Move, ExternalLink,
+  Wand2, ChevronDown, ChevronRight, Move, ExternalLink, Brain, Loader2,
 } from 'lucide-react'
 import api from '@/lib/api'
 import { formatCurrency } from '@/lib/utils'
@@ -106,6 +106,10 @@ export default function BudgetComparisonModal({
   const [maximized, setMaximized] = useState(false)
   const [filter, setFilter] = useState<'all' | 'unmatched' | 'excluded'>('all')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+
+  // Resumen IA (local): prosa que redacta el LLM sobre el diff determinista.
+  const [aiSummary, setAiSummary] = useState<string | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
 
   // Movable + resizable
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
@@ -481,6 +485,45 @@ export default function BudgetComparisonModal({
     await reloadAll()
   }
 
+  // Construye el payload de un presupuesto con el shape que espera el backend
+  // (mismo que analyze-budget: budget + chapters[{code,name,items[...]}]).
+  const toBudgetPayload = (full: FullBudget) => ({
+    budget: full.budget,
+    chapters: full.chapters
+      .filter((ch) => !ch.chapter.is_legal_text && ch.chapter.is_active !== false)
+      .map((ch) => ({
+        code: ch.chapter.code,
+        name: ch.chapter.name,
+        items: ch.items
+          .filter((it) => it.is_active !== false)
+          .map((it) => ({
+            code: it.code, name: it.name, unit: it.unit,
+            quantity: it.quantity, unit_price: it.unit_price,
+          })),
+      })),
+  })
+
+  const handleAiSummary = async () => {
+    if (!fullA || !fullB) return
+    setAiLoading(true)
+    setAiSummary(null)
+    try {
+      const { data } = await api.post('/ai/compare-budgets', {
+        budget_a: toBudgetPayload(fullA),
+        budget_b: toBudgetPayload(fullB),
+        label_a: fullA.budget.name,
+        label_b: fullB.budget.name,
+      })
+      setAiSummary(data?.assessment || 'Sin resumen disponible.')
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } }; message?: string })
+        ?.response?.data?.error || (err as { message?: string })?.message || 'Error al generar el resumen'
+      setAiSummary(msg)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   const toggleExpand = (id: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev)
@@ -609,6 +652,16 @@ export default function BudgetComparisonModal({
             </button>
           )}
 
+          <button
+            onClick={handleAiSummary}
+            disabled={aiLoading || !fullA || !fullB}
+            title="Resumen del análisis con IA local"
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Brain className="w-3.5 h-3.5" />}
+            Resumen IA
+          </button>
+
           <div className="flex bg-white border border-gray-300 rounded overflow-hidden text-xs">
             {(['all', 'unmatched', 'excluded'] as const).map(f => (
               <button
@@ -621,6 +674,17 @@ export default function BudgetComparisonModal({
             ))}
           </div>
         </div>
+
+        {/* Banner de resumen IA (prosa del LLM local) */}
+        {aiSummary && (
+          <div className="px-4 py-2 border-b bg-indigo-50/60 flex items-start gap-2 flex-shrink-0">
+            <Brain className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-gray-700 flex-1">{aiSummary}</p>
+            <button onClick={() => setAiSummary(null)} className="p-0.5 hover:bg-indigo-100 rounded" title="Ocultar">
+              <X className="w-3.5 h-3.5 text-gray-400" />
+            </button>
+          </div>
+        )}
 
         {/* Summary */}
         {totals && (

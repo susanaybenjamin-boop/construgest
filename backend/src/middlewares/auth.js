@@ -126,6 +126,12 @@ async function lookupBudget(budgetId) {
   return { projectId: data.project_id, budgetId: data.id }
 }
 
+// project_id de un presupuesto (para validar acceso en la comparativa).
+async function projectIdFromBudget(budgetId) {
+  const b = await lookupBudget(budgetId)
+  return b?.projectId || null
+}
+
 async function lookupChapter(chapterId) {
   const { data } = await supabase
     .from('cons_chapters').select('budget_id').eq('id', chapterId).single()

@@ -9,6 +9,7 @@ import { Wallet, Plus, Loader2, Trash2, Search, Edit, Receipt, TrendingUp, Build
 import { useNotificationStore } from '@/stores/notificationStore'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { DecimalInput } from '@/components/ui/DecimalInput'
+import AiInsightPanel from '@/components/ai/AiInsightPanel'
 
 export default function ExpensesPage() {
   const { t } = useTranslation()
@@ -249,6 +250,16 @@ export default function ExpensesPage() {
             Nuevo Gasto
           </button>
         </div>
+      </div>
+
+      {/* Análisis IA (local): gastos reales vs presupuesto, desviaciones y anomalías */}
+      <div className="mb-6">
+        <AiInsightPanel
+          title="Análisis de gastos (IA)"
+          description="Gastos reales frente al presupuesto: desviaciones por capítulo y anomalías."
+          endpoint="/ai/analyze-expenses"
+          body={() => ({ project_id: projectId })}
+        />
       </div>
 
       {/* Summary Cards */}

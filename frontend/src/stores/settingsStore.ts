@@ -63,16 +63,6 @@ interface SettingsState {
     currency: string
     default_folder_path: string
   }
-  // AI config
-  ai: {
-    anthropic_enabled: boolean
-    groq_enabled: boolean
-    gemini_enabled: boolean
-    default_provider: string
-    anthropic_api_key: string
-    groq_api_key: string
-    gemini_api_key: string
-  }
   // Appearance
   appearance: {
     theme: string
@@ -97,7 +87,6 @@ interface SettingsActions {
   loadSettings: (orgId: string) => Promise<void>
   updateCompany: (key: string, value: string) => void
   updateDefaults: (key: string, value: number | string) => void
-  updateAI: (key: string, value: boolean | string) => void
   updateAppearance: (key: string, value: string) => void
   updatePrint: (key: string, value: string | number) => void
   updatePdfStyles: (key: string, value: string | number | boolean) => void
@@ -126,15 +115,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
     currency: 'EUR',
     default_folder_path: '',
   },
-  ai: {
-    anthropic_enabled: true,
-    groq_enabled: true,
-    gemini_enabled: true,
-    default_provider: 'anthropic',
-    anthropic_api_key: '',
-    groq_api_key: '',
-    gemini_api_key: '',
-  },
   appearance: {
     theme: 'light',
     language: 'es',
@@ -159,7 +139,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
         set({
           company: { ...get().company, ...data.company },
           defaults: { ...get().defaults, ...data.defaults },
-          ai: { ...get().ai, ...data.ai },
           appearance: { ...get().appearance, ...data.appearance },
           print: { ...get().print, ...data.print },
           pdf_styles: { ...PDF_STYLES_DEFAULTS, ...data.pdf_styles },
@@ -180,10 +159,6 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
     set((s) => ({ defaults: { ...s.defaults, [key]: value }, dirty: true }))
   },
 
-  updateAI: (key, value) => {
-    set((s) => ({ ai: { ...s.ai, [key]: value }, dirty: true }))
-  },
-
   updateAppearance: (key, value) => {
     set((s) => ({ appearance: { ...s.appearance, [key]: value }, dirty: true }))
   },
@@ -199,9 +174,9 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
   saveSettings: async (orgId: string) => {
     set({ loading: true })
     try {
-      const { company, defaults, ai, appearance, print, pdf_styles } = get()
+      const { company, defaults, appearance, print, pdf_styles } = get()
       await api.put(`/settings/organization/${orgId}`, {
-        company, defaults, ai, appearance, print, pdf_styles,
+        company, defaults, appearance, print, pdf_styles,
       })
       set({ dirty: false })
     } catch {
