@@ -6,73 +6,65 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useTranslation } from 'react-i18next'
 import {
-  Save, Loader2, Building2, Sliders, Brain, Palette,
-  Globe, Percent, DollarSign, Zap,
-  Eye, EyeOff, Copy, CheckCircle2, XCircle, Key,
+  Save, Loader2, Building2, Sliders, Palette,
+  Globe, Percent, DollarSign,
+  Eye, EyeOff, CheckCircle2,
   Printer, Info, FileText, Upload, Trash2, RefreshCw, Image as ImageIcon,
-  Lock, User as UserIcon, FolderOpen, Download, UploadCloud, BarChart3,
+  Lock, User as UserIcon, FolderOpen, Download, UploadCloud,
 } from 'lucide-react'
 import api from '@/lib/api'
 import localApi from '@/lib/localApi'
 import { DecimalInput } from '@/components/ui/DecimalInput'
 import { FolderPicker } from '@/components/ui/FolderPicker'
 import { useProjectStore } from '@/stores/projectStore'
+import { useVersionStore } from '@/stores/versionStore'
 
-type Tab = 'company' | 'defaults' | 'ai' | 'print' | 'appearance' | 'pdf_styles' | 'account'
+type Tab = 'company' | 'defaults' | 'print' | 'appearance' | 'pdf_styles' | 'account'
 
-interface ConsumptionData {
-  total_calls: number
-  total_input_tokens: number
-  total_output_tokens: number
-  by_provider: { provider: string; calls: number; input_tokens: number; output_tokens: number }[]
-}
-
-function AIConsumptionPanel() {
-  const [data, setData] = useState<ConsumptionData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    api.get('/settings/ai-consumption?period=month')
-      .then(({ data: d }) => setData(d as ConsumptionData))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
-  }, [])
-
-  if (loading) return <div className="flex items-center gap-2 text-gray-400 text-sm py-3"><Loader2 className="w-4 h-4 animate-spin" /> Cargando consumo...</div>
-  if (!data || data.total_calls === 0) return <p className="text-sm text-gray-400 py-2">Sin consumo registrado en los últimos 30 días.</p>
-
-  const providerColors: Record<string, string> = { anthropic: 'bg-orange-100 text-orange-700', groq: 'bg-purple-100 text-purple-700', gemini: 'bg-blue-100 text-blue-700' }
-  const formatTokens = (n: number) => n >= 1000000 ? `${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n)
+// Tarjeta "Acerca de": versión instalada + comprobación de actualizaciones.
+function AboutCard() {
+  const { info, loading, load } = useVersionStore()
+  useEffect(() => { load() }, [load])
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
-        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
-          <p className="text-2xl font-bold text-gray-900">{data.total_calls}</p>
-          <p className="text-xs text-gray-500">Llamadas</p>
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <Info className="w-4 h-4" /> Acerca de
+      </h3>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-500">Versión instalada</p>
+          <p className="text-lg font-bold text-gray-900">v{info?.current ?? '—'}</p>
         </div>
-        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
-          <p className="text-2xl font-bold text-gray-900">{formatTokens(data.total_input_tokens)}</p>
-          <p className="text-xs text-gray-500">Tokens entrada</p>
-        </div>
-        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
-          <p className="text-2xl font-bold text-gray-900">{formatTokens(data.total_output_tokens)}</p>
-          <p className="text-xs text-gray-500">Tokens salida</p>
-        </div>
+        <button
+          onClick={() => load(true)}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Comprobar
+        </button>
       </div>
-      {data.by_provider.length > 0 && (
-        <div className="space-y-1.5">
-          {data.by_provider.map((p) => (
-            <div key={p.provider} className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-100 bg-white">
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${providerColors[p.provider] || 'bg-gray-100 text-gray-700'}`}>
-                  {p.provider}
-                </span>
-                <span className="text-sm text-gray-600">{p.calls} llamadas</span>
-              </div>
-              <span className="text-xs text-gray-400">{formatTokens(p.input_tokens + p.output_tokens)} tokens</span>
-            </div>
-          ))}
+      {info && (
+        <div className="mt-4 pt-4 border-t border-gray-100 text-sm">
+          {!info.checkedRemote ? (
+            <p className="text-gray-400">
+              No se pudo comprobar si hay actualizaciones (sin conexión, o repositorio privado sin token).
+            </p>
+          ) : info.updateAvailable ? (
+            <p className="text-blue-700 flex items-center gap-2 flex-wrap">
+              Nueva versión <strong>v{info.latest}</strong> disponible.
+              {info.releaseUrl && (
+                <a href={info.releaseUrl} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                  Ver novedades
+                </a>
+              )}
+            </p>
+          ) : (
+            <p className="text-green-600 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Estás en la última versión.
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -81,7 +73,7 @@ function AIConsumptionPanel() {
 
 export default function AdminSettingsPage() {
   const { t, i18n } = useTranslation()
-  const { user, organizationId, checkAuth, isSuperAdmin } = useAuthStore()
+  const { user, organizationId, checkAuth } = useAuthStore()
   const settings = useSettingsStore()
   const { projects, loadProjects } = useProjectStore()
   const { addToast } = useNotificationStore()
@@ -101,16 +93,6 @@ export default function AdminSettingsPage() {
   const [logoUrl, setLogoUrl] = useState<string>('')
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
-
-  // ── API Key UI state ──
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({
-    anthropic_api_key: false,
-    groq_api_key: false,
-    gemini_api_key: false,
-  })
-  const [verifying, setVerifying] = useState<Record<string, boolean>>({})
-  const [verifyResult, setVerifyResult] = useState<Record<string, { valid: boolean; message: string } | null>>({})
-  const [copied, setCopied] = useState<string | null>(null)
 
   // ── PDF preview state ──
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
@@ -223,46 +205,9 @@ export default function AdminSettingsPage() {
     }
   }
 
-  // ── API Key handlers ──
-  const toggleKeyVisibility = (field: string) => {
-    setShowKeys(prev => ({ ...prev, [field]: !prev[field] }))
-  }
-
-  const copyToClipboard = async (field: string) => {
-    const value = settings.ai[field as keyof typeof settings.ai] as string
-    if (!value) return
-    await navigator.clipboard.writeText(value)
-    setCopied(field)
-    setTimeout(() => setCopied(null), 2000)
-  }
-
-  const verifyKey = async (provider: string, keyField: string) => {
-    const apiKey = settings.ai[keyField as keyof typeof settings.ai] as string
-    if (!apiKey || apiKey.includes('••••')) {
-      addToast('warning', 'Introduce una API key nueva antes de verificar')
-      return
-    }
-    setVerifying(prev => ({ ...prev, [keyField]: true }))
-    setVerifyResult(prev => ({ ...prev, [keyField]: null }))
-    try {
-      const { data } = await api.post('/settings/verify-ai-key', {
-        provider,
-        api_key: apiKey,
-      })
-      setVerifyResult(prev => ({ ...prev, [keyField]: data }))
-      addToast(data.valid ? 'success' : 'error', data.message)
-    } catch {
-      setVerifyResult(prev => ({ ...prev, [keyField]: { valid: false, message: 'Error de conexion' } }))
-      addToast('error', 'Error al verificar la API key')
-    } finally {
-      setVerifying(prev => ({ ...prev, [keyField]: false }))
-    }
-  }
-
   const tabs: { id: Tab; label: string; icon: typeof Building2; desc: string }[] = [
     { id: 'company', label: 'Empresa / Emisor', icon: Building2, desc: 'Datos de la empresa que aparecen en los documentos' },
     { id: 'defaults', label: 'Valores por Defecto', icon: Sliders, desc: 'IVA y moneda por defecto' },
-    ...(isSuperAdmin ? [{ id: 'ai' as Tab, label: 'Inteligencia Artificial', icon: Brain, desc: 'Proveedores de IA y API keys' }] : []),
     { id: 'print', label: 'Impresion', icon: Printer, desc: 'Formato, orientacion y margenes' },
     { id: 'appearance', label: 'Apariencia', icon: Palette, desc: 'Idioma y tema visual' },
     { id: 'pdf_styles', label: 'Estilos PDF', icon: FileText, desc: 'Colores, fuentes y maquetacion de PDFs' },
@@ -640,147 +585,6 @@ export default function AdminSettingsPage() {
                         </div>
                       </div>
                     )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ─── Tab: IA ─── */}
-            {activeTab === 'ai' && (
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">Inteligencia Artificial</h2>
-                <p className="text-sm text-gray-500 mb-5">Configura los proveedores de IA para el analisis de presupuestos.</p>
-
-                <div className="space-y-4">
-                  {/* ── Toggles de proveedores ── */}
-                  {[
-                    { key: 'anthropic_enabled', name: 'Anthropic (Claude)', desc: 'Mejor razonamiento, recomendado', color: 'bg-orange-100 text-orange-600' },
-                    { key: 'groq_enabled', name: 'Groq (Llama)', desc: 'Rapido y economico', color: 'bg-purple-100 text-purple-600' },
-                    { key: 'gemini_enabled', name: 'Google Gemini', desc: 'Alternativa Google', color: 'bg-blue-100 text-blue-600' },
-                  ].map((provider) => (
-                    <div key={provider.key} className="flex items-center justify-between p-4 rounded-xl border border-gray-200 bg-gray-50">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-lg ${provider.color} flex items-center justify-center`}>
-                          <Zap className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{provider.name}</p>
-                          <p className="text-xs text-gray-500">{provider.desc}</p>
-                        </div>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settings.ai[provider.key as keyof typeof settings.ai] as boolean}
-                          onChange={(e) => settings.updateAI(provider.key, e.target.checked)}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-300 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-                      </label>
-                    </div>
-                  ))}
-
-                  <div className="max-w-xs">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor por defecto</label>
-                    <select value={settings.ai.default_provider} onChange={(e) => settings.updateAI('default_provider', e.target.value)} className={inputClass}>
-                      <option value="anthropic">Anthropic (Claude)</option>
-                      <option value="groq">Groq (Llama)</option>
-                      <option value="gemini">Google Gemini</option>
-                    </select>
-                  </div>
-
-                  {/* ── API Keys ── */}
-                  <div className="border-t border-gray-200 pt-5 mt-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                      <Key className="w-4 h-4 text-gray-500" />
-                      API Keys
-                    </h3>
-                    <p className="text-xs text-gray-500 mb-4">
-                      Introduce las claves API de cada proveedor. Se guardan de forma segura por organizacion.
-                    </p>
-
-                    {[
-                      { keyField: 'anthropic_api_key', provider: 'anthropic', label: 'Anthropic API Key', placeholder: 'sk-ant-api03-...' },
-                      { keyField: 'groq_api_key', provider: 'groq', label: 'Groq API Key', placeholder: 'gsk_...' },
-                      { keyField: 'gemini_api_key', provider: 'gemini', label: 'Gemini API Key', placeholder: 'AIza...' },
-                    ].map(({ keyField, provider, label, placeholder }) => (
-                      <div key={keyField} className="mb-3">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <input
-                              type={showKeys[keyField] ? 'text' : 'password'}
-                              value={(settings.ai[keyField as keyof typeof settings.ai] as string) || ''}
-                              onChange={(e) => settings.updateAI(keyField, e.target.value)}
-                              className={`${inputClass} pr-20`}
-                              placeholder={placeholder}
-                              autoComplete="off"
-                            />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <button
-                                type="button"
-                                onClick={() => toggleKeyVisibility(keyField)}
-                                className="p-1 text-gray-400 hover:text-gray-600 transition"
-                                tabIndex={-1}
-                                title={showKeys[keyField] ? 'Ocultar' : 'Mostrar'}
-                              >
-                                {showKeys[keyField]
-                                  ? <EyeOff className="w-4 h-4" />
-                                  : <Eye className="w-4 h-4" />}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => copyToClipboard(keyField)}
-                                className="p-1 text-gray-400 hover:text-gray-600 transition"
-                                tabIndex={-1}
-                                title="Copiar"
-                              >
-                                {copied === keyField
-                                  ? <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                  : <Copy className="w-4 h-4" />}
-                              </button>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => verifyKey(provider, keyField)}
-                            disabled={!!verifying[keyField]}
-                            className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 transition disabled:opacity-50 whitespace-nowrap flex items-center gap-1.5"
-                          >
-                            {verifying[keyField]
-                              ? <Loader2 className="w-4 h-4 animate-spin" />
-                              : 'Verificar'}
-                          </button>
-                        </div>
-                        {verifyResult[keyField] && (
-                          <p className={`text-xs mt-1 flex items-center gap-1 ${
-                            verifyResult[keyField]!.valid ? 'text-green-600' : 'text-red-500'
-                          }`}>
-                            {verifyResult[keyField]!.valid
-                              ? <CheckCircle2 className="w-3 h-3" />
-                              : <XCircle className="w-3 h-3" />}
-                            {verifyResult[keyField]!.message}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="bg-violet-50 rounded-xl p-4 border border-violet-100">
-                    <p className="text-sm text-violet-700">
-                      Los proveedores se usan con fallback automatico: si el principal falla, se intenta con el siguiente habilitado.
-                      Si no configuras una API key aqui, se usara la clave del servidor (si existe).
-                    </p>
-                  </div>
-
-                  {/* ── Consumo de IA ── */}
-                  <div className="border-t border-gray-200 pt-5 mt-5">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
-                      <BarChart3 className="w-4 h-4 text-gray-500" />
-                      Consumo de IA
-                    </h3>
-                    <p className="text-xs text-gray-500 mb-3">Uso de IA en los últimos 30 días.</p>
-                    <AIConsumptionPanel />
                   </div>
                 </div>
               </div>
@@ -1186,29 +990,8 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
 
-                {/* Desktop App */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4" />
-                    Aplicación de Escritorio
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Instala la app de escritorio para sincronizar automáticamente tus proyectos en tu disco local.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || 'https://construgest-web.onrender.com/api'}/settings/installer`}
-                      download
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm font-medium text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar Instalador
-                    </a>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-3">
-                    Ejecuta el archivo descargado una sola vez. Queda instalado en Windows y puedes borrar el archivo de Descargas.
-                  </p>
-                </div>
+                {/* Acerca de / Versión */}
+                <AboutCard />
               </div>
             )}
           </div>

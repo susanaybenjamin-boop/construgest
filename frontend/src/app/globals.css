@@ -2,28 +2,6 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Ferrapp custom theme colors */
-@theme inline {
-  --color-surface: #1e293b;
-  --color-surface-light: #334155;
-  --color-accent: #f59e0b;
-  --color-accent-dark: #d97706;
-  --color-success: #22c55e;
-  --color-danger: #ef4444;
-}
-
-/* Override shared CSS vars inside ferrapp scope for dark theme */
-.ferrapp-theme {
-  --background: 222.2 84% 4.9%;
-  --foreground: 214 32% 91%;
-  --border: 215 25% 35%;
-}
-
-.ferrapp-theme input[type="number"]::-webkit-inner-spin-button,
-.ferrapp-theme input[type="number"]::-webkit-outer-spin-button {
-  opacity: 1;
-}
-
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -253,13 +231,6 @@ button:not(:disabled):focus-visible {
   background-color: hsl(var(--card));
   color: hsl(var(--foreground));
 }
-
-/* Ferrapp ya se diseña oscuro con colores propios (text-black sobre fondos ámbar, etc.).
-   Restauramos los literales cuando el safety-net los convertiría en ilegibles. */
-.dark .ferrapp-theme .text-black,
-.dark .ferrapp-theme.text-black { color: #000; }
-.dark .ferrapp-theme .bg-white,
-.dark .ferrapp-theme.bg-white { background-color: #fff; }
 
 /* Escape hatch: mantener un subárbol en claro (visor PDF, planos, firmas) */
 .dark .theme-light-locked,

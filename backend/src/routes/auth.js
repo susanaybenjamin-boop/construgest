@@ -1,7 +1,9 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import supabase from "../db/supabase.js";
+// FASE 2 (DATA-1): auth migrado a MariaDB local vía el shim compatible con Supabase.
+// Para volver a la nube temporalmente, cambiar este import por ../db/supabase.js
+import supabase from "../db/local.js";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -194,7 +196,7 @@ router.post("/forgot-password", async (req, res, next) => {
       .eq("id", user.id);
 
     // TODO: Send email with reset link (for now, log it)
-    const resetUrl = `${process.env.FRONTEND_URL || 'https://construgest-web-git-main-benjamins-projects-1d0caeba.vercel.app'}/login?reset_token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?reset_token=${resetToken}`;
     console.log(`[Password Reset] User: ${user.email}, URL: ${resetUrl}`);
 
     res.json({ message: "Si el correo existe, recibirás un enlace para restablecer tu contraseña" });

@@ -1,19 +1,16 @@
-import supabase from '../db/supabase.js'
+// Notificaciones LOCAL: persiste en MariaDB (cons_notifications) y entrega en
+// vivo por el hub WebSocket propio (topic `user:{userId}`, event 'notification').
+// Antes insertaba en la nube (Supabase) y hacía broadcast por Supabase Realtime.
+import supabase from '../db/local.js'
+import { publish } from './realtimeHub.js'
 
 /**
- * Crea una notificacion en DB y la envia por Supabase Broadcast al usuario destino
+ * Crea una notificación en la BD local y la entrega en vivo al usuario destino.
  */
 export async function createNotification(userId, type, title, body, data = {}) {
-  // Insertar en DB
   const { data: notification, error } = await supabase
     .from('cons_notifications')
-    .insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      data,
-    })
+    .insert({ user_id: userId, type, title, body, data })
     .select()
     .single()
 
@@ -22,19 +19,7 @@ export async function createNotification(userId, type, title, body, data = {}) {
     return null
   }
 
-  // Broadcast via Supabase Realtime
-  try {
-    const channel = supabase.channel(`user:${userId}`)
-    await channel.send({
-      type: 'broadcast',
-      event: 'notification',
-      payload: notification,
-    })
-    supabase.removeChannel(channel)
-  } catch (err) {
-    console.error('Error broadcasting notification:', err.message)
-  }
-
+  publish(`user:${userId}`, 'notification', notification)
   return notification
 }
 

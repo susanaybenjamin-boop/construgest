@@ -1,7 +1,10 @@
 import 'dotenv/config'
+import { createServer } from 'http'
 import express from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import { initRealtime } from './services/realtimeHub.js'
+import { getVersionStatus, getCurrentVersion } from './services/version.js'
 
 // Route imports
 import authRoutes from './routes/auth.js'
@@ -24,14 +27,15 @@ import adminRoutes from './routes/admin.js'
 import branchRoutes from './routes/branches.js'
 import mailboxRoutes from './routes/mailbox.js'
 import notificationRoutes from './routes/notifications.js'
-import ferrappRoutes from './routes/ferrapp.js'
+import filesRoutes from './routes/files.js'
 
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// CORS - manual implementation for Express 5 compatibility
+// CORS - manual implementation for Express 5 compatibility.
+// App autohospedada en local: se permite cualquier localhost (el frontend Next
+// corre en :3000) y, opcionalmente, un FRONTEND_URL configurado.
 const ALLOWED_ORIGINS = [
-  'https://construgest-web.vercel.app',
   'http://localhost:3000',
   process.env.FRONTEND_URL,
 ].filter(Boolean)
@@ -40,11 +44,8 @@ app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
-  } else if (origin) {
-    // Allow any vercel preview deploys
-    if (origin.endsWith('.vercel.app') || origin.startsWith('http://localhost')) {
-      res.setHeader('Access-Control-Allow-Origin', origin)
-    }
+  } else if (origin && origin.startsWith('http://localhost')) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
@@ -68,8 +69,8 @@ app.use(helmet({
   contentSecurityPolicy: false,
 }))
 
-// Detrás de Render/Vercel hay proxy, así que confiamos en la cadena de IPs
-// para que el rate limiter use la IP del cliente y no la del proxy.
+// En local no hay proxy inverso, pero dejamos trust proxy por si se despliega
+// tras uno (nginx/traefik) para que el rate limiter use la IP real del cliente.
 app.set('trust proxy', 1)
 
 // Rate limit global: protege la API entera. Ventana de 1 min, 300 req/IP.
@@ -99,6 +100,14 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+// Versión actual + comprobación de actualizaciones (GitHub Releases). Público.
+app.get('/api/version', async (req, res) => {
+  try {
+    res.json(await getVersionStatus())
+  } catch {
+    res.json({ current: getCurrentVersion(), latest: null, updateAvailable: false, checkedRemote: false })
+  }
+})
 
 // Routes
 app.use('/api/auth', authRoutes)
@@ -121,7 +130,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/branches', branchRoutes)
 app.use('/api/mailbox', mailboxRoutes)
 app.use('/api/notifications', notificationRoutes)
-app.use('/api/ferrapp', ferrappRoutes)
+app.use('/api/files', filesRoutes)
 
 // Error handler
 app.use((err, req, res, next) => {
@@ -131,7 +140,10 @@ app.use((err, req, res, next) => {
   })
 })
 
-app.listen(PORT, () => {
+// http.Server explícito para poder montar el WebSocket (Realtime local) encima.
+const server = createServer(app)
+initRealtime(server)
+server.listen(PORT, () => {
   console.log(`ConstruGest API running on port ${PORT}`)
 })
 

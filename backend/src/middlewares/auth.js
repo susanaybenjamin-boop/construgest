@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 
 const JWT_SECRET = process.env.JWT_SECRET
 
@@ -124,6 +124,12 @@ async function lookupBudget(budgetId) {
     .from('cons_budgets').select('id, project_id').eq('id', budgetId).single()
   if (!data) return null
   return { projectId: data.project_id, budgetId: data.id }
+}
+
+// project_id de un presupuesto (para validar acceso en la comparativa).
+async function projectIdFromBudget(budgetId) {
+  const b = await lookupBudget(budgetId)
+  return b?.projectId || null
 }
 
 async function lookupChapter(chapterId) {

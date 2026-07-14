@@ -1,551 +1,505 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middlewares/auth.js'
+import supabase from '../db/local.js'
 import { callAI } from '../services/ai-service.js'
+import { extractMaterials } from '../services/extraction.js'
+import {
+  comparePrices,
+  suggestOptimizations,
+  normalizeReference,
+  findSimilar,
+} from '../services/price-reference.js'
+import { loadPublicPriceBases } from '../services/price-base.js'
+import { recordCorrection, getRecentCorrections, fewShotFor, CORRECTION_SKILLS } from '../services/ai-corrections.js'
+import {
+  analyzeBudget,
+  buildSummaryPrompt,
+  buildSuggestions,
+  fallbackSummary,
+  estimateContingency,
+  buildContingencyPrompt,
+  reportStructure,
+  buildReportPrompt,
+} from '../services/budget-analytics.js'
 
 const router = Router()
 router.use(authMiddleware)
 
 // ==================== Helpers ==================== //
 
-/** Truncate data string to avoid exceeding model context window */
-function truncateData(data, maxChars = 10000) {
-  const str = (typeof data === 'string' ? data : JSON.stringify(data)) ?? ''
-  if (str.length <= maxChars) return str
-  console.warn(`[AI] Datos truncados de ${str.length} a ${maxChars} chars`)
-  return str.substring(0, maxChars) + '...(datos truncados)'
+/**
+ * Carga la referencia de precios de una organización.
+ * Fuente 1: biblioteca propia (`cons_saved_partidas`) → MANDA (precios reales).
+ * Fuente 2: bases públicas BC3 del directorio `data/price-bases` (respaldo,
+ * enchufable). Se concatenan; en `lookupPrices` la biblioteca gana a igualdad
+ * de similitud (ver source priority en price-reference.js).
+ */
+async function loadPriceReference(orgId) {
+  const { data, error } = await supabase
+    .from('cons_saved_partidas')
+    .select('name, unit, unit_price, cost_price, usage_count, source')
+    .eq('organization_id', orgId)
+  if (error) throw error
+  const biblioteca = normalizeReference(data || [], 'biblioteca')
+  const publicas = loadPublicPriceBases()
+  return [...biblioteca, ...publicas]
 }
 
-/** Generic AI analysis handler — supports single or multi-field data */
-async function handleAIAnalysis(req, res, next, buildPrompt, aiOptions = {}) {
+// ================================================================
+//  PRESUPUESTOS — análisis sobre el motor determinista
+// ================================================================
+
+// POST /api/ai/analyze-budget — Análisis comprehensivo de presupuesto.
+// CAPA 1 (código): totales, %, incidencias, sugerencias → 0% alucinación.
+// CAPA 2 (LLM local): SOLO redacta el resumen ejecutivo con las cifras ya dadas.
+router.post('/analyze-budget', async (req, res, next) => {
   try {
-    const body = req.body
-    // Support both { data: ... } and custom fields
-    if (!body || (Object.keys(body).length === 0)) {
-      return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+
+    // El LLM solo escribe la prosa. Si falla o está caído, resumen de reserva.
+    let summary = fallbackSummary(a)
+    try {
+      const r = await callAI(buildSummaryPrompt(a), { maxTokens: 512, temperature: 0.2 })
+      const text = (r?.resumen || r?.summary || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) summary = text
+    } catch (err) {
+      console.warn('[analyze-budget] LLM falló, resumen de reserva:', err.message)
     }
 
-    const prompt = typeof buildPrompt === 'string'
-      ? `${buildPrompt}\n\nDATOS:\n${truncateData(body.data)}`
-      : buildPrompt(body)
-
-    const result = await callAI(prompt, { organizationId: req.user.organization_id, userId: req.user.id, ...aiOptions })
-    res.json(result)
+    res.json({
+      summary,
+      total_cost: a.budget_total,
+      estimated_savings: 0,          // el ahorro real necesita catálogo/mercado (compare-prices)
+      confidence_score: a.confidence_score,
+      risk_level: a.risk_level,
+      suggestions: buildSuggestions(a),
+      warnings: a.issues,
+      optimizations: [],             // se rellenan en compare-prices con precios de referencia
+    })
   } catch (err) {
     next(err)
   }
-}
-
-// ================================================================
-//  PRESUPUESTOS — 8 skills
-// ================================================================
-
-// POST /api/ai/analyze-budget — Análisis comprehensivo de presupuesto
-router.post('/analyze-budget', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 10000)
-    return `Eres un experto en presupuestos de construcción. Analiza este presupuesto.
-
-Responde SOLO con JSON válido en este formato exacto:
-{
-  "summary": "Resumen ejecutivo del presupuesto en 2-3 frases",
-  "total_cost": 0.0,
-  "estimated_savings": 0.0,
-  "confidence_score": 80.0,
-  "risk_level": "medium",
-  "suggestions": [
-    {"id": "s1", "title": "Título", "description": "Detalle de la sugerencia", "impact": "high", "savings": 0.0, "implementation": "Cómo implementar", "risk": "low"}
-  ],
-  "warnings": [
-    {"id": "w1", "severity": "warning", "message": "Problema detectado", "affected_items": ["01.01"], "recommendation": "Solución propuesta"}
-  ],
-  "optimizations": [
-    {"item_code": "01.01", "item_name": "Nombre", "current_price": 100, "suggested_price": 85, "savings": 15, "reason": "Motivo", "confidence": 0.8}
-  ]
-}
-
-PRESUPUESTO:
-${data}`
-  })
 })
 
-// POST /api/ai/suggest-optimizations — Optimizaciones de costes
-router.post('/suggest-optimizations', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 10000)
-    return `Eres experto en optimización de costes de construcción. Analiza precios y sugiere optimizaciones.
+// POST /api/ai/compare-budgets — Concilia dos presupuestos del mismo proyecto
+// (p.ej. el de Construgest vs uno importado de Presto). Empareja por nombre+unidad,
+// calcula diferencias de precio/importe y qué falta en cada lado. LLM solo el resumen.
+router.post('/compare-budgets', async (req, res, next) => {
+  try {
+    const a = req.body?.budget_a ?? req.body?.data_a ?? req.body?.a
+    const b = req.body?.budget_b ?? req.body?.data_b ?? req.body?.b
+    if (!a || !b) return res.status(400).json({ error: 'Se requieren dos presupuestos (budget_a, budget_b)' })
 
-Responde SOLO con un array JSON:
-[
-  {"item_code": "01.01", "item_name": "Nombre partida", "current_price": 100, "suggested_price": 85, "savings": 15, "reason": "Precio negociable con proveedores locales", "confidence": 0.8}
-]
+    const { compareBudgets, buildComparePrompt, fallbackCompareSummary } = await import('../services/budget-compare.js')
+    const result = compareBudgets(a, b, { labelA: req.body?.label_a, labelB: req.body?.label_b })
 
-Si no hay optimizaciones posibles, responde: []
+    // OJO: `result.summary` es el objeto de conteos; la prosa del LLM va en `assessment`
+    // para NO pisarlo.
+    let assessment = fallbackCompareSummary(result)
+    try {
+      const r = await callAI(buildComparePrompt(result), { maxTokens: 500, temperature: 0.2 })
+      const text = (r?.resumen || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) assessment = text
+    } catch (err) {
+      console.warn('[compare-budgets] LLM falló, resumen de reserva:', err.message)
+    }
 
-PRESUPUESTO:
-${data}`
-  })
+    res.json({ ...result, assessment })
+  } catch (err) {
+    next(err)
+  }
 })
 
-// POST /api/ai/detect-issues — Detección de problemas e inconsistencias
+// POST /api/ai/suggest-optimizations — Optimizaciones de costes.
+// TOOL: precios de referencia (biblioteca del org). Marca las partidas cuyo precio
+// supera su referencia >10%; savings = (precio − referencia) × cantidad. Sin
+// referencia (biblioteca vacía) devuelve [] a propósito. 100% determinista.
+router.post('/suggest-optimizations', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    const reference = await loadPriceReference(req.user.organization_id)
+    res.json(suggestOptimizations(a.items_flat, reference))
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/ai/detect-issues — Detección de problemas e inconsistencias.
+// 100% determinista (sin LLM): duplicados, partidas sin valorar/sin cantidad,
+// capítulos vacíos, descripciones vagas y descuadres. Consistente e instantáneo.
 router.post('/detect-issues', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 10000)
-    return `Eres un auditor experto en construcción. Detecta problemas en este presupuesto.
-
-Busca: duplicados, partidas faltantes, precios anómalos, inconsistencias, especificaciones vagas.
-
-Responde SOLO con un array JSON:
-[
-  {"id": "w1", "severity": "critical", "message": "Descripción del problema", "affected_items": ["01.01"], "recommendation": "Cómo solucionarlo"}
-]
-
-severity puede ser: "critical", "warning", "info"
-Si no hay problemas, responde: []
-
-PRESUPUESTO:
-${data}`
-  })
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    res.json(a.issues)   // ya en el shape {id,severity,message,affected_items,recommendation}
+  } catch (err) {
+    next(err)
+  }
 })
 
-// POST /api/ai/estimate-timeline — Estimación de cronograma
-router.post('/estimate-timeline', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un planificador de obras experto. Estima un cronograma para este presupuesto.
+// POST /api/ai/executive-report — Informe ejecutivo profesional.
+// Estructura (título, desglose, métricas, riesgos) del motor; el LLM SOLO redacta
+// resumen_ejecutivo / conclusiones / proximos_pasos.
+router.post('/executive-report', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    const base = reportStructure(a)
 
-Responde SOLO con JSON válido:
-{
-  "total_duration_weeks": 20,
-  "phases": [
-    {"phase": "Preparación", "duration_weeks": 2, "tasks": ["Excavación", "Desbroce"], "is_critical": true}
-  ],
-  "critical_path": ["Cimentación", "Estructura", "Cubierta"],
-  "recommendations": "Recomendaciones sobre el cronograma"
-}
+    let narrative = { resumen_ejecutivo: fallbackSummary(a), conclusiones: [], proximos_pasos: [] }
+    try {
+      const r = await callAI(buildReportPrompt(a), { maxTokens: 900, temperature: 0.2 })
+      if (r && (r.resumen_ejecutivo || r.conclusiones || r.proximos_pasos)) {
+        narrative = {
+          resumen_ejecutivo: (r.resumen_ejecutivo || narrative.resumen_ejecutivo).toString(),
+          conclusiones: Array.isArray(r.conclusiones) ? r.conclusiones.map(String) : [],
+          proximos_pasos: Array.isArray(r.proximos_pasos) ? r.proximos_pasos.map(String) : [],
+        }
+      }
+    } catch (err) {
+      console.warn('[executive-report] LLM falló, informe con estructura del motor:', err.message)
+    }
 
-PRESUPUESTO:
-${data}`
-  })
+    res.json({ ...base, ...narrative })
+  } catch (err) {
+    next(err)
+  }
 })
 
-// POST /api/ai/executive-report — Informe ejecutivo profesional
-router.post('/executive-report', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un consultor senior de construcción. Genera un informe ejecutivo profesional.
+// POST /api/ai/compare-prices — Comparación con precios de referencia.
+// TOOL: biblioteca del org. Empareja cada partida con su referencia y la clasifica
+// (overpriced/within_range/underpriced). El LLM SOLO redacta la valoración general.
+router.post('/compare-prices', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const projectType = req.body.project_type || 'obra de construcción'
+    const a = analyzeBudget(req.body.data)
+    const reference = await loadPriceReference(req.user.organization_id)
+    const c = comparePrices(a.items_flat, reference)
 
-Incluye estas secciones:
-1. RESUMEN EJECUTIVO (1 párrafo)
-2. DESGLOSE DE COSTOS (por capítulo)
-3. RIESGOS IDENTIFICADOS
-4. OPORTUNIDADES DE AHORRO
-5. RECOMENDACIONES
+    const over = c.market_analysis.filter((m) => m.status === 'overpriced').length
+    let overall_assessment = c.matched_count === 0
+      ? 'No hay referencia de precios en tu biblioteca para estas partidas todavía. Guarda partidas con precio para poder comparar.'
+      : `${c.matched_count} de ${c.total_count} partidas tienen referencia; ${over} por encima. Margen de negociación estimado: ${c.negotiation_potential} €.`
 
-Responde SOLO con JSON válido:
-{
-  "titulo": "Informe Ejecutivo - [Nombre proyecto]",
-  "resumen_ejecutivo": "Párrafo con el resumen ejecutivo completo",
-  "desglose_costos": [{"capitulo": "01", "nombre": "Nombre", "importe": 0, "porcentaje": 0}],
-  "riesgos": [{"descripcion": "Riesgo", "probabilidad": "alta|media|baja", "impacto": "alto|medio|bajo"}],
-  "oportunidades_ahorro": [{"descripcion": "Oportunidad", "ahorro_estimado": 0}],
-  "metricas_clave": [{"nombre": "Coste por m²", "valor": "850 €/m²"}],
-  "conclusiones": ["Conclusión"],
-  "proximos_pasos": ["Siguiente paso"]
-}
+    // El LLM solo redacta la valoración (con las cifras ya dadas), si hay datos.
+    if (c.matched_count > 0) {
+      try {
+        const top = c.market_analysis.filter((m) => m.status === 'overpriced').slice(0, 6)
+          .map((m) => `- ${m.item_name}: ${m.quoted_price} € vs ref ${m.market_price_avg} € (+${m.diff_pct}%)`).join('\n') || '- (ninguna por encima)'
+        const prompt = `Valora en 2-3 frases (español) este presupuesto frente a los precios de referencia.
+NO inventes cifras: usa solo estos datos.
+Partidas con referencia: ${c.matched_count}/${c.total_count} · por encima: ${over} · margen negociación: ${c.negotiation_potential} €
+Más caras que la referencia:
+${top}
+Responde SOLO con este JSON: {"valoracion": "tu valoración aquí"}`
+        const r = await callAI(prompt, { maxTokens: 400, temperature: 0.2 })
+        const text = (r?.valoracion || r?.raw_response || '').toString().trim()
+        if (text && text.length >= 20) overall_assessment = text
+      } catch (err) {
+        console.warn('[compare-prices] LLM falló, valoración de reserva:', err.message)
+      }
+    }
 
-PRESUPUESTO:
-${data}`
-  })
+    res.json({
+      project_type: projectType,
+      market_analysis: c.market_analysis,
+      overall_assessment,
+      negotiation_potential: c.negotiation_potential,
+      indice_competitividad: c.indice_competitividad,
+    })
+  } catch (err) {
+    next(err)
+  }
 })
 
-// POST /api/ai/compare-prices — Comparación con precios de mercado
-router.post('/compare-prices', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    const projectType = body.project_type || 'obra de construcción'
-    return `Compara este presupuesto de construcción con precios de mercado para: ${projectType}.
+// POST /api/ai/estimate-contingency — Estimación de imprevistos.
+// % por reglas (complejidad + incertidumbre detectada por el motor); el LLM SOLO
+// redacta la justificación.
+router.post('/estimate-contingency', async (req, res, next) => {
+  try {
+    if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
+    const a = analyzeBudget(req.body.data)
+    const c = estimateContingency(a, req.body.project_complexity || 'media')
 
-Responde SOLO con JSON válido:
-{
-  "project_type": "${projectType}",
-  "market_analysis": [
-    {"item_code": "01.01", "item_name": "Nombre", "market_price_avg": 100, "quoted_price": 95, "status": "within_range", "opportunity": "Sin acción necesaria"}
-  ],
-  "overall_assessment": "Valoración general del presupuesto vs mercado",
-  "negotiation_potential": 5000,
-  "indice_competitividad": 85
-}
+    let justification = `Contingencia del ${c.recommended_contingency_pct}% sobre ${a.budget_total} €. ${c.risk_factors.join('. ')}.`
+    try {
+      const r = await callAI(buildContingencyPrompt(a, c), { maxTokens: 400, temperature: 0.2 })
+      const text = (r?.justificacion || r?.justification || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) justification = text
+    } catch (err) {
+      console.warn('[estimate-contingency] LLM falló, justificación de reserva:', err.message)
+    }
 
-status puede ser: "within_range", "overpriced", "underpriced"
-
-PRESUPUESTO:
-${data}`
-  })
-})
-
-// POST /api/ai/validate-specifications — Validar especificaciones técnicas
-router.post('/validate-specifications', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Valida estas especificaciones técnicas de obra.
-
-Verifica: completitud, compatibilidad de materiales, cumplimiento normativo, viabilidad técnica.
-
-Responde SOLO con JSON válido:
-{
-  "is_complete": true,
-  "issues": [
-    {"spec_id": "s1", "severity": "warning", "issue": "Problema detectado", "solution": "Cómo solucionarlo"}
-  ],
-  "compliance_score": 85,
-  "recommendations": ["Recomendación"]
-}
-
-ESPECIFICACIONES:
-${data}`
-  })
-})
-
-// POST /api/ai/estimate-contingency — Estimación de imprevistos
-router.post('/estimate-contingency', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    const complexity = body.project_complexity || 'media'
-    return `Estima un porcentaje de imprevistos para este presupuesto de obra.
-Complejidad del proyecto: ${complexity}.
-
-Responde SOLO con JSON válido:
-{
-  "recommended_contingency_pct": 15,
-  "contingency_amount": 12345,
-  "risk_factors": ["Factor de riesgo 1", "Factor 2"],
-  "contingency_breakdown": {"materials": 5, "labor": 3, "unforeseen": 7},
-  "justification": "Explicación detallada del porcentaje recomendado"
-}
-
-PRESUPUESTO:
-${data}`
-  })
+    res.json({ ...c, justification })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
 //  MATERIALES — análisis con catálogo
 // ================================================================
 
-// POST /api/ai/analyze-materials — Análisis de materiales con catálogo
-router.post('/analyze-materials', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const materialsData = truncateData(body.data, 8000)
-    const catalogData = body.catalog ? truncateData(body.catalog, 4000) : '(Sin catálogo de referencia disponible)'
+// POST /api/ai/analyze-materials — Análisis del catálogo de materiales.
+// TOOL: cons_materials + cons_supplier_materials (precios por proveedor). 100%
+// determinista: duplicados a agrupar, materiales donde pagas más que el proveedor
+// más barato, y optimización por proveedor.
+router.post('/analyze-materials', async (req, res, next) => {
+  try {
+    const orgId = req.user.organization_id
 
-    const catalogSection = body.catalog
-      ? `CATÁLOGO DE REFERENCIA (código|nombre|categoría|ud|coste|venta):\n${catalogData}`
-      : catalogData
+    const { data: materials, error: matErr } = await supabase
+      .from('cons_materials')
+      .select('id, code, name, unit, unit_price, material_group_id')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+    if (matErr) throw matErr
 
-    return `Eres un experto en materiales de construcción. Analiza estos materiales comparándolos con el catálogo.
+    const ids = (materials || []).map((m) => m.id)
+    let supplierLinks = []
+    if (ids.length) {
+      const { data, error } = await supabase
+        .from('cons_supplier_materials')
+        .select('material_id, supplier_id, unit_price')
+        .in('material_id', ids)
+      if (error) throw error
+      supplierLinks = data || []
+    }
 
-${catalogSection}
+    const { data: suppliers } = await supabase
+      .from('cons_suppliers')
+      .select('id, name')
+      .eq('organization_id', orgId)
 
-Responde SOLO con JSON válido:
-{
-  "total_items": 10,
-  "potential_savings": 5000.0,
-  "total_value": 50000.0,
-  "duplicates": [
-    {"id_1": "M1", "id_2": "M2", "name_1": "Nombre1", "name_2": "Nombre2", "similarity_score": 90.0, "reason": "Mismo material", "suggested_action": "Fusionar", "cost_impact": 500.0}
-  ],
-  "unused_materials": [],
-  "supplier_optimization": ["Consejo de optimización"],
-  "inventory_insights": ["Observación del inventario"],
-  "price_alerts": [
-    {"material_name": "Material", "user_price": 120.0, "catalog_price": 85.0, "difference_percent": 41.0, "recommendation": "Negociar precio"}
-  ],
-  "catalog_alternatives": [
-    {"current_material": "Material actual", "alternative_code": "ALT1", "alternative_name": "Alternativa", "alternative_price": 80.0, "savings_estimate": 500.0, "reason": "Más económico"}
-  ],
-  "missing_from_catalog": []
-}
-
-Usa arrays vacíos [] si no hay datos para un campo.
-
-MATERIALES DEL USUARIO:
-${materialsData}`
-  })
-})
-
-// POST /api/ai/analyze-plans — Análisis de planos (Texto)
-router.post('/analyze-plans', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en revisión de planos de construcción. Analiza esta información.
-
-Responde SOLO con JSON válido:
-{
-  "summary": "Resumen del análisis de los planos",
-  "scale_detected": "1:100",
-  "measurements_found": 42,
-  "confidence_score": 80.0,
-  "potential_issues": [
-    "Problema o inconsistencia encontrada"
-  ],
-  "recommendations": [
-    "Recomendación para mejorar"
-  ]
-}
-
-INFORMACIÓN DE PLANOS:
-${data}`
-  })
-})
-
-// ================================================================
-//  CRONOGRAMA — análisis avanzado de planificación
-// ================================================================
-
-// POST /api/ai/analyze-schedule — Análisis de cronograma
-router.post('/analyze-schedule', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en planificación de obras. Analiza este cronograma.
-
-Responde SOLO con JSON válido:
-{
-  "total_duration_weeks": 24,
-  "feasibility_score": 75.0,
-  "critical_path": ["Cimentación", "Estructura", "Cubierta"],
-  "bottlenecks": ["Cuello de botella identificado"],
-  "resource_conflicts": ["Conflicto de recursos"],
-  "optimization_recommendations": ["Recomendación de optimización"],
-  "risk_factors": ["Factor de riesgo"]
-}
-
-Usa arrays vacíos [] si no hay datos para un campo.
-
-CRONOGRAMA:
-${data}`
-  })
-})
-
-// ================================================================
-//  ANOTACIONES — análisis de observaciones de obra
-// ================================================================
-
-// POST /api/ai/analyze-annotations — Análisis de anotaciones
-router.post('/analyze-annotations', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en gestión de anotaciones y observaciones de obra. Agrupa y analiza.
-
-Responde SOLO con JSON válido:
-{
-  "total_annotations": 28,
-  "by_type": {"error": 5, "comentario": 12, "mejora": 8, "duda": 3},
-  "grouped_issues": ["Grupo de problemas relacionados (N anotaciones)"],
-  "priority_issues": ["Problema prioritario (severidad)"],
-  "related_annotations": [[0, 5, 8], [2, 7]],
-  "resolution_suggestions": ["Sugerencia de resolución ordenada por prioridad"]
-}
-
-ANOTACIONES:
-${data}`
-  })
+    const { analyzeMaterials } = await import('../services/materials-analytics.js')
+    res.json(analyzeMaterials(materials || [], supplierLinks, suppliers || []))
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
 //  CERTIFICACIONES — análisis de progreso y facturación
 // ================================================================
 
-// POST /api/ai/analyze-certifications — Análisis de certificaciones
-router.post('/analyze-certifications', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const data = truncateData(body.data, 8000)
-    return `Eres un especialista en certificaciones y facturación de obras. Analiza el progreso.
+// POST /api/ai/analyze-certifications — Avance de obra certificado.
+// TOOL: certificaciones del proyecto valoradas (mismo cálculo que el endpoint
+// overview). Determinista: avance %, pendiente, ritmo, riesgo. LLM solo el resumen.
+router.post('/analyze-certifications', async (req, res, next) => {
+  try {
+    const projectId = req.body?.project_id
+    if (!projectId) return res.status(400).json({ error: 'Se requiere project_id' })
 
-Responde SOLO con JSON válido:
-{
-  "summary": "Resumen del estado de certificaciones",
-  "total_progress": 65.5,
-  "completed_units": 150,
-  "pending_units": 80,
-  "completion_estimate": "Estimado completar en 3 meses",
-  "critical_path": ["Estructura", "Acabados"],
-  "recommendations": ["Recomendación para acelerar certificación"],
-  "risk_assessment": "Valoración general de riesgos del avance"
-}
+    const { data: budgets } = await supabase
+      .from('cons_budgets').select('id').eq('project_id', projectId)
+    const budgetIds = (budgets || []).map((b) => b.id)
 
-CERTIFICACIONES:
-${data}`
-  })
+    const { analyzeCertifications, buildOverview, buildCertificationsPrompt, fallbackCertificationsSummary } =
+      await import('../services/certification-analytics.js')
+
+    let overview = []
+    if (budgetIds.length) {
+      const { data: certs } = await supabase
+        .from('cons_certifications').select('id, budget_id, number, name, status').in('budget_id', budgetIds)
+      const certIds = (certs || []).map((c) => c.id)
+
+      let items = []
+      if (certIds.length) {
+        const { data } = await supabase
+          .from('cons_certification_items').select('certification_id, budget_item_id, certified_quantity').in('certification_id', certIds)
+        items = data || []
+      }
+      // Precios de las partidas certificadas.
+      const itemIds = [...new Set(items.map((i) => i.budget_item_id))]
+      const priceMap = {}
+      if (itemIds.length) {
+        const { data: prices } = await supabase
+          .from('cons_budget_items').select('id, unit_price').in('id', itemIds)
+        for (const p of (prices || [])) priceMap[p.id] = Number(p.unit_price) || 0
+      }
+      // Total presupuestado por presupuesto (capítulos + partidas activas).
+      const budgetTotals = {}
+      for (const bId of budgetIds) {
+        const { data: chs } = await supabase
+          .from('cons_chapters').select('id').eq('budget_id', bId).eq('is_active', true)
+        const chIds = (chs || []).map((c) => c.id)
+        let total = 0
+        if (chIds.length) {
+          const { data: bis } = await supabase
+            .from('cons_budget_items').select('quantity, unit_price').in('chapter_id', chIds).eq('is_active', true)
+          total = (bis || []).reduce((s, x) => s + Number(x.quantity) * Number(x.unit_price), 0)
+        }
+        budgetTotals[bId] = total
+      }
+      overview = buildOverview(certs || [], items, priceMap, budgetTotals)
+    }
+
+    const a = analyzeCertifications(overview)
+    let summary = fallbackCertificationsSummary(a)
+    if (overview.length) {
+      try {
+        const r = await callAI(buildCertificationsPrompt(a), { maxTokens: 400, temperature: 0.2 })
+        if (r?.resumen) summary = String(r.resumen)
+      } catch (err) {
+        console.warn('[analyze-certifications] LLM falló, resumen de reserva:', err.message)
+      }
+    }
+
+    res.json({ summary, recommendations: [], ...a })
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
 //  GASTOS — control económico
 // ================================================================
 
-// POST /api/ai/analyze-expenses — Análisis de gastos vs presupuesto
-router.post('/analyze-expenses', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const expensesData = truncateData(body.data || body.expenses, 6000)
-    const budgetData = body.budget ? truncateData(body.budget, 6000) : ''
+// POST /api/ai/analyze-expenses — Gastos reales vs presupuesto.
+// TOOL: cons_project_expenses (enlazados a capítulo) + importes presupuestados por
+// capítulo. Determinista: desviación por capítulo, total, anomalías. LLM solo prosa.
+router.post('/analyze-expenses', async (req, res, next) => {
+  try {
+    const projectId = req.body?.project_id
+    if (!projectId) return res.status(400).json({ error: 'Se requiere project_id' })
 
-    const budgetSection = budgetData ? `\n\nPRESUPUESTO:\n${budgetData}` : ''
+    // Gastos del proyecto.
+    const { data: expenses, error: expErr } = await supabase
+      .from('cons_project_expenses')
+      .select('budget_chapter_id, amount, concept, supplier_name')
+      .eq('project_id', projectId)
+    if (expErr) throw expErr
 
-    return `Eres un especialista en control de costos de obras. Compara gastos vs presupuesto.
+    // Presupuesto del proyecto (aprobado si hay, si no el primero) → capítulos activos + importe.
+    const { data: budgets } = await supabase
+      .from('cons_budgets').select('id, status').eq('project_id', projectId)
+    const budget = (budgets || []).find((b) => b.status === 'approved') || (budgets || [])[0]
+    let chapters = []
+    if (budget) {
+      const { data: chs } = await supabase
+        .from('cons_chapters').select('id, code, name').eq('budget_id', budget.id).eq('is_active', true)
+      const chIds = (chs || []).map((c) => c.id)
+      let items = []
+      if (chIds.length) {
+        const { data } = await supabase
+          .from('cons_budget_items').select('chapter_id, quantity, unit_price').in('chapter_id', chIds).eq('is_active', true)
+        items = data || []
+      }
+      const budgetedByCh = {}
+      for (const it of items) budgetedByCh[it.chapter_id] = (budgetedByCh[it.chapter_id] || 0) + Number(it.quantity) * Number(it.unit_price)
+      chapters = (chs || []).map((c) => ({ id: c.id, code: c.code, name: c.name, budgeted: budgetedByCh[c.id] || 0 }))
+    }
 
-Responde SOLO con JSON válido:
-{
-  "summary": "Resumen del control de gastos",
-  "total_spent": 150000.0,
-  "budget_total": 200000.0,
-  "variance_percentage": -25.0,
-  "budget_variance": -50000.0,
-  "anomalies_found": 3,
-  "risk_level": "medium",
-  "expense_anomalies": ["Anomalía: gasto X supera presupuesto en Y%"],
-  "optimization_opportunities": ["Oportunidad de ahorro identificada"],
-  "trend_analysis": "Análisis de la tendencia de gasto"
-}
+    const { analyzeExpenses, buildExpensesPrompt, fallbackExpensesSummary } = await import('../services/expense-analytics.js')
+    const a = analyzeExpenses(expenses || [], chapters)
 
-risk_level puede ser: "low", "medium", "high"
-variance_percentage y budget_variance negativos = por debajo del presupuesto (bien)
-variance_percentage y budget_variance positivos = por encima del presupuesto (mal)
+    let summary = fallbackExpensesSummary(a)
+    let trend_analysis = ''
+    try {
+      const r = await callAI(buildExpensesPrompt(a), { maxTokens: 500, temperature: 0.2 })
+      if (r?.resumen) summary = String(r.resumen)
+      if (r?.tendencia) trend_analysis = String(r.tendencia)
+    } catch (err) {
+      console.warn('[analyze-expenses] LLM falló, resumen de reserva:', err.message)
+    }
 
-GASTOS:
-${expensesData}${budgetSection}`
-  })
-})
-
-// ================================================================
-//  DETECCIÓN DE ERRORES — debugging
-// ================================================================
-
-// POST /api/ai/detect-errors — Análisis de logs de error
-router.post('/detect-errors', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const logsData = truncateData(body.data || body.logs, 6000)
-    const contextData = body.context ? truncateData(body.context, 2000) : ''
-
-    const contextSection = contextData ? `\nCONTEXTO:\n${contextData}\n` : ''
-
-    return `Eres un ingeniero experto en debugging. Analiza estos logs de error.
-
-Responde SOLO con un array JSON de errores encontrados:
-[
-  {
-    "error_type": "tipo de error",
-    "severity": "high",
-    "description": "Descripción del error",
-    "affected_area": "Área afectada",
-    "root_cause": "Causa raíz probable",
-    "suggested_fix": "Cómo solucionarlo",
-    "fix_code_snippet": "Código o comando sugerido"
+    res.json({ summary, trend_analysis, optimization_opportunities: [], ...a })
+  } catch (err) {
+    next(err)
   }
-]
-
-severity puede ser: "critical", "high", "medium", "low"
-Si no hay errores, responde: []
-${contextSection}
-LOGS:
-${logsData}`
-  })
 })
 
 // ================================================================
 //  SIMILITUD DE PARTIDAS
 // ================================================================
 
-// POST /api/ai/find-similar — Encontrar partidas similares en biblioteca
-router.post('/find-similar', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const partidaData = truncateData(body.data || body.partida)
-    const libraryData = body.library ? truncateData(body.library, 8000) : '[]'
+// POST /api/ai/find-similar — Partidas parecidas en la biblioteca (lookup determinista).
+// TOOL: biblioteca del org. Empareja por nombre (Jaccard) + misma unidad. Base del
+// autoaprendizaje (AI-4): al crear una partida se ofrecen las guardadas para reutilizar.
+router.post('/find-similar', async (req, res, next) => {
+  try {
+    const raw = req.body?.partida ?? req.body?.data
+    const query = typeof raw === 'string' ? (() => { try { return JSON.parse(raw) } catch { return { name: raw } } })() : raw
+    if (!query?.name) return res.status(400).json({ error: 'Se requiere la partida (name, unit)' })
 
-    return `Compara esta partida de construcción con las de la biblioteca. Encuentra similares (>60%).
+    const { data, error } = await supabase
+      .from('cons_saved_partidas')
+      .select('id, code, name, unit, unit_price, usage_count')
+      .eq('organization_id', req.user.organization_id)
+    if (error) throw error
 
-Criterios: nombre similar, misma unidad, precio comparable (±30%), alcance parecido.
-
-Responde SOLO con un array JSON:
-[
-  {"saved_partida_id": "5", "saved_name": "Nombre partida", "similarity_score": 87.5, "reason": "Mismo concepto, precio similar"}
-]
-
-Si no hay similitudes >60%, responde: []
-
-PARTIDA NUEVA:
-${partidaData}
-
-BIBLIOTECA:
-${libraryData}`
-  })
+    res.json(findSimilar(query, data || []))
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
 //  EXTRACCIÓN DE MATERIALES — desde texto de archivo (Excel/PDF)
 // ================================================================
 
-// POST /api/ai/extract-materials — Extrae materiales y precios de texto de lista de proveedor
-// Uses Haiku for much lower cost (~10x cheaper than Sonnet)
-router.post('/extract-materials', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const { text, filename } = body
-    const content = truncateData(text, 15000)
-    return `Eres un experto en materiales de construcción. Analiza este contenido extraído de un archivo de lista de precios de proveedor.
+// POST /api/ai/extract-materials — Extrae materiales y precios de texto de lista de proveedor.
+// Capa 1 (código): pre-limpieza + normalización de números + validación.
+// Capa 2 (LLM local): solo convierte el texto borroso en JSON.
+router.post('/extract-materials', async (req, res, next) => {
+  try {
+    const { text, filename } = req.body
+    if (!text) return res.status(400).json({ error: 'Texto requerido para la extracción' })
 
-Tu tarea es extraer TODOS los materiales con sus precios unitarios de coste.
-Formato del archivo original: ${filename || 'desconocido'}
+    // AI-4: few-shot con las correcciones previas del usuario para esta skill.
+    const fewShot = await fewShotFor(req.user.organization_id, 'extract-materials')
 
-REGLAS ESTRICTAS:
-- Extrae SOLO filas que tengan material real + precio numérico válido
-- Ignora completamente: cabeceras de columna, totales, subtotales, notas, encabezados de sección
-- "unit_price" debe ser el PRECIO DE COSTE unitario (sin IVA si se indica; si no se indica, usa el precio directo)
-- "unit" debe ser unidad estándar de construcción: ud, m, m2, m3, kg, l, ml, h, t, etc.
-- Si hay múltiples hojas o secciones separadas por "=== HOJA:", extrae de TODAS
-- "code" es opcional, incluye SOLO si hay referencia/código explícito en el archivo
-- Normaliza los nombres: elimina caracteres raros, mantén la descripción técnica clara
-- Si el precio tiene separadores de miles (1.200,50 o 1,200.50) normalízalo a número decimal correcto
-
-Responde SOLO con un array JSON válido (sin texto adicional):
-[
-  {"name": "Descripción clara del material", "unit": "ud", "unit_price": 12.50, "code": "REF001"}
-]
-
-Si un campo "code" no existe en la fuente, omítelo del objeto.
-Si no encuentras materiales con precio válido, responde: []
-
-CONTENIDO DEL ARCHIVO:
-${content}`
-  }, { model: 'claude-haiku-4-5-20251001' })
+    const materials = await extractMaterials(text, {
+      filename,
+      callAI,
+      fewShot,
+      aiContext: {
+        organizationId: req.user.organization_id,
+        userId: req.user.id,
+        operation: 'extract-materials',
+      },
+    })
+    res.json(materials)
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================
-//  CHAT LIBRE — Asistente general de construcción
+//  AUTOAPRENDIZAJE (AI-4) — correcciones del usuario → few-shot
 // ================================================================
 
-// POST /api/ai/chat — Chat libre con contexto de proyecto
-router.post('/chat', async (req, res, next) => {
+// POST /api/ai/corrections — registra una corrección del usuario.
+// body: { skill, context?, wrong?, corrected }. `corrected` = lo que quedó bien.
+router.post('/corrections', async (req, res, next) => {
   try {
-    const { message, context } = req.body
-    if (!message) return res.status(400).json({ error: 'Mensaje requerido' })
-
-    const contextSection = context ? `\nCONTEXTO DEL PROYECTO:\n${truncateData(context, 4000)}\n` : ''
-
-    const prompt = `Eres un asistente experto en construcción, presupuestos de obra y gestión de proyectos en España.
-Responde de forma clara, concisa y profesional en español.
-Si te preguntan sobre datos específicos, utiliza el contexto proporcionado.
-${contextSection}
-PREGUNTA DEL USUARIO:
-${message}`
-
-    const result = await callAI(prompt, { organizationId: req.user.organization_id, userId: req.user.id })
-
-    // For chat, return raw text if it's not JSON
-    if (typeof result === 'string') {
-      res.json({ response: result })
-    } else if (result.raw_response) {
-      res.json({ response: result.raw_response })
-    } else {
-      res.json(result)
+    const { skill, context, wrong, corrected } = req.body || {}
+    if (!skill || !CORRECTION_SKILLS.has(skill)) {
+      return res.status(400).json({ error: 'skill no válida' })
     }
+    if (corrected == null) return res.status(400).json({ error: 'Falta el dato corregido' })
+
+    const saved = await recordCorrection({
+      orgId: req.user.organization_id, skill, context, wrong, corrected,
+    })
+    res.status(201).json(saved)
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/ai/corrections?skill=extract-materials — últimas correcciones (debug/UI).
+router.get('/corrections', async (req, res, next) => {
+  try {
+    const skill = req.query.skill
+    if (!skill || !CORRECTION_SKILLS.has(skill)) {
+      return res.status(400).json({ error: 'skill no válida' })
+    }
+    const limit = Math.min(Number(req.query.limit) || 20, 100)
+    res.json(await getRecentCorrections(req.user.organization_id, skill, limit))
   } catch (err) {
     next(err)
   }
@@ -556,8 +510,8 @@ ${message}`
 // ================================================================
 
 // POST /api/ai/parse-budget-pdf — Parse budget structure from PDF
-// Modo dual: si hay pdfBase64 y el usuario tiene IA activa -> Gemini Vision OCR
-//             si no -> texto de pdfjs-dist + parser algoritmico + fallback IA
+// Modo dual: 1) texto de pdfjs-dist + parser algorítmico + LLM local;
+//            2) fallback OCR LOCAL (tesseract/poppler) si el PDF es escaneado.
 router.post('/parse-budget-pdf', async (req, res, next) => {
   try {
     const { text, pdfBase64 } = req.body
@@ -567,23 +521,27 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
 
     let result
 
-    // Intentar OCR con Vision si hay PDF original
-    if (pdfBase64) {
-      try {
-        const visionResult = await parseBudgetWithVision(pdfBase64, req.user.organization_id, req.user.id)
-        if (visionResult && visionResult.chapters && visionResult.chapters.length > 0) {
-          result = visionResult
-          console.log(`[parse-budget-pdf] Vision OCR: ${result.chapters.length} capitulos, ${result.chapters.reduce((s, c) => s + c.items.length, 0)} partidas`)
-        }
-      } catch (err) {
-        console.log(`[parse-budget-pdf] Vision OCR fallo: ${err.message}, usando metodo texto`)
-      }
+    // 1) Método texto (rápido): pdfjs (frontend) + parser algorítmico + LLM local.
+    //    Es lo normal para PDFs digitales; el OCR (lento en CPU) solo si esto no da nada.
+    if (text) {
+      const r = await parseBudgetFromText(text, true, req.user.organization_id, req.user.id)
+      if (r.logs?.length) console.log(`[parse-budget-pdf] ${r.logs[r.logs.length - 1]}`)
+      if (r.chapters?.length > 0) result = r
     }
 
-    // Fallback: metodo texto (pdfjs-dist + algoritmico + IA)
-    if (!result && text) {
-      result = await parseBudgetFromText(text, true, req.user.organization_id, req.user.id)
-      if (result.logs?.length) console.log(`[parse-budget-pdf] ${result.logs[result.logs.length - 1]}`)
+    // 2) Fallback: OCR LOCAL (PDF escaneado sin capa de texto).
+    if (!result && pdfBase64) {
+      try {
+        const ocrResult = await parseBudgetWithVision(pdfBase64, req.user.organization_id, req.user.id)
+        if (ocrResult?.chapters?.length > 0) {
+          result = ocrResult
+          console.log(`[parse-budget-pdf] OCR local: ${result.chapters.length} capitulos, ${result.chapters.reduce((s, c) => s + c.items.length, 0)} partidas`)
+        } else if (ocrResult) {
+          result = ocrResult   // devolver logs aunque no haya capítulos
+        }
+      } catch (err) {
+        console.log(`[parse-budget-pdf] OCR local fallo: ${err.message}`)
+      }
     }
 
     if (!result) {

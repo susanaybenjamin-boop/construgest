@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import api from '@/lib/api'
 import { getToken, setToken, clearToken } from '@/lib/tokenStorage'
+import { closeRealtime } from '@/lib/realtimeClient'
 import type { User } from '@/types'
 
 interface AuthState {
@@ -72,6 +73,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     clearToken()
+    closeRealtime()
     set({ user: null, token: null, organizationId: null })
     window.location.href = '/login'
   },

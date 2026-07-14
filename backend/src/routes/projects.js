@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto'
 import { mkdir, writeFile, readFile, readdir } from 'fs/promises'
 import { join } from 'path'
 import { authMiddleware, projectAccessMiddleware } from '../middlewares/auth.js'
-import supabase from '../db/supabase.js'
+import supabase from '../db/local.js'
 import { parseDxf, formatEntitiesForAI } from '../services/dxf-service.js'
 import { notifyProjectsChange } from '../services/realtimeBroadcast.js'
 

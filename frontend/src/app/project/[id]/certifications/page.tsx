@@ -16,6 +16,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { DecimalInput } from '@/components/ui/DecimalInput'
 import CertificationPdfPreviewModal from '@/components/certifications/CertificationPdfPreviewModal'
 import CertifyFromWorkLogsModal from '@/components/certifications/CertifyFromWorkLogsModal'
+import AiInsightPanel from '@/components/ai/AiInsightPanel'
 
 // Map of budget_item_id → { quantity: number, amount: number }
 type CertifiedTotalsMap = Record<string, { quantity: number; amount: number }>
@@ -440,6 +441,16 @@ export default function CertificationsPage() {
         </div>
       ) : (
         <>
+          {/* Análisis IA (local): avance certificado, pendiente y riesgo */}
+          <div className="mb-6">
+            <AiInsightPanel
+              title="Análisis de certificaciones (IA)"
+              description="Avance certificado, pendiente y riesgo del proyecto."
+              endpoint="/ai/analyze-certifications"
+              body={() => ({ project_id: projectId })}
+            />
+          </div>
+
           {/* Tabs */}
           <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
             <button onClick={() => setActiveTab('workspace')} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === 'workspace' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50 active:bg-gray-200'}`}>

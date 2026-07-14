@@ -455,3 +455,32 @@ export function parseBC3(buffer) {
 
   return result;
 }
+
+/**
+ * Extrae de un BC3 una lista PLANA de precios de referencia (no la jerarquia).
+ *
+ * Uso: bases de precios publicas (p.ej. Base de Costes de la Construccion de
+ * Andalucia) exportadas en BC3. Toma cada concepto "hoja" (ni raiz ## ni
+ * capitulo #) que tenga unidad y precio > 0. Sirve de 2a fuente para la tool de
+ * precios (loadPriceReference), como respaldo de la biblioteca propia.
+ *
+ * @param {Buffer} buffer contenido del .bc3
+ * @returns {Array<{name:string, unit:string, unit_price:number}>}
+ */
+export function extractPriceRows(buffer) {
+  const text = decodeBuffer(buffer);
+  const records = splitRecords(text);
+  const concepts = buildConceptMap(records);
+  const texts = buildTextMap(records);
+
+  const rows = [];
+  for (const c of concepts.values()) {
+    if (c.conceptType !== 'partida') continue;   // saltar root (##) y capitulos (#)
+    if (!c.unit) continue;                        // sin unidad no sirve de referencia
+    if (!(c.price > 0)) continue;                 // sin precio no aporta
+    const name = c.summary || texts.get(c.code) || '';
+    if (!name.trim()) continue;
+    rows.push({ name: name.trim(), unit: c.unit, unit_price: c.price });
+  }
+  return rows;
+}

@@ -49,18 +49,28 @@ services:
     ports:
       - "5000:5000"
     env_file:
-      - ./backend/.env         # Supabase + claves de IA (por ahora)
+      - ./backend/.env         # PORT, FRONTEND_URL, JWT_SECRET (local)
     environment:
-      # Preparado para la Fase 2 (aún no se usa): cómo llegar a la MariaDB de arriba.
       # Dentro de la red de Docker el host de la BD es el nombre del servicio: "mariadb".
       DB_HOST: mariadb
       DB_PORT: "3306"
       DB_NAME: construgest
       DB_USER: construgest
       DB_PASSWORD: construgest
+      # Almacenamiento de ficheros en disco (reemplaza Supabase Storage).
+      STORAGE_DIR: /data/storage
+      FILES_BASE_URL: http://localhost:5000/api/files
+      # IA LOCAL (Ollama corre en el host; el contenedor lo alcanza por host.docker.internal).
+      OLLAMA_HOST: http://host.docker.internal:11434
+      OLLAMA_MODEL: qwen2.5:3b
+      # IA 100% local (sin proveedores de nube).
+      AI_PROVIDER_ORDER: local
+    volumes:
+      - construgest_files:/data      # ficheros subidos (persisten entre rebuilds)
     depends_on:
       mariadb:
         condition: service_healthy
 
 volumes:
   mariadb_data:
+  construgest_files:

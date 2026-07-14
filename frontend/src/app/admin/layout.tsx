@@ -7,10 +7,11 @@ import { useAuthStore } from '@/stores/authStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import {
   Building2, LayoutDashboard, Library, Truck, Settings,
-  LogOut, Loader2, HardHat, Users, GitBranch, Mail, Brain, Scissors,
+  LogOut, Loader2, HardHat, Users, GitBranch, Mail,
   Trash2,
 } from 'lucide-react'
 import NotificationBell from '@/components/ui/NotificationBell'
+import UpdateBanner from '@/components/ui/UpdateBanner'
 import { useRealtimeNotificationStore } from '@/stores/realtimeNotificationStore'
 import { useMailboxStore } from '@/stores/mailboxStore'
 import { useProjectStore } from '@/stores/projectStore'
@@ -28,8 +29,6 @@ const navItems = [
   { key: 'subcontractors', label: 'Subcontratas', icon: HardHat, href: '/admin/subcontractors' },
   { key: 'settings', label: 'Configuración', icon: Settings, href: '/admin/settings' },
   { key: 'users', label: 'Usuarios', icon: Users, href: '/admin/users', superAdminOnly: true },
-  { key: 'mcp', label: 'Control IA', icon: Brain, href: '/admin/mcp', superAdminOnly: true },
-  { key: 'ferrapp', label: 'Ferralla', icon: Scissors, href: '/ferrapp' },
   { key: 'trash', label: 'Papelera', icon: Trash2, href: '/admin/trash' },
 ]
 
@@ -182,6 +181,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main Content */}
       <main className="flex-1 ml-56 min-w-0 overflow-x-hidden">
         <div className="p-6 lg:p-8">
+          <UpdateBanner />
           {children}
         </div>
       </main>
