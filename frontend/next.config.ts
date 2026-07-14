@@ -1,15 +1,8 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Server Node autónomo (.next/standalone) para empaquetar en el .msi (Fase 5).
   output: 'standalone',
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-      },
-    ],
-  },
 }
 
 export default nextConfig

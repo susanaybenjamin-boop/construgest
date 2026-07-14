@@ -1,0 +1,45 @@
+{
+  "name": "construgest-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shell de escritorio (Electron) de Construgest: arranca los servicios locales y muestra la app.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.construgest.app",
+    "productName": "ConstruGest",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**"
+    ],
+    "extraResources": [
+      { "from": "../backend", "to": "backend", "filter": ["**/*", "!node_modules/.cache/**"] },
+      { "from": "../frontend/.next/standalone", "to": "frontend" },
+      { "from": "../frontend/.next/static", "to": "frontend/.next/static" },
+      { "from": "../frontend/public", "to": "frontend/public" },
+      { "from": "../database/init", "to": "database/init" },
+      { "from": "runtime", "to": "runtime" }
+    ],
+    "win": {
+      "target": [{ "target": "msi", "arch": ["x64"] }],
+      "icon": "build/icon.ico"
+    },
+    "msi": {
+      "oneClick": false,
+      "perMachine": false,
+      "runAfterFinish": true
+    }
+  }
+}
