@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/stores/authStore'
-import { Building2, Loader2, Eye, EyeOff, ArrowLeft, Mail, Lock, Download, Monitor, CheckCircle2 } from 'lucide-react'
+import { Building2, Loader2, Eye, EyeOff, ArrowLeft, Mail, Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import api from '@/lib/api'
 
@@ -34,14 +34,6 @@ export default function LoginPage() {
   const [resetSuccess, setResetSuccess] = useState(false)
   const [resetError, setResetError] = useState('')
 
-  // Deteccion de app de escritorio instalada.
-  // - Si la sesion esta en display-mode: standalone, el usuario ya esta
-  //   dentro del atajo PWA (chrome --app=...) creado por el instalador.
-  // - Si no, hacemos un ping al backend local (puerto 5000, /api/health)
-  //   que deja corriendo el instalador como servicio en segundo plano.
-  //   Si responde, la app esta instalada en esta maquina.
-  const [desktopInstalled, setDesktopInstalled] = useState(false)
-
   // Check if there's a reset token in URL
   useEffect(() => {
     const token = searchParams.get('reset_token')
@@ -50,28 +42,6 @@ export default function LoginPage() {
       setView('reset')
     }
   }, [searchParams])
-
-  // Comprobar si la app de escritorio esta instalada en esta maquina
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    // Pista 1: estamos dentro del atajo standalone (chrome --app=...)
-    try {
-      if (window.matchMedia('(display-mode: standalone)').matches) {
-        setDesktopInstalled(true)
-        return
-      }
-    } catch { /* ignore */ }
-    // Pista 2: el backend local responde en localhost:5000/api/health
-    const ctrl = new AbortController()
-    const timeoutId = setTimeout(() => ctrl.abort(), 1500)
-    fetch('http://localhost:5000/api/health', { signal: ctrl.signal, cache: 'no-store' })
-      .then(r => {
-        if (r.ok) setDesktopInstalled(true)
-      })
-      .catch(() => { /* no esta instalado o no se puede contactar */ })
-      .finally(() => clearTimeout(timeoutId))
-    return () => { clearTimeout(timeoutId); ctrl.abort() }
-  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -202,32 +172,6 @@ export default function LoginPage() {
                 </Link>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                {desktopInstalled ? (
-                  <div
-                    aria-disabled="true"
-                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-green-200 bg-green-50 text-green-700 text-sm font-medium cursor-default select-none"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    App de Escritorio instalada
-                  </div>
-                ) : (
-                  <a
-                    href={`${process.env.NEXT_PUBLIC_API_URL || 'https://construgest-web.onrender.com/api'}/settings/installer`}
-                    download
-                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 hover:text-gray-800 text-sm font-medium transition-all"
-                  >
-                    <Monitor className="w-4 h-4" />
-                    Descargar App de Escritorio
-                    <Download className="w-3.5 h-3.5 text-gray-400" />
-                  </a>
-                )}
-                <p className="text-[11px] text-gray-400 text-center mt-2">
-                  {desktopInstalled
-                    ? 'Detectada en este equipo · abrela desde el acceso directo del escritorio'
-                    : 'Sincroniza tus proyectos en tu disco local'}
-                </p>
-              </div>
             </>
           )}
 

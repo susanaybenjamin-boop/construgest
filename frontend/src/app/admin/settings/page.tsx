@@ -17,8 +17,59 @@ import localApi from '@/lib/localApi'
 import { DecimalInput } from '@/components/ui/DecimalInput'
 import { FolderPicker } from '@/components/ui/FolderPicker'
 import { useProjectStore } from '@/stores/projectStore'
+import { useVersionStore } from '@/stores/versionStore'
 
 type Tab = 'company' | 'defaults' | 'print' | 'appearance' | 'pdf_styles' | 'account'
+
+// Tarjeta "Acerca de": versión instalada + comprobación de actualizaciones.
+function AboutCard() {
+  const { info, loading, load } = useVersionStore()
+  useEffect(() => { load() }, [load])
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+        <Info className="w-4 h-4" /> Acerca de
+      </h3>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-gray-500">Versión instalada</p>
+          <p className="text-lg font-bold text-gray-900">v{info?.current ?? '—'}</p>
+        </div>
+        <button
+          onClick={() => load(true)}
+          disabled={loading}
+          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+          Comprobar
+        </button>
+      </div>
+      {info && (
+        <div className="mt-4 pt-4 border-t border-gray-100 text-sm">
+          {!info.checkedRemote ? (
+            <p className="text-gray-400">
+              No se pudo comprobar si hay actualizaciones (sin conexión, o repositorio privado sin token).
+            </p>
+          ) : info.updateAvailable ? (
+            <p className="text-blue-700 flex items-center gap-2 flex-wrap">
+              Nueva versión <strong>v{info.latest}</strong> disponible.
+              {info.releaseUrl && (
+                <a href={info.releaseUrl} target="_blank" rel="noopener noreferrer" className="underline font-medium">
+                  Ver novedades
+                </a>
+              )}
+            </p>
+          ) : (
+            <p className="text-green-600 flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> Estás en la última versión.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function AdminSettingsPage() {
   const { t, i18n } = useTranslation()
@@ -939,29 +990,8 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
 
-                {/* Desktop App */}
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4" />
-                    Aplicación de Escritorio
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Instala la app de escritorio para sincronizar automáticamente tus proyectos en tu disco local.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <a
-                      href={`${process.env.NEXT_PUBLIC_API_URL || 'https://construgest-web.onrender.com/api'}/settings/installer`}
-                      download
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition shadow-sm font-medium text-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Descargar Instalador
-                    </a>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-3">
-                    Ejecuta el archivo descargado una sola vez. Queda instalado en Windows y puedes borrar el archivo de Descargas.
-                  </p>
-                </div>
+                {/* Acerca de / Versión */}
+                <AboutCard />
               </div>
             )}
           </div>

@@ -49,7 +49,7 @@ services:
     ports:
       - "5000:5000"
     env_file:
-      - ./backend/.env         # Supabase + claves de IA (por ahora)
+      - ./backend/.env         # PORT, FRONTEND_URL, JWT_SECRET (local)
     environment:
       # Dentro de la red de Docker el host de la BD es el nombre del servicio: "mariadb".
       DB_HOST: mariadb
@@ -63,8 +63,7 @@ services:
       # IA LOCAL (Ollama corre en el host; el contenedor lo alcanza por host.docker.internal).
       OLLAMA_HOST: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen2.5:3b
-      # IA 100% local por defecto. Para reactivar la nube como red de seguridad:
-      # AI_PROVIDER_ORDER: "local,anthropic,groq,gemini"
+      # IA 100% local (sin proveedores de nube).
       AI_PROVIDER_ORDER: local
     volumes:
       - construgest_files:/data      # ficheros subidos (persisten entre rebuilds)
