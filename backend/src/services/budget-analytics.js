@@ -39,6 +39,30 @@ function jaccard(a, b) {
 }
 function normUnit(u) { return String(u || '').toLowerCase().replace(/[²³]/g, (c) => (c === '²' ? '2' : '3')).replace(/[^a-z0-9]/g, '') }
 
+// Similitud tolerante a abreviaturas: dos tokens casan si son iguales o uno es
+// prefijo del otro (mín. 3 chars). Necesario en construcción, donde la misma partida
+// se escribe "HORM. ARM." o "HORMIGON ARMADO". Se usa al emparejar entre fuentes
+// distintas (presupuesto↔biblioteca/base); para duplicados dentro de un presupuesto
+// se usa el Jaccard estricto (más conservador).
+function tokenMatch(a, b) {
+  if (a === b) return true
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a]
+  return s.length >= 3 && l.startsWith(s)
+}
+function fuzzyJaccard(a, b) {
+  const A = [...nameTokens(a)], B = [...nameTokens(b)]
+  if (!A.length || !B.length) return 0
+  const usedB = new Set()
+  let inter = 0
+  for (const ta of A) {
+    for (let k = 0; k < B.length; k++) {
+      if (usedB.has(k)) continue
+      if (tokenMatch(ta, B[k])) { usedB.add(k); inter++; break }
+    }
+  }
+  return inter / (A.length + B.length - inter)
+}
+
 function safeParse(raw) {
   if (raw == null) return {}
   if (typeof raw !== 'string') return raw
@@ -46,7 +70,8 @@ function safeParse(raw) {
 }
 
 // Helpers de matching reutilizables por otras skills (compare-budgets, find-similar…).
-export const _match = { normName, nameTokens, jaccard, normUnit }
+// jaccard = estricto (duplicados); fuzzyJaccard = tolerante a abreviaturas (cross-fuente).
+export const _match = { normName, nameTokens, jaccard, fuzzyJaccard, normUnit }
 
 /**
  * Núcleo del análisis. Devuelve todos los hechos calculados en código.

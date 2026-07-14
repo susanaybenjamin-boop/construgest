@@ -227,8 +227,17 @@ el catálogo propio. Mejora con el uso, local y sin internet.
     VERIFICADO e2e: sembradas 3 partidas en biblioteca vía API → suggest-optimizations calcula
     ahorros exactos ((185−4,47)×18=3.249,54), compare-prices clasifica overpriced + margen
     negociación 3.687 €; biblioteca vacía → [] (honesto). **PANTALLA DE IA: las 6 skills reescritas.**
-  · `[ ]` **Falta la 2ª fuente de la tool:** base pública BC3 (Benjamin consigue el fichero) →
-    concatenar en `loadPriceReference()`. También `analyze-materials` y `find-similar` sobre esta tool.
+  · `[x]` **`find-similar`** reescrita (lookup determinista contra biblioteca, base de AI-4) y
+    **`analyze-materials`** reescrita (`services/materials-analytics.js`: duplicados a agrupar +
+    dónde pagas más que el proveedor más barato + optimización por proveedor, todo desde
+    `cons_materials`/`cons_supplier_materials`). VERIFICADO e2e sembrando datos vía API.
+  · `[x]` **`fuzzyJaccard`** (matching tolerante a abreviaturas: "HORM. ARM."≈"HORMIGON ARMADO")
+    en `budget-analytics._match`; usado en price-reference/compare-budgets/find-similar/materials
+    (cross-fuente). El Jaccard estricto se mantiene para duplicados dentro de un presupuesto.
+  · `[x]` **BUG corregido en `compare-budgets`:** la ruta pisaba el objeto `summary` (conteos) con
+    la prosa del LLM → separado en `summary` (conteos) + `assessment` (prosa).
+  · `[ ]` **Falta la 2ª fuente de la tool de precios:** base pública BC3 (Benjamin consigue el
+    fichero) → concatenar en `loadPriceReference()`.
   · `[ ]` **Económicas:** `analyze-expenses`, `analyze-certifications` (motor + datos de gastos/certis).
   · `[ ]` **Cortar** las sin pantalla: estimate-timeline, analyze-schedule, analyze-plans,
     analyze-annotations, detect-errors, validate-specifications.

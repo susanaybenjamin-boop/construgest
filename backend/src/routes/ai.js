@@ -7,6 +7,7 @@ import {
   comparePrices,
   suggestOptimizations,
   normalizeReference,
+  findSimilar,
 } from '../services/price-reference.js'
 import {
   analyzeBudget,
@@ -115,16 +116,18 @@ router.post('/compare-budgets', async (req, res, next) => {
     const { compareBudgets, buildComparePrompt, fallbackCompareSummary } = await import('../services/budget-compare.js')
     const result = compareBudgets(a, b, { labelA: req.body?.label_a, labelB: req.body?.label_b })
 
-    let summary = fallbackCompareSummary(result)
+    // OJO: `result.summary` es el objeto de conteos; la prosa del LLM va en `assessment`
+    // para NO pisarlo.
+    let assessment = fallbackCompareSummary(result)
     try {
       const r = await callAI(buildComparePrompt(result), { maxTokens: 500, temperature: 0.2 })
-      const text = (r?.resumen || r?.summary || r?.raw_response || '').toString().trim()
-      if (text && text.length >= 20) summary = text
+      const text = (r?.resumen || r?.raw_response || '').toString().trim()
+      if (text && text.length >= 20) assessment = text
     } catch (err) {
       console.warn('[compare-budgets] LLM falló, resumen de reserva:', err.message)
     }
 
-    res.json({ ...result, summary })
+    res.json({ ...result, assessment })
   } catch (err) {
     next(err)
   }
@@ -306,45 +309,42 @@ router.post('/estimate-contingency', async (req, res, next) => {
 //  MATERIALES — análisis con catálogo
 // ================================================================
 
-// POST /api/ai/analyze-materials — Análisis de materiales con catálogo
-router.post('/analyze-materials', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const materialsData = truncateData(body.data, 8000)
-    const catalogData = body.catalog ? truncateData(body.catalog, 4000) : '(Sin catálogo de referencia disponible)'
+// POST /api/ai/analyze-materials — Análisis del catálogo de materiales.
+// TOOL: cons_materials + cons_supplier_materials (precios por proveedor). 100%
+// determinista: duplicados a agrupar, materiales donde pagas más que el proveedor
+// más barato, y optimización por proveedor.
+router.post('/analyze-materials', async (req, res, next) => {
+  try {
+    const orgId = req.user.organization_id
 
-    const catalogSection = body.catalog
-      ? `CATÁLOGO DE REFERENCIA (código|nombre|categoría|ud|coste|venta):\n${catalogData}`
-      : catalogData
+    const { data: materials, error: matErr } = await supabase
+      .from('cons_materials')
+      .select('id, code, name, unit, unit_price, material_group_id')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+    if (matErr) throw matErr
 
-    return `Eres un experto en materiales de construcción. Analiza estos materiales comparándolos con el catálogo.
+    const ids = (materials || []).map((m) => m.id)
+    let supplierLinks = []
+    if (ids.length) {
+      const { data, error } = await supabase
+        .from('cons_supplier_materials')
+        .select('material_id, supplier_id, unit_price')
+        .in('material_id', ids)
+      if (error) throw error
+      supplierLinks = data || []
+    }
 
-${catalogSection}
+    const { data: suppliers } = await supabase
+      .from('cons_suppliers')
+      .select('id, name')
+      .eq('organization_id', orgId)
 
-Responde SOLO con JSON válido:
-{
-  "total_items": 10,
-  "potential_savings": 5000.0,
-  "total_value": 50000.0,
-  "duplicates": [
-    {"id_1": "M1", "id_2": "M2", "name_1": "Nombre1", "name_2": "Nombre2", "similarity_score": 90.0, "reason": "Mismo material", "suggested_action": "Fusionar", "cost_impact": 500.0}
-  ],
-  "unused_materials": [],
-  "supplier_optimization": ["Consejo de optimización"],
-  "inventory_insights": ["Observación del inventario"],
-  "price_alerts": [
-    {"material_name": "Material", "user_price": 120.0, "catalog_price": 85.0, "difference_percent": 41.0, "recommendation": "Negociar precio"}
-  ],
-  "catalog_alternatives": [
-    {"current_material": "Material actual", "alternative_code": "ALT1", "alternative_name": "Alternativa", "alternative_price": 80.0, "savings_estimate": 500.0, "reason": "Más económico"}
-  ],
-  "missing_from_catalog": []
-}
-
-Usa arrays vacíos [] si no hay datos para un campo.
-
-MATERIALES DEL USUARIO:
-${materialsData}`
-  })
+    const { analyzeMaterials } = await import('../services/materials-analytics.js')
+    res.json(analyzeMaterials(materials || [], supplierLinks, suppliers || []))
+  } catch (err) {
+    next(err)
+  }
 })
 
 // POST /api/ai/analyze-plans — Análisis de planos (Texto)
@@ -528,29 +528,25 @@ ${logsData}`
 //  SIMILITUD DE PARTIDAS
 // ================================================================
 
-// POST /api/ai/find-similar — Encontrar partidas similares en biblioteca
-router.post('/find-similar', (req, res, next) => {
-  handleAIAnalysis(req, res, next, (body) => {
-    const partidaData = truncateData(body.data || body.partida)
-    const libraryData = body.library ? truncateData(body.library, 8000) : '[]'
+// POST /api/ai/find-similar — Partidas parecidas en la biblioteca (lookup determinista).
+// TOOL: biblioteca del org. Empareja por nombre (Jaccard) + misma unidad. Base del
+// autoaprendizaje (AI-4): al crear una partida se ofrecen las guardadas para reutilizar.
+router.post('/find-similar', async (req, res, next) => {
+  try {
+    const raw = req.body?.partida ?? req.body?.data
+    const query = typeof raw === 'string' ? (() => { try { return JSON.parse(raw) } catch { return { name: raw } } })() : raw
+    if (!query?.name) return res.status(400).json({ error: 'Se requiere la partida (name, unit)' })
 
-    return `Compara esta partida de construcción con las de la biblioteca. Encuentra similares (>60%).
+    const { data, error } = await supabase
+      .from('cons_saved_partidas')
+      .select('id, code, name, unit, unit_price, usage_count')
+      .eq('organization_id', req.user.organization_id)
+    if (error) throw error
 
-Criterios: nombre similar, misma unidad, precio comparable (±30%), alcance parecido.
-
-Responde SOLO con un array JSON:
-[
-  {"saved_partida_id": "5", "saved_name": "Nombre partida", "similarity_score": 87.5, "reason": "Mismo concepto, precio similar"}
-]
-
-Si no hay similitudes >60%, responde: []
-
-PARTIDA NUEVA:
-${partidaData}
-
-BIBLIOTECA:
-${libraryData}`
-  })
+    res.json(findSimilar(query, data || []))
+  } catch (err) {
+    next(err)
+  }
 })
 
 // ================================================================

@@ -11,7 +11,8 @@
 // ============================================================================
 import { analyzeBudget, _match } from './budget-analytics.js'
 
-const { jaccard, normUnit } = _match
+// Presupuesto↔presupuesto de fuentes distintas (Construgest/Presto): tolerante a abreviaturas.
+const { fuzzyJaccard: jaccard, normUnit } = _match
 
 function round2(n) { return Math.round((Number(n) || 0) * 100) / 100 }
 function pctDiff(a, b) { return a > 0 ? round2(((b - a) / a) * 100) : (b > 0 ? 100 : 0) }

@@ -12,7 +12,8 @@
 // ============================================================================
 import { _match } from './budget-analytics.js'
 
-const { jaccard, normUnit } = _match
+// Cross-fuente (presupuesto↔biblioteca/base): tolerante a abreviaturas.
+const { fuzzyJaccard: jaccard, normUnit } = _match
 function round2(n) { return Math.round((Number(n) || 0) * 100) / 100 }
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
@@ -60,6 +61,42 @@ export function lookupPrices(items, reference, { threshold = DEFAULT_THRESHOLD }
     }
     return { ...it, ref_price: null }
   })
+}
+
+/**
+ * find-similar: dada una partida (name, unit), busca las más parecidas en la
+ * biblioteca. 100% determinista (lookup). Base del autoaprendizaje (AI-4): al crear
+ * una partida se ofrecen las guardadas parecidas para reutilizar precio/descripción.
+ * @param {{name:string, unit?:string}} query
+ * @param {Array} library  filas crudas de cons_saved_partidas (con id/code)
+ */
+export function findSimilar(query, library, { threshold = 0.6, limit = 8 } = {}) {
+  const qName = String(query?.name || '')
+  const qUnit = query?.unit
+  if (!qName.trim()) return []
+
+  const out = []
+  for (const r of library) {
+    if (qUnit && r.unit && normUnit(qUnit) !== normUnit(r.unit)) continue
+    const sim = jaccard(qName, r.name)
+    if (sim < threshold) continue
+    const score = round2(sim * 100)
+    const reason = score >= 90 ? 'Nombre casi idéntico y misma unidad'
+      : score >= 75 ? 'Mismo concepto y unidad'
+        : 'Concepto parecido'
+    out.push({
+      saved_partida_id: r.id,
+      saved_code: r.code,
+      saved_name: r.name,
+      unit: r.unit,
+      unit_price: num(r.unit_price),
+      usage_count: num(r.usage_count),
+      similarity_score: score,
+      reason,
+    })
+  }
+  // Ordena por similitud y, a igualdad, por uso (más reutilizada = más fiable).
+  return out.sort((a, b) => b.similarity_score - a.similarity_score || b.usage_count - a.usage_count).slice(0, limit)
 }
 
 /**
