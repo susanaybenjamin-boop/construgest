@@ -49,7 +49,9 @@
 > deps backend + fuera consola dev · `v0.3.2` ajustes · `v0.3.3` rate-limit 300→6000/min (login
 > e import se bloqueaban) · `v0.3.4` import resiliente + renumerado que no tumba la importación ·
 > **`v0.4.0`** parser de presupuestos tipo Excel (totales en línea) + bloqueo de la app al descargar
-> el update + **login con PIN** en escritorio.
+> el update + **login con PIN** en escritorio · **`v0.4.1`** las ventanas internas (visor "Desde
+> Biblioteca"/`/budget-reference`, comparador, vista/impresión PDF) se abren DENTRO de Electron en
+> vez de escaparse al navegador del sistema (`setWindowOpenHandler` distinguía mal interno/externo).
 >
 > ### Principios básicos (SIEMPRE — detalle en `CLAUDE.md`)
 > 1. **¿Lo he VISTO funcionar?** "Compila" y "los tests pasan" NO es "funciona". Ejercitar el
