@@ -77,7 +77,12 @@
 >    `admin@construgest.local` / `construgest`. Cuando esté probado: subir `backend`+`frontend`
 >    (+`desktop`) `package.json` a la nueva versión, `desktop/build-msi.ps1 -Version X.Y.Z`, y
 >    `gh release create vX.Y.Z desktop/dist/ConstruGest-X.Y.Z.msi` (repo `susanaybenjamin-boop/construgest`).
-> 4. **Pendientes conocidos** (no bloqueantes): base de precios real de Andalucía (BCCA) en
+> 4. **Limpieza de `.msi` (REL-CLEAN):** NO mantener todas las compilaciones. Tras **comprobar que
+>    la nueva release se ha descargado/instalado bien**, conservar SOLO el `.msi` de la versión
+>    **inmediatamente anterior** (por si hay que revertir) y borrar el resto de `desktop/dist/*.msi`.
+>    Ahora hay 8 (0.1.0→0.4.0, ~3,5 GB). Es LOCAL (disco); los assets de GitHub Releases son decisión
+>    aparte (no borrar sin preguntar). No borrar el `.msi` recién probado ni el anterior.
+> 5. **Pendientes conocidos** (no bloqueantes): base de precios real de Andalucía (BCCA) en
 >    `backend/data/price-bases/`; tesseract/poppler en el `.msi` de Windows (hoy OCR solo en Docker);
 >    endpoint de import por lotes (hoy el import hace ~cientos de llamadas seguidas); e2e real del PIN
 >    y del bloqueo de update dentro del `.msi` (compilan y typecheck OK, faltan probar instalados).
@@ -462,6 +467,9 @@ Instalar el `.msi` y probar función por función en la app real; cada fallo →
   (v0.3.1), consola de dev fuera (v0.3.1), rate-limit 300→6000 (v0.3.3), import resiliente (v0.3.4).
 - `[ ]` Recorrer el resto de módulos en la app instalada (obras, certificaciones, gastos, materiales,
   proveedores, subcontratas, partes, biblioteca, IA por pantalla) y anotar/arreglar lo que falle.
+- `[ ]` **REL-CLEAN** — política de espacio: tras confirmar que la release nueva se descargó/instaló
+  bien, borrar de `desktop/dist/` todos los `.msi` salvo el nuevo y el **inmediatamente anterior**
+  (rollback). Hoy acumulados 0.1.0→0.4.0 (~3,5 GB). Solo disco local; GitHub Releases = decisión aparte.
 
 ---
 
