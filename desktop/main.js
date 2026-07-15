@@ -12,8 +12,9 @@
 // host). Backend y frontend se ejecutan con el propio Node de Electron
 // (ELECTRON_RUN_AS_NODE) → no hace falta bundlear Node aparte.
 // ============================================================================
-const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain, safeStorage } = require('electron')
 const { spawn } = require('child_process')
+const crypto = require('crypto')
 const http = require('http')
 const https = require('https')
 const net = require('net')
@@ -434,6 +435,69 @@ ipcMain.handle('update:install', async (_e, url) => {
   updating = false          // descarga completa: ya se puede cerrar para instalar
   launchInstaller(dest)
   return { started: true }
+})
+
+// ── Login rápido con PIN (solo escritorio) ───────────────────────────────────
+//
+// Tras el primer login normal el usuario crea un PIN. Guardamos sus credenciales
+// CIFRADAS con safeStorage (DPAPI en Windows: solo este usuario de Windows puede
+// descifrarlas) y, dentro del blob, un hash del PIN (scrypt+sal). En arranques
+// posteriores, el PIN correcto libera las credenciales y el frontend hace login.
+// NO toca el backend ni el JWT: es puramente comodidad de escritorio.
+const PIN_VAULT = () => path.join(app.getPath('userData'), 'pin-vault.dat')
+const MAX_PIN_FAILS = 10
+
+function pinAvailable() {
+  try { return safeStorage.isEncryptionAvailable() } catch { return false }
+}
+function readVault() {
+  try {
+    const buf = fs.readFileSync(PIN_VAULT())
+    return JSON.parse(safeStorage.decryptString(buf))
+  } catch { return null }
+}
+function writeVault(obj) {
+  fs.writeFileSync(PIN_VAULT(), safeStorage.encryptString(JSON.stringify(obj)))
+}
+function hashPin(pin, salt) {
+  return crypto.scryptSync(String(pin), salt, 32).toString('hex')
+}
+
+ipcMain.handle('pin:status', () => {
+  return { available: pinAvailable(), hasPin: fs.existsSync(PIN_VAULT()) }
+})
+
+ipcMain.handle('pin:set', (_e, { pin, email, password }) => {
+  if (!pinAvailable()) return { ok: false, reason: 'no-encryption' }
+  if (!pin || String(pin).length < 4 || !email || !password) return { ok: false, reason: 'invalid' }
+  const salt = crypto.randomBytes(16).toString('hex')
+  writeVault({ email, password, salt, hash: hashPin(pin, salt), fails: 0 })
+  return { ok: true }
+})
+
+ipcMain.handle('pin:unlock', (_e, { pin }) => {
+  const v = readVault()
+  if (!v) return { ok: false, reason: 'no-pin' }
+  const ok = crypto.timingSafeEqual(
+    Buffer.from(hashPin(pin, v.salt), 'hex'),
+    Buffer.from(v.hash, 'hex'),
+  )
+  if (ok) {
+    if (v.fails) { v.fails = 0; writeVault(v) }
+    return { ok: true, email: v.email, password: v.password }
+  }
+  v.fails = (v.fails || 0) + 1
+  if (v.fails >= MAX_PIN_FAILS) {
+    try { fs.rmSync(PIN_VAULT(), { force: true }) } catch { /* ignore */ }
+    return { ok: false, reason: 'wiped' }
+  }
+  writeVault(v)
+  return { ok: false, reason: 'bad-pin', remaining: MAX_PIN_FAILS - v.fails }
+})
+
+ipcMain.handle('pin:clear', () => {
+  try { fs.rmSync(PIN_VAULT(), { force: true }) } catch { /* ignore */ }
+  return { ok: true }
 })
 
 app.whenReady().then(async () => {

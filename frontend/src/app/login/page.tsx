@@ -7,8 +7,10 @@ import { useAuthStore } from '@/stores/authStore'
 import { Building2, Loader2, Eye, EyeOff, ArrowLeft, Mail, Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import api from '@/lib/api'
+import { desktop } from '@/lib/desktop'
+import PinGate from '@/components/auth/PinGate'
 
-type View = 'login' | 'forgot' | 'reset'
+type View = 'login' | 'forgot' | 'reset' | 'pin-enter' | 'pin-create'
 
 export default function LoginPage() {
   const { t } = useTranslation()
@@ -20,6 +22,17 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [hasPin, setHasPin] = useState(false)
+
+  // Escritorio: si ya hay un PIN guardado, arranca en la pantalla de PIN.
+  useEffect(() => {
+    const pin = desktop()?.pin
+    if (!pin) return
+    pin.status().then((s) => {
+      setHasPin(s.hasPin)
+      if (s.hasPin) setView((v) => (v === 'login' ? 'pin-enter' : v))
+    }).catch(() => {})
+  }, [])
 
   // Forgot password
   const [forgotEmail, setForgotEmail] = useState('')
@@ -47,6 +60,12 @@ export default function LoginPage() {
     e.preventDefault()
     try {
       await login(email, password)
+      // Escritorio: si aún no hay PIN, ofrecer crearlo antes de entrar.
+      const pin = desktop()?.pin
+      if (pin && !hasPin) {
+        const s = await pin.status().catch(() => null)
+        if (s?.available && !s.hasPin) { setView('pin-create'); return }
+      }
       router.push('/admin')
     } catch {}
   }
@@ -92,6 +111,26 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+
+          {/* ─── PIN: ENTRAR (escritorio) ─── */}
+          {view === 'pin-enter' && (
+            <PinGate
+              mode="enter"
+              onUnlock={async (em, pw) => { await login(em, pw); router.push('/admin') }}
+              onUsePassword={() => setView('login')}
+            />
+          )}
+
+          {/* ─── PIN: CREAR (escritorio, tras el primer login) ─── */}
+          {view === 'pin-create' && (
+            <PinGate
+              mode="create"
+              email={email}
+              password={password}
+              onCreated={() => router.push('/admin')}
+              onSkip={() => router.push('/admin')}
+            />
+          )}
 
           {/* ─── LOGIN VIEW ─── */}
           {view === 'login' && (

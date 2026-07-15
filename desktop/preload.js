@@ -19,4 +19,11 @@ contextBridge.exposeInMainWorld('construgest', {
     ipcRenderer.on('update:error', h)
     return () => ipcRenderer.removeListener('update:error', h)
   },
+  // Login rápido con PIN (credenciales cifradas con DPAPI, gestionadas en main).
+  pin: {
+    status: () => ipcRenderer.invoke('pin:status'),
+    set: (pin, email, password) => ipcRenderer.invoke('pin:set', { pin, email, password }),
+    unlock: (pin) => ipcRenderer.invoke('pin:unlock', { pin }),
+    clear: () => ipcRenderer.invoke('pin:clear'),
+  },
 })
