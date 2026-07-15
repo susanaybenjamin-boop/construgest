@@ -1,6 +1,6 @@
 {
   "name": "construgest-desktop",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Shell de escritorio (Electron) de Construgest: arranca los servicios locales y muestra la app.",
   "main": "main.js",
