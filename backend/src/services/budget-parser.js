@@ -367,27 +367,48 @@ const MONTHS = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|oct
 // Unidades reconocidas (para regex de detección de partidas)
 const UNIT_WORDS = 'm[23²³]|m\\.?[23]|m\\.?l\\.?|ud|Ud|UD|u\\.?|kg|kgs?\\.?|pa|p\\.?a\\.?|tn?\\.?|ml|Ml|ML|h\\.?|unid(?:ad(?:es)?)?|uds?\\.?|uni?\\.?|jor\\.?|sem\\.?|gl|dm[23³]|cm[2²]?|km\\.?|m\\b'
 
+/** Normalizar código numérico con coma a punto: "2,1" → "2.1" (deja el resto igual). */
+function normalizeCode(code) {
+  return /^\d+,\d+$/.test(code) ? code.replace(',', '.') : code
+}
+
 /**
  * Detectar si una línea es inicio de partida: CODE unit TITLE
  * Retorna { code, unit, title } o null
+ *
+ * allowComma: permite códigos con coma decimal (2,1) — SOLO en el parser inline
+ * (formato Excel). En el parser de separadores queda desactivado para no confundir
+ * una línea de descripción que empiece por una medida ("1,5 m de tubería…").
  */
-function detectPartidaStart(line) {
+function detectPartidaStart(line, allowComma = false) {
+  const codeChars = allowComma ? 'A-Za-z0-9.,\\-' : 'A-Za-z0-9.\\-'
+
   // Patrón principal: CÓDIGO  unidad  TÍTULO
   const re1 = new RegExp(
-    `^([A-Z0-9][A-Za-z0-9.\\-]{1,15})\\s+(${UNIT_WORDS})\\s+(.+)$`, 'i'
+    `^([A-Z0-9][${codeChars}]{1,15})\\s+(${UNIT_WORDS})\\s+(.+)$`, 'i'
   )
   const m1 = line.match(re1)
   if (m1 && /[a-záéíóúñü]/i.test(m1[3])) {
     const code = m1[1]
     if (/^[A-Z0-9]/.test(code) && looksLikePartidaCode(code)) {
-      return { code, unit: normalizeUnit(m1[2]), title: m1[3].trim() }
+      return { code: normalizeCode(code), unit: normalizeUnit(m1[2]), title: m1[3].trim() }
     }
   }
 
   // Patrón secundario: CÓDIGO  TÍTULO_EN_MAYÚSCULAS (sin unidad explícita)
-  const m2 = line.match(/^([A-Z0-9][A-Za-z0-9.\-]{1,15})\s{2,}([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\s,./\-()#]{3,})$/)
+  const m2 = line.match(new RegExp(`^([A-Z0-9][${codeChars}]{1,15})\\s{2,}([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\\s,./\\-()#]{3,})$`))
   if (m2 && looksLikePartidaCode(m2[1])) {
-    return { code: m2[1], unit: 'UD', title: m2[2].trim() }
+    return { code: normalizeCode(m2[1]), unit: 'UD', title: m2[2].trim() }
+  }
+
+  // Patrón inline SIN unidad: "5.1 CITARA L/PERF…" — código numérico (N.N, N.N.N,
+  // N,N) + título, un solo espacio, sin unidad reconocible. Solo en modo inline y
+  // solo para códigos puramente numéricos punteados (no "40x15x20 cm" de descripción).
+  if (allowComma) {
+    const m3 = line.match(/^(\d{1,3}(?:[.,]\d{1,3}){1,2})\s+([A-Za-zÁÉÍÓÚÑÜ].+)$/)
+    if (m3 && /[a-záéíóúñü]/i.test(m3[2]) && !checkInlineSummary(line)) {
+      return { code: normalizeCode(m3[1]), unit: 'UD', title: m3[2].trim() }
+    }
   }
 
   return null
@@ -398,7 +419,7 @@ function looksLikePartidaCode(s) {
   if (s.length < 2 || s.length > 16) return false
   if (!/^[A-Z0-9]/.test(s)) return false
   if (/[a-zA-Z]/.test(s) && /\d/.test(s)) return true
-  if (/^\d+\.\d+/.test(s)) return true
+  if (/^\d+[.,]\d+/.test(s)) return true
   if (/^[A-Z]{2,10}$/.test(s)) {
     const blacklist = ['LA', 'EL', 'DE', 'EN', 'UN', 'SE', 'NO', 'ES', 'POR', 'CON',
       'SIN', 'MAS', 'DOS', 'SUS', 'LOS', 'LAS', 'DEL', 'UNA', 'QUE', 'SU', 'AL']
@@ -507,6 +528,40 @@ function checkSummaryLine(line) {
   if (qty > 0 && price > 0 && amount > 5 && diff / amount < 0.10) return { qty, price, amount }
 
   return null
+}
+
+/**
+ * Comprobar summary INLINE (formato Excel): los 3 últimos números de la línea son
+ * cantidad · precio · importe, aunque haya texto delante y símbolos € entre medias.
+ *   "Losa de cimentación… 18 185,00 € 3.330,00 €"  → qty 18, price 185, amount 3330
+ *   "1 850,00 € 850,00 €"                          → qty 1,  price 850, amount 850
+ * Se exige importe ≈ cantidad × precio (precio > 0) para no confundir con texto.
+ * Retorna { qty, price, amount, textBefore } o null.
+ */
+function checkInlineSummary(line) {
+  const cleaned = line.trim().replace(/€/g, ' ')
+  const matches = [...cleaned.matchAll(/-?\d[\d.,]*/g)]
+  if (matches.length < 3) return null
+
+  const last3 = matches.slice(-3)
+  // Precio e importe DEBEN venir con 2 decimales (formato dinero: 185,00 / 1.331,00).
+  // Así una línea de descripción con enteros sueltos (…árido 15 mm… → 15·1=15) NO se
+  // confunde con un total. La cantidad (1er nº) puede ser entera o decimal.
+  const money2dec = s => /[.,]\d{2}$/.test(s)
+  if (!money2dec(last3[1][0]) || !money2dec(last3[2][0])) return null
+
+  const qty = parseSpanishNum(last3[0][0])
+  const price = parseSpanishNum(last3[1][0])
+  const amount = parseSpanishNum(last3[2][0])
+  if (qty <= 0 || price <= 0 || amount <= 0) return null
+
+  const expected = qty * price
+  const diff = Math.abs(amount - expected)
+  const tolerance = Math.max(0.5, expected * 0.03)
+  if (diff > tolerance) return null
+
+  const textBefore = cleaned.substring(0, last3[0].index).replace(/\s+/g, ' ').trim()
+  return { qty, price, amount, textBefore }
 }
 
 /**
@@ -948,6 +1003,84 @@ export function parseBudgetAlgorithmic(text) {
 }
 
 /**
+ * Parser INLINE (formato Excel / hoja de cálculo).
+ *
+ * Estructura de cada partida en este formato:
+ *   [CÓDIGO  unidad  TÍTULO]                              ← detectPartidaStart(_, true)
+ *   [Descripción multilínea]                              ← texto con letras
+ *   [Ubicación…  cantidad  precio€  importe€]             ← checkInlineSummary() cierra la partida
+ *
+ * No hay líneas separadoras "____" y los totales van al FINAL de una línea de texto
+ * (no en línea aparte). Se usa solo cuando el parser de separadores no extrae nada.
+ */
+export function parseBudgetInlineSummary(text) {
+  const logs = ['📐 Parser inline v1.0 — totales en línea (formato Excel, sin separadores)']
+
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l)
+  const chapters = []
+  let currentChapter = null
+  let currentPartida = null
+
+  function closePartida() {
+    if (currentPartida && currentPartida.summary) {
+      const item = buildPartidaItem(currentPartida, logs)
+      if (item) {
+        if (!currentChapter) {
+          currentChapter = { code: '01', name: 'PARTIDAS GENERALES', items: [] }
+        }
+        currentChapter.items.push(item)
+      }
+    }
+    currentPartida = null
+  }
+
+  for (const line of lines) {
+    // Capítulo
+    const ch = detectChapter(line)
+    if (ch) {
+      closePartida()
+      if (currentChapter) chapters.push(currentChapter)
+      currentChapter = { code: ch.code, name: ch.name, items: [] }
+      continue
+    }
+
+    // "total capitulo …" y demás totales cierran la partida abierta y se ignoran
+    if (isTotalLine(line)) {
+      closePartida()
+      continue
+    }
+
+    // Inicio de partida (con soporte de códigos con coma: 2,1)
+    const ps = detectPartidaStart(line, true)
+    if (ps) {
+      closePartida()
+      currentPartida = { code: ps.code, unit: ps.unit, title: ps.title, bodyLines: [], summary: null }
+      continue
+    }
+
+    // Summary inline: cierra la partida en curso
+    const inl = currentPartida ? checkInlineSummary(line) : null
+    if (inl) {
+      if (inl.textBefore) currentPartida.bodyLines.push(inl.textBefore)
+      currentPartida.summary = { qty: inl.qty, price: inl.price, amount: inl.amount }
+      closePartida()
+      continue
+    }
+
+    // Resto → cuerpo de la partida (descripción)
+    if (currentPartida) currentPartida.bodyLines.push(line)
+  }
+
+  closePartida()
+  if (currentChapter) chapters.push(currentChapter)
+
+  const totalItems = chapters.reduce((s, ch) => s + ch.items.length, 0)
+  logs.push(`✅ Parser inline: ${chapters.length} capítulos, ${totalItems} partidas`)
+
+  return { chapters, logs }
+}
+
+/**
  * Construir un item de partida a partir de su bloque de datos.
  * Ahora extrae TAMBIÉN las mediciones.
  */
@@ -1178,6 +1311,20 @@ export async function parseBudgetFromText(rawText, useAI = true, organizationId 
     }
 
     allLogs.push(`⚠️ Solo ${finalItems}/${separatorEstimate} partidas (< 30%). Intentando IA...`)
+  }
+
+  // Paso 2b: Parser INLINE (formato Excel: totales al final de línea, sin
+  // separadores ___). Determinista y rápido — se intenta ANTES de la IA local.
+  if (algoItems === 0) {
+    const inlineResult = parseBudgetInlineSummary(cleanedText)
+    const { chapters: inlineChapters, errors: inlineErrors } = validateAndClean(inlineResult.chapters)
+    const inlineItems = inlineChapters.reduce((s, ch) => s + ch.items.length, 0)
+    allLogs.push(...inlineResult.logs)
+    if (inlineErrors.length) allLogs.push(`ℹ️ ${inlineErrors.length} partidas descartadas (cantidad/precio 0)`)
+    if (inlineItems > 0) {
+      allLogs.push(`✅ Resultado: ${inlineChapters.length} capítulos, ${inlineItems} partidas (inline)`)
+      return { chapters: inlineChapters, logs: allLogs }
+    }
   }
 
   // Paso 3: Fallback IA

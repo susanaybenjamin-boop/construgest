@@ -12,8 +12,9 @@
 // host). Backend y frontend se ejecutan con el propio Node de Electron
 // (ELECTRON_RUN_AS_NODE) → no hace falta bundlear Node aparte.
 // ============================================================================
-const { app, BrowserWindow, dialog, shell, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain, safeStorage } = require('electron')
 const { spawn } = require('child_process')
+const crypto = require('crypto')
 const http = require('http')
 const https = require('https')
 const net = require('net')
@@ -25,6 +26,7 @@ const DB = { name: 'construgest', user: 'construgest', password: 'construgest' }
 const OLLAMA_MODEL = 'qwen2.5:3b'
 const children = []
 let win = null
+let updating = false   // true mientras se descarga la actualización (bloquea el cierre)
 
 // ── Rutas: en dev la raíz del repo es ../ ; empaquetado, process.resourcesPath ──
 const RES = app.isPackaged ? process.resourcesPath : path.join(__dirname, '..')
@@ -348,40 +350,154 @@ function createWindow() {
   win.loadURL(`http://localhost:${PORTS.frontend}`)
   win.once('ready-to-show', () => win.show())
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
+  // Mientras se descarga una actualización (453 MB), impedir cerrar la ventana:
+  // si el proceso principal muere, la descarga se corta y el .msi queda a medias.
+  win.on('close', (e) => {
+    if (updating) {
+      e.preventDefault()
+      if (!win.isDestroyed()) win.webContents.send('update:progress', { pct: -1, blocked: true })
+    }
+  })
 }
 
 // ── Autoactualización: descargar el .msi de la release y lanzar el instalador ─
 
-/** Descarga una URL a un fichero, siguiendo redirecciones (GitHub → CDN). */
-function downloadFile(url, dest, redirects = 0) {
+/**
+ * Descarga una URL a un fichero, siguiendo redirecciones (GitHub → CDN).
+ * Escribe a `dest.part` y renombra al final: el instalador NUNCA ve un fichero a
+ * medias. Emite progreso (%) por onProgress si hay Content-Length.
+ */
+function downloadFile(url, dest, onProgress, redirects = 0) {
+  const part = dest + '.part'
   return new Promise((resolve, reject) => {
     if (redirects > 5) return reject(new Error('demasiadas redirecciones'))
     https.get(url, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         res.resume()
-        return resolve(downloadFile(res.headers.location, dest, redirects + 1))
+        return resolve(downloadFile(res.headers.location, dest, onProgress, redirects + 1))
       }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error(`HTTP ${res.statusCode}`)) }
-      const f = fs.createWriteStream(dest)
+
+      const total = Number(res.headers['content-length']) || 0
+      let received = 0
+      let lastPct = -1
+      const f = fs.createWriteStream(part)
+      res.on('data', (chunk) => {
+        received += chunk.length
+        if (total && onProgress) {
+          const pct = Math.floor((received / total) * 100)
+          if (pct !== lastPct) { lastPct = pct; onProgress(pct, received, total) }
+        }
+      })
       res.pipe(f)
-      f.on('finish', () => f.close(() => resolve(dest)))
-      f.on('error', reject)
+      f.on('finish', () => f.close(() => {
+        try {
+          fs.rmSync(dest, { force: true })
+          fs.renameSync(part, dest)     // atómico: .part → .msi ya completo
+          resolve(dest)
+        } catch (e) { reject(e) }
+      }))
+      f.on('error', (e) => { try { fs.rmSync(part, { force: true }) } catch { /* ignore */ } reject(e) })
     }).on('error', reject)
   })
 }
 
-// El frontend (dentro de Electron) pide actualizar: descarga el .msi y lanza el
-// instalador (major-upgrade por UpgradeCode) y cierra la app para liberar ficheros.
+/** Lanza el instalador MSI (major-upgrade por UpgradeCode) y cierra la app. */
+function launchInstaller(dest) {
+  log('Lanzando instalador…', dest)
+  const child = spawn('msiexec', ['/i', dest], { detached: true, stdio: 'ignore' })
+  child.on('error', (e) => log('no se pudo lanzar msiexec:', e.message))
+  child.unref()
+  // Margen para que msiexec tome el fichero antes de que muera el proceso padre.
+  setTimeout(() => { shutdown(); app.quit() }, 1500)
+}
+
+// El frontend (dentro de Electron) pide actualizar: descarga el .msi (con la
+// ventana bloqueada para que la descarga no se interrumpa) y lanza el instalador.
 ipcMain.handle('update:install', async (_e, url) => {
   if (!url) throw new Error('sin URL de descarga')
   const dest = path.join(app.getPath('temp'), 'ConstruGest-update.msi')
-  log('Descargando actualización…', url)
-  await downloadFile(url, dest)
-  log('Lanzando instalador…')
-  const child = spawn('msiexec', ['/i', dest], { detached: true, stdio: 'ignore' })
-  child.unref()
-  setTimeout(() => { shutdown(); app.quit() }, 800)
+  updating = true
+  const send = (ch, payload) => { if (win && !win.isDestroyed()) win.webContents.send(ch, payload) }
+  try {
+    log('Descargando actualización…', url)
+    await downloadFile(url, dest, (pct, recv, total) => send('update:progress', { pct, recv, total }))
+    const size = fs.existsSync(dest) ? fs.statSync(dest).size : 0
+    if (!size) throw new Error('la descarga quedó vacía')
+    log(`Actualización descargada (${(size / 1048576).toFixed(0)} MB).`)
+    send('update:progress', { pct: 100, recv: size, total: size })
+  } catch (e) {
+    updating = false
+    log('Fallo en la actualización:', e.message)
+    send('update:error', e.message)
+    throw e
+  }
+  updating = false          // descarga completa: ya se puede cerrar para instalar
+  launchInstaller(dest)
   return { started: true }
+})
+
+// ── Login rápido con PIN (solo escritorio) ───────────────────────────────────
+//
+// Tras el primer login normal el usuario crea un PIN. Guardamos sus credenciales
+// CIFRADAS con safeStorage (DPAPI en Windows: solo este usuario de Windows puede
+// descifrarlas) y, dentro del blob, un hash del PIN (scrypt+sal). En arranques
+// posteriores, el PIN correcto libera las credenciales y el frontend hace login.
+// NO toca el backend ni el JWT: es puramente comodidad de escritorio.
+const PIN_VAULT = () => path.join(app.getPath('userData'), 'pin-vault.dat')
+const MAX_PIN_FAILS = 10
+
+function pinAvailable() {
+  try { return safeStorage.isEncryptionAvailable() } catch { return false }
+}
+function readVault() {
+  try {
+    const buf = fs.readFileSync(PIN_VAULT())
+    return JSON.parse(safeStorage.decryptString(buf))
+  } catch { return null }
+}
+function writeVault(obj) {
+  fs.writeFileSync(PIN_VAULT(), safeStorage.encryptString(JSON.stringify(obj)))
+}
+function hashPin(pin, salt) {
+  return crypto.scryptSync(String(pin), salt, 32).toString('hex')
+}
+
+ipcMain.handle('pin:status', () => {
+  return { available: pinAvailable(), hasPin: fs.existsSync(PIN_VAULT()) }
+})
+
+ipcMain.handle('pin:set', (_e, { pin, email, password }) => {
+  if (!pinAvailable()) return { ok: false, reason: 'no-encryption' }
+  if (!pin || String(pin).length < 4 || !email || !password) return { ok: false, reason: 'invalid' }
+  const salt = crypto.randomBytes(16).toString('hex')
+  writeVault({ email, password, salt, hash: hashPin(pin, salt), fails: 0 })
+  return { ok: true }
+})
+
+ipcMain.handle('pin:unlock', (_e, { pin }) => {
+  const v = readVault()
+  if (!v) return { ok: false, reason: 'no-pin' }
+  const ok = crypto.timingSafeEqual(
+    Buffer.from(hashPin(pin, v.salt), 'hex'),
+    Buffer.from(v.hash, 'hex'),
+  )
+  if (ok) {
+    if (v.fails) { v.fails = 0; writeVault(v) }
+    return { ok: true, email: v.email, password: v.password }
+  }
+  v.fails = (v.fails || 0) + 1
+  if (v.fails >= MAX_PIN_FAILS) {
+    try { fs.rmSync(PIN_VAULT(), { force: true }) } catch { /* ignore */ }
+    return { ok: false, reason: 'wiped' }
+  }
+  writeVault(v)
+  return { ok: false, reason: 'bad-pin', remaining: MAX_PIN_FAILS - v.fails }
+})
+
+ipcMain.handle('pin:clear', () => {
+  try { fs.rmSync(PIN_VAULT(), { force: true }) } catch { /* ignore */ }
+  return { ok: true }
 })
 
 app.whenReady().then(async () => {
