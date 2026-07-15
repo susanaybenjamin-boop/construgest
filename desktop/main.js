@@ -349,7 +349,35 @@ function createWindow() {
   win.removeMenu()
   win.loadURL(`http://localhost:${PORTS.frontend}`)
   win.once('ready-to-show', () => win.show())
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' } })
+  // Las ventanas internas de la app (visor de referencia, comparador, PDF, impresión)
+  // deben abrirse DENTRO de Electron, no en el navegador del sistema. Solo las URLs
+  // realmente externas (otro host http/https) se delegan al navegador del usuario.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    const isInternal =
+      url === 'about:blank' ||
+      url.startsWith('blob:') ||
+      url.startsWith('data:') ||
+      url.startsWith(`http://localhost:${PORTS.frontend}`) ||
+      url.startsWith(`http://127.0.0.1:${PORTS.frontend}`) ||
+      url.startsWith(`http://localhost:${PORTS.backend}`) ||
+      url.startsWith(`http://127.0.0.1:${PORTS.backend}`)
+    if (isInternal) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          width: 1200,
+          height: 800,
+          autoHideMenuBar: true,
+          webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+          },
+        },
+      }
+    }
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
   // Mientras se descarga una actualización (453 MB), impedir cerrar la ventana:
   // si el proceso principal muere, la descarga se corta y el .msi queda a medias.
   win.on('close', (e) => {
