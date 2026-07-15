@@ -1,6 +1,90 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-14
+> ## 📍 ESTADO ACTUAL — 2026-07-15
+>
+> ### Qué es Construgest y de dónde viene
+> App de gestión de construcción (presupuestos, certificaciones, obras, materiales,
+> proveedores, subcontratas, partes de trabajo, IA). Nació como **`construgest-web`**:
+> Node/Express + Next.js 16/React 19 + **Supabase** (Postgres, Storage, RPC, Realtime)
+> e IA de nube (Anthropic/Groq/Gemini). **El objetivo de este proyecto fue quitar la
+> nube y hacerlo 100% local y autohospedado**, como Benjagest: MariaDB en vez de
+> Supabase, IA local con Ollama, y un `.msi` autocontenido. Copia de trabajo:
+> `C:\Proyectos\Construgest` (separada de `construgest-web`). **Login propio (bcrypt+JWT),
+> nunca Supabase Auth.** La BD Supabase original está COMPARTIDA con otras apps → solo se
+> migró `cons_*` (+ `mcp_*`); todo lo `*_180`/ajeno no se tocó. El módulo "ferralla"
+> (`ferrapp_*`) se ELIMINÓ (no encajaba en el producto).
+>
+> ### El camino desde cero (todo HECHO y verificado en ejecución)
+> - **Fase 0 — Esquema de la nube:** extraído a `docs/schema/` (tablas + RPC).
+> - **Fase 1 — MariaDB + entorno dev:** `database/` con `docker-compose.yml` (MariaDB :3308 +
+>   backend :5000) y `01_schema.sql` (Postgres→MariaDB: uuid→CHAR(36), timestamptz→DATETIME(3)
+>   UTC, jsonb/arrays→JSON, COLLATE utf8mb4_unicode_ci) + seeds.
+> - **Fase 2 — Capa de datos:** 20 rutas + middleware migradas de Supabase a MariaDB con un
+>   **shim** (`db/local.js`) que imita la API `.from()/.rpc()/.storage` (select/insert/update/
+>   delete/upsert, filtros, RETURNING, **selects anidados** por FK, storage en disco). Verificado
+>   ruta por ruta con curl.
+> - **Fase 3 — Storage + Realtime locales:** ficheros en disco (`db/storage.js`+`routes/files.js`);
+>   Realtime = **WebSocket propio** (`services/realtimeHub.js`, `/ws`) que sustituye Supabase Realtime
+>   (topics `budget:{id}`, `org:{id}:projects|branches`, `user:{id}`), auth JWT + heartbeat.
+> - **Fase 4 — IA 100% local (Ollama `qwen2.5:3b`, i5 sin GPU):** arquitectura de **3 capas**
+>   (código determinista para cifras · LLM local solo para prosa/borroso, **0% cifras del modelo** ·
+>   OCR pdfjs+Tesseract). **13 skills** reescritas; extracción de materiales; import de PDF; base de
+>   precios (biblioteca propia + BC3 público); **autoaprendizaje** por correcciones (few-shot). Chat
+>   eliminado. SDKs y claves de nube fuera del backend.
+> - **Fase 5 — Empaquetado autocontenido:** **nativo sin Docker + ventana Electron**; `.msi` con
+>   **WiX v3** (`desktop/`). El shell (`desktop/main.js`) arranca MariaDB (init idempotente la 1ª vez),
+>   Ollama (+pull del modelo), backend y frontend con el Node de Electron. Binarios en `desktop/runtime/`.
+>   **Auto-update real** contra GitHub Releases (`/api/version` + banner + descarga/instala el `.msi`).
+> - **UI conectada + limpieza de nube:** frontend hablando con el WS local; 5 skills IA cableadas en
+>   pantallas; borradas refs muertas de nube (Vercel/Render/Supabase/Vision) y paneles admin de IA.
+>
+> ### 🚩 DÓNDE ESTAMOS AHORA — FASE 6: PRUEBAS EN PRODUCCIÓN
+> El backend, la IA, el empaquetado y el auto-update están HECHOS. **v0.4.0** compilada y
+> publicada (GitHub Releases, `.msi` adjunto). Ya NO estamos construyendo a ciegas: la app se
+> **instala y se prueba función por función en la app REAL** (el `.msi` en el portátil), y cada
+> fallo que aparece se arregla, se corta release y se autoactualiza. Este es el ciclo actual.
+>
+> **Historial de releases** (versión = `backend/package.json`, la compara el auto-update):
+> `v0.1.0` 1ª release · `v0.2.0`/`v0.3.0` empaquetado · `v0.3.1` init MariaDB reentrante +
+> deps backend + fuera consola dev · `v0.3.2` ajustes · `v0.3.3` rate-limit 300→6000/min (login
+> e import se bloqueaban) · `v0.3.4` import resiliente + renumerado que no tumba la importación ·
+> **`v0.4.0`** parser de presupuestos tipo Excel (totales en línea) + bloqueo de la app al descargar
+> el update + **login con PIN** en escritorio.
+>
+> ### Principios básicos (SIEMPRE — detalle en `CLAUDE.md`)
+> 1. **¿Lo he VISTO funcionar?** "Compila" y "los tests pasan" NO es "funciona". Ejercitar el
+>    camino real antes de dar algo por bueno; si no se pudo verificar, decírselo a Benjamin.
+> 2. **No asumir:** leer/`grep` antes de tocar (la ruta entera, todos los callers, la columna real).
+> 3. **Pantalla por fichero:** nada de mega-ficheros (el God Object de 44k líneas de Benjagest NO
+>    se repite). Componentes a `components/<feature>/` cuando un `page.tsx` pasa de ~600-800 líneas.
+> 4. **Auto-refresh (dura):** tras crear/editar/borrar, invalidar las queries de React Query.
+> 5. **UI:** no tocar estilos; respetar i18n (`t()`); botón Cancelar/Cerrar; sin emojis en código.
+> 6. **Git:** trabajar en `feat/benjamin`, commits pequeños por slice (español + Co-Authored-By),
+>    merge `--no-ff` a `develop` cuando esté PROBADO. Nunca `--no-verify`/`--amend`/`--force` sobre
+>    lo pusheado. Benjamin decide el QUÉ; Claude propone el CÓMO con opciones.
+>
+> ### PRÓXIMA SESIÓN — empezar por aquí
+> **Estamos en pruebas en producción (Fase 6).** El flujo de cada sesión:
+> 1. Leer esta cabecera + `CLAUDE.md`. Confirmar con Benjamin qué instaló y qué versión corre
+>    (banner "nueva versión" / "Acerca de" en Ajustes muestran la versión).
+> 2. **Probar funciones en la app instalada** y recoger fallos. Diagnóstico rápido con el LOG de
+>    la app: `%APPDATA%\construgest-desktop\logs\construgest.log` (ahí van backend/frontend/
+>    mariadb/ollama y el update). El import de presupuestos, además, muestra el error REAL del
+>    servidor en vez de tragárselo.
+> 3. **Arreglar → verificar → cortar release.** Para probar un arreglo de backend/IA sin reinstalar:
+>    dev con Docker (`docker compose up -d`; tras editar backend `--build backend`) + Ollama del host
+>    (`ollama pull qwen2.5:3b`); frontend `preview_start name=frontend` (:3000). Login:
+>    `admin@construgest.local` / `construgest`. Cuando esté probado: subir `backend`+`frontend`
+>    (+`desktop`) `package.json` a la nueva versión, `desktop/build-msi.ps1 -Version X.Y.Z`, y
+>    `gh release create vX.Y.Z desktop/dist/ConstruGest-X.Y.Z.msi` (repo `susanaybenjamin-boop/construgest`).
+> 4. **Pendientes conocidos** (no bloqueantes): base de precios real de Andalucía (BCCA) en
+>    `backend/data/price-bases/`; tesseract/poppler en el `.msi` de Windows (hoy OCR solo en Docker);
+>    endpoint de import por lotes (hoy el import hace ~cientos de llamadas seguidas); e2e real del PIN
+>    y del bloqueo de update dentro del `.msi` (compilan y typecheck OK, faltan probar instalados).
+>
+> ---
+>
+> ## 🗂️ Detalle histórico hasta 2026-07-14 (referencia)
 >
 > **FASE 0 y FASE 1 COMPLETAS.** Entorno local Docker + MariaDB con esquema y seed.
 > - Repo GitHub **privado** `susanaybenjamin-boop/construgest`. Ramas: trabajo en
@@ -356,9 +440,28 @@ Arquitectura decidida: **nativo sin Docker + ventana Electron**, `.msi` con **Wi
   empaquetan Electron+backend+frontend+database. VERIFICADO: genera
   `desktop/dist/ConstruGest-0.1.0.msi` (304 MB, MSI válido) con el payload correcto. Fix de
   paso: `outputFileTracingRoot` para que el standalone no se anide.
-- `[ ]` **F5-3** colocar binarios nativos en `desktop/runtime/` (MariaDB portable, Ollama+modelo,
-  tesseract/poppler) para un `.msi` 100% autocontenido. Guía en `desktop/runtime/README.md`.
-- `[ ]` Probar el `.msi` instalado en una máquina limpia (instalar + arrancar la ventana).
+- `[~]` **F5-3** binarios nativos en `desktop/runtime/`: MariaDB portable + Ollama COLOCADOS y en el
+  `.msi`. **Falta:** tesseract/poppler para OCR de PDF escaneado en Windows (hoy solo en Docker Linux).
+- `[x]` **F5-6** auto-update real contra GitHub Releases: `services/version.js` + `GET /api/version`
+  (compara `backend/package.json` con la última release, extrae el asset `.msi`), banner
+  `UpdateBanner.tsx` + `versionStore`, e IPC `update:install` en Electron (descarga + `msiexec /i`).
+- `[x]` **UPD-1** (v0.4.0) el update **bloquea la app** con overlay de progreso mientras descarga los
+  ~450 MB (si se cierra la ventana se cortaba la descarga → `.msi` a medias) + descarga atómica
+  `.part`→`.msi` + botón Reintentar.
+- `[x]` **PIN-1** (v0.4.0) login rápido con **PIN** solo en escritorio: bóveda cifrada con
+  `safeStorage` (DPAPI) que guarda credenciales + hash del PIN (scrypt); no toca backend/JWT.
+  `desktop/main.js` (IPC pin:*), `preload.js`, `lib/desktop.ts`, `components/auth/PinGate.tsx`,
+  `login/page.tsx`. Verificado tsc + login web intacta; **e2e real dentro del `.msi` pendiente**.
+
+### `[~]` FASE 6 — PRUEBAS EN PRODUCCIÓN (EN CURSO)
+Instalar el `.msi` y probar función por función en la app real; cada fallo → arreglo → release.
+- `[x]` **IMP-1** (v0.4.0) parser de presupuestos tipo **Excel** (totales al final de línea, códigos
+  con coma `2,1`, sin separadores `___`): `services/budget-parser.js:parseBudgetInlineSummary`.
+  Verificado en ejecución contra el PDF real (P-55 ojijares): 25 partidas, **83.927,60 €** al céntimo.
+- `[x]` Bugs del `.msi` instalado ya cazados: init MariaDB reentrante (v0.3.1), deps del backend
+  (v0.3.1), consola de dev fuera (v0.3.1), rate-limit 300→6000 (v0.3.3), import resiliente (v0.3.4).
+- `[ ]` Recorrer el resto de módulos en la app instalada (obras, certificaciones, gastos, materiales,
+  proveedores, subcontratas, partes, biblioteca, IA por pantalla) y anotar/arreglar lo que falle.
 
 ---
 
@@ -375,6 +478,17 @@ Antes de marcar un slice como hecho:
 ---
 
 ## 🕓 Histórico
+
+### [HIST] 2026-07-15 — Pruebas en producción (Fase 6) + v0.4.0
+- Probando el `.msi` instalado. Fallo del import de un PDF hecho en Excel ("No se pudieron
+  extraer capítulos"): formato con totales en línea y códigos con coma → **parser inline** nuevo
+  (IMP-1), verificado al céntimo contra el PDF real.
+- Auto-update: la descarga de 450 MB se cortaba si se cerraba la ventana → **overlay de bloqueo**
+  + descarga atómica (UPD-1). Login sin recuerdo de credenciales → **PIN local** cifrado con DPAPI
+  (PIN-1).
+- Release **v0.4.0** compilada con WiX y publicada en GitHub con el `.msi` adjunto.
+- Consolidada la cabecera de este backlog como recap "desde cero" + principios + flujo de la fase
+  de pruebas en producción.
 
 ### [HIST] 2026-07-13 — Arranque del proyecto
 - Revisión completa de `construgest-web` (nube: Node + Next + Supabase).
