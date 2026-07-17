@@ -51,7 +51,12 @@
 > **`v0.4.0`** parser de presupuestos tipo Excel (totales en línea) + bloqueo de la app al descargar
 > el update + **login con PIN** en escritorio · **`v0.4.1`** las ventanas internas (visor "Desde
 > Biblioteca"/`/budget-reference`, comparador, vista/impresión PDF) se abren DENTRO de Electron en
-> vez de escaparse al navegador del sistema (`setWindowOpenHandler` distinguía mal interno/externo).
+> vez de escaparse al navegador del sistema (`setWindowOpenHandler` distinguía mal interno/externo) ·
+> **`v0.4.2`** no dejar procesos huérfanos que bloqueen el arranque (WINPROC-1): tras cierre forzado/
+> suspensión, backend/MariaDB/frontend quedaban agarrando sus puertos y al reabrir el backend nuevo
+> chocaba con EADDRINUSE (parecía "sin BD/sin backend", no dejaba entrar). Ahora `freeOwnedPorts()`
+> libera 3308/5000/3000 al arrancar (netstat+taskkill, solo empaquetado/Windows) y `shutdown()` mata
+> el árbol de procesos con `taskkill /T /F`.
 >
 > ### Principios básicos (SIEMPRE — detalle en `CLAUDE.md`)
 > 1. **¿Lo he VISTO funcionar?** "Compila" y "los tests pasan" NO es "funciona". Ejercitar el
