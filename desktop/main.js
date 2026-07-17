@@ -98,6 +98,80 @@ function waitForTcp(port, { timeoutMs = 30000, intervalMs = 500 } = {}) {
   })
 }
 
+/** Espera a que un puerto TCP quede LIBRE (nadie escuchando). */
+function waitForPortFree(port, { timeoutMs = 8000, intervalMs = 300 } = {}) {
+  const start = Date.now()
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      const s = net.connect(port, '127.0.0.1')
+      s.on('connect', () => {
+        s.destroy()
+        if (Date.now() - start > timeoutMs) reject(new Error(`el puerto ${port} sigue ocupado`))
+        else setTimeout(tick, intervalMs)
+      })
+      s.on('error', () => { s.destroy(); resolve(true) })
+    }
+    tick()
+  })
+}
+
+/** ¿Hay algo escuchando ya en este puerto? */
+function portInUse(port) {
+  return new Promise((resolve) => {
+    const s = net.connect(port, '127.0.0.1')
+    s.on('connect', () => { s.destroy(); resolve(true) })
+    s.on('error', () => { s.destroy(); resolve(false) })
+    s.setTimeout(1500, () => { s.destroy(); resolve(false) })
+  })
+}
+
+/**
+ * Windows: mata el árbol de procesos que ESCUCHA en un puerto. Sirve para limpiar
+ * huérfanos de una sesión anterior (backend/MariaDB/frontend que quedaron agarrando
+ * el puerto tras un cierre forzado, una suspensión o un crash: sin esto, el arranque
+ * siguiente choca con EADDRINUSE y la app parece "sin BD/sin backend").
+ */
+function killPortWindows(port) {
+  return new Promise((resolve) => {
+    let out = ''
+    const ns = spawn('netstat', ['-ano', '-p', 'tcp'], { stdio: ['ignore', 'pipe', 'ignore'] })
+    ns.stdout.on('data', (d) => { out += d })
+    ns.on('error', () => resolve(false))
+    ns.on('close', () => {
+      const pids = new Set()
+      for (const line of out.split('\n')) {
+        // "  TCP    127.0.0.1:5000   0.0.0.0:0   LISTENING   21188"
+        const m = line.match(/:(\d+)\s+\S+\s+LISTENING\s+(\d+)/i)
+        if (m && Number(m[1]) === port && m[2] !== '0') pids.add(m[2])
+      }
+      if (!pids.size) return resolve(false)
+      let pending = pids.size
+      for (const pid of pids) {
+        log(`Puerto ${port} ocupado por un proceso huérfano (PID ${pid}) → terminándolo`)
+        const tk = spawn('taskkill', ['/PID', pid, '/T', '/F'], { stdio: 'ignore' })
+        const done = () => { if (--pending === 0) resolve(true) }
+        tk.on('error', done)
+        tk.on('close', done)
+      }
+    })
+  })
+}
+
+/**
+ * Libera los puertos PROPIOS de la app si un huérfano los tiene tomados. Solo en la
+ * app empaquetada de Windows: en dev, MariaDB/Ollama corren fuera (Docker/host) y NO
+ * se deben tocar. No incluye Ollama (:11434): se reutiliza el del host.
+ */
+async function freeOwnedPorts() {
+  if (!app.isPackaged || process.platform !== 'win32') return
+  for (const port of [PORTS.mariadb, PORTS.backend, PORTS.frontend]) {
+    if (await portInUse(port)) {
+      await killPortWindows(port)
+      try { await waitForPortFree(port) } catch (e) { log(e.message) }
+    }
+  }
+}
+
 /** Lanza un comando y espera a que termine con éxito (código 0). */
 function runToEnd(cmd, args, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -304,6 +378,11 @@ async function ensureOllamaModel() {
 
 async function startServices() {
   fs.mkdirSync(paths.storageDir, { recursive: true })
+
+  // Limpia huérfanos de una sesión anterior que hayan quedado agarrando nuestros
+  // puertos (tras un cierre forzado/suspensión): si no, el backend nuevo choca con
+  // EADDRINUSE y la app parece "sin base de datos / sin backend".
+  await freeOwnedPorts()
 
   await startMariaDB()
   startOllama()
@@ -540,7 +619,17 @@ app.whenReady().then(async () => {
 })
 
 function shutdown() {
-  for (const c of children) { try { c.kill() } catch { /* best-effort */ } }
+  for (const c of children) {
+    try {
+      // En Windows, matar el árbol (/T) con /F arrastra los subprocesos y es más
+      // fiable que SIGTERM: evita dejar MariaDB/backend/frontend huérfanos.
+      if (process.platform === 'win32' && c.pid) {
+        spawn('taskkill', ['/PID', String(c.pid), '/T', '/F'], { stdio: 'ignore' })
+      } else {
+        c.kill()
+      }
+    } catch { /* best-effort */ }
+  }
 }
 app.on('window-all-closed', () => { shutdown(); app.quit() })
 app.on('before-quit', shutdown)
