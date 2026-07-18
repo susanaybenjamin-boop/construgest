@@ -10,7 +10,11 @@
 > (patrón `undefined→NULL` del shim, arreglado de raíz), IDOR entre organizaciones (ficheros,
 > gastos, subcontratas/trabajadores/equipos, ajustes, analítica IA), badges/contadores rotos,
 > planos que no dibujaban, certificaciones, partes, materiales, y el cambio de estado desde la
-> lista. 14 commits por área en `feat/benjamin` + bump a **v0.4.3**. `.msi` en build. Regresión OK.
+> lista. 17 commits por área en `feat/benjamin` (pusheados) + bump a **v0.4.3**. `.msi` construido y
+> **release v0.4.3 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.3.msi` adjunto). Regresión OK.
+> **Próximo:** que Benjamin actualice su app instalada (banner de nueva versión) y confirme que sus
+> 10 proyectos reales siguen; luego REL-CLEAN (borrar `desktop/dist/ConstruGest-0.4.1.msi`, conservar
+> 0.4.2 y 0.4.3) y merge `--no-ff` de `feat/benjamin` a `develop`.
 > Nota: los BUGs "restore duplicado", "clobber de backups" y "cambio de estado" que estaban en
 > Pendientes quedan CUBIERTOS por este barrido (estado ya arreglado; restore/clobber siguen
 > pendientes de decidir su rediseño, ver Pendientes).
