@@ -88,13 +88,16 @@ router.put('/:id', async (req, res, next) => {
   try {
     const { unit_price, notes } = req.body
 
+    // Construir el patch SOLO con las claves presentes en el body: si unit_price
+    // no viene, parseFloat(undefined) sería NaN y mysql2 lo serializa como el
+    // identificador `NaN` -> 500 "Unknown column 'NaN'".
+    const patch = { last_updated: new Date().toISOString().split('T')[0] }
+    if (unit_price !== undefined) patch.unit_price = parseFloat(unit_price)
+    if (notes !== undefined) patch.notes = notes || null
+
     const { data, error } = await supabase
       .from('cons_supplier_materials')
-      .update({
-        unit_price: parseFloat(unit_price),
-        notes: notes !== undefined ? (notes || null) : undefined,
-        last_updated: new Date().toISOString().split('T')[0],
-      })
+      .update(patch)
       .eq('id', req.params.id)
       .select('*, material:cons_materials(id, code, name, unit, unit_price, sale_price)')
       .single()
