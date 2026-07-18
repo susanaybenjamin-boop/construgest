@@ -43,8 +43,10 @@ router.get('/:id', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_get_worker', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Worker not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -71,9 +73,11 @@ router.put('/:id', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_update_worker', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
       p_data: req.body,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Worker not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -83,10 +87,12 @@ router.put('/:id', async (req, res, next) => {
 // DELETE /api/workers/:id — Delete worker
 router.delete('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.rpc('rpc_delete_worker', {
+    const { data, error } = await supabase.rpc('rpc_delete_worker', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data || !data.affected) return res.status(404).json({ error: 'Worker not found' })
     res.json({ success: true })
   } catch (err) {
     next(err)

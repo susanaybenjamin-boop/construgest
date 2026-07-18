@@ -43,8 +43,10 @@ router.get('/:id', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_get_equipment', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Equipment not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -71,9 +73,11 @@ router.put('/:id', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_update_equipment', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
       p_data: req.body,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Equipment not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -83,10 +87,12 @@ router.put('/:id', async (req, res, next) => {
 // DELETE /api/equipment-catalog/:id — Delete equipment
 router.delete('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.rpc('rpc_delete_equipment', {
+    const { data, error } = await supabase.rpc('rpc_delete_equipment', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data || !data.affected) return res.status(404).json({ error: 'Equipment not found' })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -95,9 +101,23 @@ router.delete('/:id', async (req, res, next) => {
 
 // ─── Equipment ↔ Supplier Materials (portes, etc.) ───────────────
 
+// Verifica que el equipo pertenece a la org del usuario (evita IDOR al operar
+// materiales de un equipo ajeno conociendo su id). Devuelve true si es propio.
+async function equipmentBelongsToOrg(equipmentId, orgId) {
+  const { data, error } = await supabase.rpc('rpc_get_equipment', {
+    p_id: equipmentId,
+    p_org_id: orgId,
+  })
+  if (error) throw error
+  return !!data
+}
+
 // GET /api/equipment-catalog/:id/materials — Get linked supplier materials for an equipment
 router.get('/:id/materials', async (req, res, next) => {
   try {
+    if (!(await equipmentBelongsToOrg(req.params.id, req.user.organization_id))) {
+      return res.status(404).json({ error: 'Equipment not found' })
+    }
     const { data, error } = await supabase
       .from('cons_equipment_materials')
       .select('*, supplier_material:cons_supplier_materials(*, material:cons_materials(id, code, name, unit, unit_price, sale_price), supplier:cons_suppliers(id, name))')
@@ -113,6 +133,9 @@ router.get('/:id/materials', async (req, res, next) => {
 // POST /api/equipment-catalog/:id/materials — Link a supplier material to equipment
 router.post('/:id/materials', async (req, res, next) => {
   try {
+    if (!(await equipmentBelongsToOrg(req.params.id, req.user.organization_id))) {
+      return res.status(404).json({ error: 'Equipment not found' })
+    }
     const { supplier_material_id, notes } = req.body
     const { data, error } = await supabase
       .from('cons_equipment_materials')
@@ -133,6 +156,9 @@ router.post('/:id/materials', async (req, res, next) => {
 // DELETE /api/equipment-catalog/:id/materials/:linkId — Unlink a supplier material
 router.delete('/:id/materials/:linkId', async (req, res, next) => {
   try {
+    if (!(await equipmentBelongsToOrg(req.params.id, req.user.organization_id))) {
+      return res.status(404).json({ error: 'Equipment not found' })
+    }
     const { error } = await supabase
       .from('cons_equipment_materials')
       .delete()
