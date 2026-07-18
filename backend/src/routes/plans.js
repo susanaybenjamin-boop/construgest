@@ -5,6 +5,23 @@ import supabase from '../db/local.js'
 const router = Router()
 router.use(authMiddleware)
 
+// La columna `data` de cons_plan_annotations es LONGTEXT (JSON) en MariaDB.
+// mysql2 no la parsea y el typeCast del proyecto solo cubre TINY(1)/DECIMAL,
+// asi que llega como string. El frontend consume ann.data.points como objeto,
+// por lo que hay que parsearla ANTES de responder (GET lista, POST, PATCH).
+function parseAnnotation(a) {
+  if (!a) return a
+  if (typeof a.data === 'string') {
+    try {
+      return { ...a, data: JSON.parse(a.data) }
+    } catch {
+      // Si no fuese JSON valido, dejar el valor tal cual.
+      return a
+    }
+  }
+  return a
+}
+
 // GET /api/plans/file/:fileId/annotations
 router.get('/file/:fileId/annotations', async (req, res, next) => {
   try {
@@ -22,7 +39,7 @@ router.get('/file/:fileId/annotations', async (req, res, next) => {
 
     const { data, error } = await query
     if (error) throw error
-    res.json(data)
+    res.json(Array.isArray(data) ? data.map(parseAnnotation) : data)
   } catch (err) {
     next(err)
   }
@@ -40,7 +57,7 @@ router.post('/annotations', async (req, res, next) => {
       .single()
 
     if (error) throw error
-    res.status(201).json(data)
+    res.status(201).json(parseAnnotation(data))
   } catch (err) {
     next(err)
   }
@@ -58,7 +75,7 @@ router.patch('/annotations/:id', async (req, res, next) => {
       .single()
 
     if (error) throw error
-    res.json(data)
+    res.json(parseAnnotation(data))
   } catch (err) {
     next(err)
   }
