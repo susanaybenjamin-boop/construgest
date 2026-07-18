@@ -5,6 +5,63 @@ import supabase from '../db/local.js'
 const router = Router()
 router.use(authMiddleware)
 
+// Estados válidos de una certificación (constraint en BD).
+const ALLOWED_STATUSES = ['draft', 'submitted', 'approved', 'finalized']
+
+// Valida que certificar `newQtyByItem` (budget_item_id -> cantidad) en el
+// presupuesto `budgetId` no supere la cantidad presupuestada, teniendo en cuenta
+// lo ya certificado en OTRAS certificaciones del mismo presupuesto. Las partidas
+// auxiliares (is_auxiliary) se saltan, igual que en PUT /:id/items/:itemId.
+// Devuelve null si todo OK, o un objeto de error 409 si alguna partida se pasa.
+async function checkExceedsBudget(budgetId, newQtyByItem, excludeCertId = null) {
+  const itemIds = Object.keys(newQtyByItem).filter(id => parseFloat(newQtyByItem[id] || 0) > 0)
+  if (itemIds.length === 0) return null
+
+  // Info de las partidas (cantidad presupuestada + flag auxiliar)
+  const { data: bis } = await supabase
+    .from('cons_budget_items')
+    .select('id, quantity, is_auxiliary')
+    .in('id', itemIds)
+  const biMap = Object.fromEntries((bis || []).map(b => [b.id, b]))
+
+  // Cantidades ya certificadas en OTRAS certificaciones del presupuesto
+  const { data: certs } = await supabase
+    .from('cons_certifications')
+    .select('id')
+    .eq('budget_id', budgetId)
+  const otherCertIds = (certs || []).map(c => c.id).filter(id => id !== excludeCertId)
+
+  const otherQtyByItem = {}
+  if (otherCertIds.length > 0) {
+    const { data: otherItems } = await supabase
+      .from('cons_certification_items')
+      .select('budget_item_id, certified_quantity')
+      .in('certification_id', otherCertIds)
+    for (const it of (otherItems || [])) {
+      otherQtyByItem[it.budget_item_id] =
+        (otherQtyByItem[it.budget_item_id] || 0) + parseFloat(it.certified_quantity || 0)
+    }
+  }
+
+  for (const id of itemIds) {
+    const bi = biMap[id]
+    if (!bi || bi.is_auxiliary) continue
+    const budgetQty = parseFloat(bi.quantity || 0)
+    const otherQty = otherQtyByItem[id] || 0
+    const newQty = parseFloat(newQtyByItem[id] || 0)
+    const maxAllowed = budgetQty - otherQty
+    if (newQty > maxAllowed + 1e-6) {
+      return {
+        error: 'exceeds_budget_total',
+        budget_item_id: id,
+        max: maxAllowed,
+        message: `Máximo permitido: ${maxAllowed.toFixed(2)} (presupuesto: ${budgetQty.toFixed(2)}, certificado en otras: ${otherQty.toFixed(2)}).`,
+      }
+    }
+  }
+  return null
+}
+
 // GET /api/certifications/project/:projectId/overview
 // Returns all certifications for a project with amounts and progress
 router.get('/project/:projectId/overview', async (req, res, next) => {
@@ -151,6 +208,18 @@ router.get('/budget/:budgetId', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { budget_id, name, period_start, period_end, notes, items } = req.body
+
+    // Validar que ninguna partida supere lo presupuestado ANTES de crear nada
+    // (misma comprobación que PUT /:id/items/:itemId). Evita dejar una cert huérfana.
+    if (items && items.length > 0) {
+      const newQtyByItem = {}
+      for (const it of items) {
+        newQtyByItem[it.budget_item_id] =
+          (newQtyByItem[it.budget_item_id] || 0) + parseFloat(it.certified_quantity || 0)
+      }
+      const exceed = await checkExceedsBudget(budget_id, newQtyByItem)
+      if (exceed) return res.status(409).json(exceed)
+    }
 
     // Get next certification number
     const { data: existing } = await supabase
@@ -653,6 +722,32 @@ router.put('/:id/status', async (req, res, next) => {
   try {
     const { status, invoice_number } = req.body
 
+    // B3: validar el estado destino ANTES de tocar la BD (si no, el constraint
+    // de MariaDB revienta con un 500 filtrando su nombre interno).
+    if (!ALLOWED_STATUSES.includes(status)) {
+      return res.status(400).json({
+        error: 'invalid_status',
+        message: `Estado no válido: ${status}. Válidos: ${ALLOWED_STATUSES.join(', ')}.`,
+      })
+    }
+
+    // M3: leer el estado actual para validar la transición. Una certificación
+    // finalizada (facturada) es terminal: no puede volver a otro estado, o si no
+    // se podría revertir a 'draft' y borrar una cert ya facturada (el guard de
+    // DELETE solo mira el estado actual).
+    const { data: current, error: curErr } = await supabase
+      .from('cons_certifications')
+      .select('status')
+      .eq('id', req.params.id)
+      .single()
+    if (curErr || !current) return res.status(404).json({ error: 'cert_not_found' })
+    if (current.status === 'finalized' && status !== 'finalized') {
+      return res.status(409).json({
+        error: 'cannot_revert_finalized',
+        message: 'Una certificación finalizada (facturada) no puede volver a otro estado.',
+      })
+    }
+
     const updateData = { status, updated_at: new Date().toISOString() }
     // When finalizing, also store the invoice number and finalized_at date
     if (status === 'finalized') {
@@ -670,56 +765,71 @@ router.put('/:id/status', async (req, res, next) => {
     if (error) throw error
 
     // ─── Auto-update project status when certification is finalized ───
-    if (status === 'finalized' && data.project_id) {
+    // cons_certifications NO tiene project_id: se deriva desde el presupuesto.
+    if (status === 'finalized' && data.budget_id) {
       try {
-        // Get budget total for this project
-        const { data: budgetRows } = await supabase
+        // Derivar el proyecto desde el presupuesto de la certificación
+        const { data: budgetRow } = await supabase
           .from('cons_budgets')
-          .select('id')
-          .eq('project_id', data.project_id)
-          .limit(1)
-        const budgetId = budgetRows?.[0]?.id
+          .select('project_id')
+          .eq('id', data.budget_id)
+          .single()
+        const projectId = budgetRow?.project_id
 
-        if (budgetId) {
-          // Get all budget items total
-          const { data: budgetItems } = await supabase
-            .from('cons_budget_items')
-            .select('quantity, unit_price')
-            .eq('budget_id', budgetId)
-          const budgetTotal = (budgetItems || []).reduce((s, i) => s + (i.quantity || 0) * (i.unit_price || 0), 0)
-
-          // Get all finalized certifications for this project
-          const { data: finalizedCerts } = await supabase
-            .from('cons_certifications')
+        if (projectId) {
+          // Todos los presupuestos del proyecto
+          const { data: projBudgets } = await supabase
+            .from('cons_budgets')
             .select('id')
-            .eq('project_id', data.project_id)
-            .eq('status', 'finalized')
-          const finalizedIds = (finalizedCerts || []).map(c => c.id)
+            .eq('project_id', projectId)
+          const budgetIds = (projBudgets || []).map(b => b.id)
 
-          if (finalizedIds.length > 0 && budgetTotal > 0) {
-            // Sum all certified amounts from finalized certifications
-            const { data: certItems } = await supabase
-              .from('cons_certification_items')
-              .select('certified_quantity, item_id')
-              .in('certification_id', finalizedIds)
+          if (budgetIds.length > 0) {
+            // Total presupuestado (solo capítulos y partidas activas), como en el resto del fichero
+            let budgetTotal = 0
+            const { data: activeChapters } = await supabase
+              .from('cons_chapters')
+              .select('id')
+              .in('budget_id', budgetIds)
+              .eq('is_active', true)
+            const activeChapterIds = (activeChapters || []).map(c => c.id)
+            if (activeChapterIds.length > 0) {
+              const { data: budgetItems } = await supabase
+                .from('cons_budget_items')
+                .select('quantity, unit_price')
+                .in('chapter_id', activeChapterIds)
+                .eq('is_active', true)
+              budgetTotal = (budgetItems || []).reduce(
+                (s, i) => s + (i.quantity || 0) * (i.unit_price || 0), 0
+              )
+            }
 
-            // Get unit prices for certified items
-            const itemIds = [...new Set((certItems || []).map(ci => ci.item_id).filter(Boolean))]
-            const { data: items } = await supabase
-              .from('cons_budget_items')
-              .select('id, unit_price')
-              .in('id', itemIds)
-            const priceMap = Object.fromEntries((items || []).map(i => [i.id, i.unit_price || 0]))
+            // Certificaciones finalizadas de estos presupuestos
+            const { data: finalizedCerts } = await supabase
+              .from('cons_certifications')
+              .select('id')
+              .in('budget_id', budgetIds)
+              .eq('status', 'finalized')
+            const finalizedIds = (finalizedCerts || []).map(c => c.id)
 
-            const totalCertified = (certItems || []).reduce((s, ci) => s + (ci.certified_quantity || 0) * (priceMap[ci.item_id] || 0), 0)
-            const progressPct = (totalCertified / budgetTotal) * 100
+            if (finalizedIds.length > 0 && budgetTotal > 0) {
+              // Sumar directamente la columna certified_amount (ya es qty × unit_price)
+              const { data: certItems } = await supabase
+                .from('cons_certification_items')
+                .select('certified_amount')
+                .in('certification_id', finalizedIds)
+              const totalCertified = (certItems || []).reduce(
+                (s, ci) => s + parseFloat(ci.certified_amount || 0), 0
+              )
+              const progressPct = (totalCertified / budgetTotal) * 100
 
-            // If >= 99.5% certified, mark project as completed
-            if (progressPct >= 99.5) {
-              await supabase
-                .from('cons_projects')
-                .update({ status: 'completed', updated_at: new Date().toISOString() })
-                .eq('id', data.project_id)
+              // If >= 99.5% certified, mark project as completed
+              if (progressPct >= 99.5) {
+                await supabase
+                  .from('cons_projects')
+                  .update({ status: 'completed', updated_at: new Date().toISOString() })
+                  .eq('id', projectId)
+              }
             }
           }
         }
@@ -859,6 +969,10 @@ router.post('/from-work-logs', async (req, res, next) => {
     for (const s of cleanSelections) {
       itemTotals[s.budget_item_id] = (itemTotals[s.budget_item_id] || 0) + s.consumed_quantity
     }
+
+    // Validar que ninguna partida supere lo presupuestado antes de crear la cert
+    const exceed = await checkExceedsBudget(budget_id, itemTotals)
+    if (exceed) return res.status(409).json(exceed)
 
     // Next certification number
     const { data: existing } = await supabase
