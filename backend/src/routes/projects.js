@@ -244,18 +244,22 @@ router.get('/:id', projectAccessMiddleware, async (req, res, next) => {
 })
 
 // PUT /api/projects/:id - Update project
-router.put('/:id', projectAccessMiddleware, async (req, res, next) => {
+router.put('/:id', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
-    const { name, description, location, client_name, client_contact, address, city, province, postal_code, country, start_date, end_date, status, folder_path } = req.body
+    // Solo actualizar los campos que llegan en el body. Antes se reconstruía el
+    // objeto entero y el shim convertía los `undefined` en NULL: al cambiar solo
+    // el estado desde la lista (se manda { status }) hacía SET name=NULL sobre una
+    // columna NOT NULL y fallaba ("Error al cambiar el estado").
+    const editable = ['name', 'description', 'location', 'client_name', 'client_contact', 'address', 'city', 'province', 'postal_code', 'country', 'start_date', 'end_date', 'status', 'folder_path']
+    const updates = { updated_at: new Date().toISOString() }
+    for (const f of editable) {
+      if (req.body[f] === undefined) continue
+      updates[f] = (f === 'start_date' || f === 'end_date') ? (req.body[f] || null) : req.body[f]
+    }
 
     const { data, error } = await supabase
       .from('cons_projects')
-      .update({
-        name, description, location, client_name, client_contact,
-        address, city, province, postal_code, country,
-        start_date: start_date || null, end_date: end_date || null,
-        status, folder_path, updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq('id', req.params.id)
       .select()
       .single()
@@ -270,7 +274,7 @@ router.put('/:id', projectAccessMiddleware, async (req, res, next) => {
 
 // DELETE /api/projects/:id - Soft delete (mover a papelera).
 // Para eliminación definitiva usar DELETE /:id/permanent.
-router.delete('/:id', projectAccessMiddleware, async (req, res, next) => {
+router.delete('/:id', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     if (req.userRole !== 'owner') {
       return res.status(403).json({ error: 'Solo el propietario puede eliminar proyectos' })
@@ -314,7 +318,7 @@ router.post('/:id/restore', async (req, res, next) => {
 })
 
 // DELETE /api/projects/:id/permanent - Eliminación definitiva (solo owner)
-router.delete('/:id/permanent', projectAccessMiddleware, async (req, res, next) => {
+router.delete('/:id/permanent', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     if (req.userRole !== 'owner') {
       return res.status(403).json({ error: 'Solo el propietario puede eliminar definitivamente' })
@@ -332,7 +336,7 @@ router.delete('/:id/permanent', projectAccessMiddleware, async (req, res, next) 
 })
 
 // POST /api/projects/:id/files - Upload file
-router.post('/:id/files', projectAccessMiddleware, upload.single('file'), async (req, res, next) => {
+router.post('/:id/files', projectAccessMiddleware({ requireWrite: true }), upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se ha proporcionado ningún archivo' })
@@ -439,6 +443,7 @@ router.get('/:id/files/:fileId/dxf-data', projectAccessMiddleware, async (req, r
       .from('cons_project_files')
       .select('dxf_svg_path, dxf_entities, dxf_layers, dxf_bounding_box')
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .single()
 
     if (error) throw error
@@ -471,6 +476,7 @@ router.get('/:id/files/:fileId/dxf-text', projectAccessMiddleware, async (req, r
       .from('cons_project_files')
       .select('dxf_entities, dxf_layers')
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .single()
 
     if (error) throw error
@@ -486,7 +492,7 @@ router.get('/:id/files/:fileId/dxf-text', projectAccessMiddleware, async (req, r
 })
 
 // POST /api/projects/:id/files/multi-dwg — Upload multiple DWG/DXF files as pages of a single plan
-router.post('/:id/files/multi-dwg', projectAccessMiddleware, upload.array('files', 50), async (req, res, next) => {
+router.post('/:id/files/multi-dwg', projectAccessMiddleware({ requireWrite: true }), upload.array('files', 50), async (req, res, next) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: 'No se han proporcionado archivos' })
@@ -612,6 +618,7 @@ router.get('/:id/files/:fileId/pages', projectAccessMiddleware, async (req, res,
       .from('cons_project_files')
       .select('*')
       .eq('parent_file_id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .order('page_order', { ascending: true })
 
     if (error) throw error
@@ -622,7 +629,7 @@ router.get('/:id/files/:fileId/pages', projectAccessMiddleware, async (req, res,
 })
 
 // PUT /api/projects/:id/files/:fileId/reorder — Reorder pages of a multi-DWG file
-router.put('/:id/files/:fileId/reorder', projectAccessMiddleware, async (req, res, next) => {
+router.put('/:id/files/:fileId/reorder', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     const { pageOrder } = req.body // Array of child file IDs in desired order
 
@@ -637,6 +644,7 @@ router.put('/:id/files/:fileId/reorder', projectAccessMiddleware, async (req, re
         .update({ page_order: i })
         .eq('id', pageOrder[i])
         .eq('parent_file_id', req.params.fileId)
+        .eq('project_id', req.params.id)
 
       if (error) console.warn(`[reorder] Error updating page ${pageOrder[i]}:`, error.message)
     }
@@ -654,9 +662,10 @@ router.get('/:id/files/:fileId/url', projectAccessMiddleware, async (req, res, n
       .from('cons_project_files')
       .select('storage_path')
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .single()
 
-    if (error) throw error
+    if (error || !file) return res.status(404).json({ error: 'Archivo no encontrado' })
 
     const { data: signedUrl, error: urlError } = await supabase.storage
       .from('construgest-files')
@@ -750,7 +759,7 @@ router.get('/:id/files', projectAccessMiddleware, async (req, res, next) => {
 })
 
 // PUT /api/projects/:id/files/:fileId/replace - Replace file content (e.g. after page deletion)
-router.put('/:id/files/:fileId/replace', projectAccessMiddleware, upload.single('file'), async (req, res, next) => {
+router.put('/:id/files/:fileId/replace', projectAccessMiddleware({ requireWrite: true }), upload.single('file'), async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No se ha proporcionado ningún archivo' })
@@ -761,9 +770,10 @@ router.put('/:id/files/:fileId/replace', projectAccessMiddleware, upload.single(
       .from('cons_project_files')
       .select('storage_path')
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .single()
 
-    if (fetchError) throw fetchError
+    if (fetchError || !existing) return res.status(404).json({ error: 'Archivo no encontrado' })
 
     // Overwrite in Supabase Storage
     const { error: uploadError } = await supabase.storage
@@ -780,6 +790,7 @@ router.put('/:id/files/:fileId/replace', projectAccessMiddleware, upload.single(
       .from('cons_project_files')
       .update({ file_size: req.file.size })
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .select()
       .single()
 
@@ -791,13 +802,14 @@ router.put('/:id/files/:fileId/replace', projectAccessMiddleware, upload.single(
 })
 
 // DELETE /api/projects/:id/files/:fileId
-router.delete('/:id/files/:fileId', projectAccessMiddleware, async (req, res, next) => {
+router.delete('/:id/files/:fileId', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     // Get file path first
     const { data: file } = await supabase
       .from('cons_project_files')
       .select('storage_path')
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
       .single()
 
     // Delete from storage
@@ -810,6 +822,7 @@ router.delete('/:id/files/:fileId', projectAccessMiddleware, async (req, res, ne
       .from('cons_project_files')
       .delete()
       .eq('id', req.params.fileId)
+      .eq('project_id', req.params.id)
 
     if (error) throw error
     res.json({ success: true })
@@ -819,7 +832,7 @@ router.delete('/:id/files/:fileId', projectAccessMiddleware, async (req, res, ne
 })
 
 // POST /api/projects/:id/backup - Export full project backup to folder_path
-router.post('/:id/backup', projectAccessMiddleware, async (req, res, next) => {
+router.post('/:id/backup', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     const projectId = req.params.id
 
@@ -964,7 +977,7 @@ router.post('/:id/backup', projectAccessMiddleware, async (req, res, next) => {
 })
 
 // POST /api/projects/:id/restore - Restore project data from backup folder
-router.post('/:id/restore', projectAccessMiddleware, async (req, res, next) => {
+router.post('/:id/restore', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     const projectId = req.params.id
 
@@ -1114,7 +1127,7 @@ router.post('/:id/restore', projectAccessMiddleware, async (req, res, next) => {
 })
 
 // POST /api/projects/:id/sync-data - Sync project data JSON to local disk
-router.post('/:id/sync-data', projectAccessMiddleware, async (req, res, next) => {
+router.post('/:id/sync-data', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     const { folder_path, filename, data } = req.body
     if (!folder_path || !filename || data === undefined) {
@@ -1133,7 +1146,7 @@ router.post('/:id/sync-data', projectAccessMiddleware, async (req, res, next) =>
 })
 
 // POST /api/projects/:id/sync-file - Sync a file to local disk
-router.post('/:id/sync-file', projectAccessMiddleware, upload.single('file'), async (req, res, next) => {
+router.post('/:id/sync-file', projectAccessMiddleware({ requireWrite: true }), upload.single('file'), async (req, res, next) => {
   try {
     const folderPath = req.body.folder_path
     const fileName = req.body.file_name
