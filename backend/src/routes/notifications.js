@@ -25,14 +25,14 @@ router.get('/', async (req, res, next) => {
 // GET /api/notifications/unread-count
 router.get('/unread-count', async (req, res, next) => {
   try {
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('cons_notifications')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .eq('user_id', req.user.id)
       .eq('read', false)
 
     if (error) throw error
-    res.json({ count: count || 0 })
+    res.json({ count: (data || []).length })
   } catch (err) {
     next(err)
   }
