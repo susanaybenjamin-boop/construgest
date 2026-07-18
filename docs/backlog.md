@@ -2,7 +2,20 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-07-18
 >
-> ### Último (2026-07-18): DATOS REALES importados a la app instalada
+> ### Último (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
+> Barrido multi-agente de TODO Construgest (41 agentes, estático + dinámico con curl real).
+> **27 bugs confirmados (0 falsos positivos), los 27 ARREGLADOS y verificados en ejecución**
+> contra la BD demo (backend dev nativo `node --watch`). Detalle y checklist en
+> [`docs/qa-v0.4.3-findings.md`](qa-v0.4.3-findings.md). Categorías: corrupción de datos
+> (patrón `undefined→NULL` del shim, arreglado de raíz), IDOR entre organizaciones (ficheros,
+> gastos, subcontratas/trabajadores/equipos, ajustes, analítica IA), badges/contadores rotos,
+> planos que no dibujaban, certificaciones, partes, materiales, y el cambio de estado desde la
+> lista. 14 commits por área en `feat/benjamin` + bump a **v0.4.3**. `.msi` en build. Regresión OK.
+> Nota: los BUGs "restore duplicado", "clobber de backups" y "cambio de estado" que estaban en
+> Pendientes quedan CUBIERTOS por este barrido (estado ya arreglado; restore/clobber siguen
+> pendientes de decidir su rediseño, ver Pendientes).
+>
+> ### Anterior (2026-07-18): DATOS REALES importados a la app instalada
 > Migrados los **10 proyectos reales** de la web (backups `_backup/` en
 > `C:\Users\benja\Documents\CONSTRUGEST-DESKTOP`) a la MariaDB de la app instalada
 > (`%APPDATA%\construgest-desktop\data`), dentro de la organización real de Benjamin
@@ -67,7 +80,10 @@
 > suspensión, backend/MariaDB/frontend quedaban agarrando sus puertos y al reabrir el backend nuevo
 > chocaba con EADDRINUSE (parecía "sin BD/sin backend", no dejaba entrar). Ahora `freeOwnedPorts()`
 > libera 3308/5000/3000 al arrancar (netstat+taskkill, solo empaquetado/Windows) y `shutdown()` mata
-> el árbol de procesos con `taskkill /T /F`.
+> el árbol de procesos con `taskkill /T /F`. · **`v0.4.3`** barrido de QA pre-release: **27 bugs**
+> arreglados (corrupción de datos por `undefined→NULL` del shim, IDOR entre organizaciones, badges/
+> contadores, planos, certificaciones, partes, materiales, cambio de estado desde la lista). Ver
+> [`docs/qa-v0.4.3-findings.md`](qa-v0.4.3-findings.md).
 >
 > ### Para la próxima RELEASE (v0.4.3) — arreglo ya en código, falta empaquetar
 > - **BUG cambio de estado desde la LISTA** (arreglado en `feat/benjamin`, sin commitear/publicar):
