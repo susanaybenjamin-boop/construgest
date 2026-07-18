@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { authMiddleware } from '../middlewares/auth.js'
+import { authMiddleware, resolveProjectAccess } from '../middlewares/auth.js'
 import supabase from '../db/local.js'
 import { callAI } from '../services/ai-service.js'
 import { extractMaterials } from '../services/extraction.js'
@@ -293,6 +293,11 @@ router.post('/analyze-certifications', async (req, res, next) => {
     const projectId = req.body?.project_id
     if (!projectId) return res.status(400).json({ error: 'Se requiere project_id' })
 
+    // A4: mismo agujero que analyze-expenses — validar acceso antes de leer las
+    // certificaciones/presupuestos del proyecto.
+    const access = await resolveProjectAccess(req.user.id, req.user.organization_id, projectId)
+    if (!access) return res.status(403).json({ error: 'No tienes acceso a este proyecto' })
+
     const { data: budgets } = await supabase
       .from('cons_budgets').select('id').eq('project_id', projectId)
     const budgetIds = (budgets || []).map((b) => b.id)
@@ -365,6 +370,11 @@ router.post('/analyze-expenses', async (req, res, next) => {
   try {
     const projectId = req.body?.project_id
     if (!projectId) return res.status(400).json({ error: 'Se requiere project_id' })
+
+    // A4: validar acceso al proyecto ANTES de leer sus gastos/presupuesto. Sin
+    // esto se filtraba analítica de gastos de proyectos de OTRAS organizaciones.
+    const access = await resolveProjectAccess(req.user.id, req.user.organization_id, projectId)
+    if (!access) return res.status(403).json({ error: 'No tienes acceso a este proyecto' })
 
     // Gastos del proyecto.
     const { data: expenses, error: expErr } = await supabase

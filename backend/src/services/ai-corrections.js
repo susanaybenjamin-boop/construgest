@@ -19,14 +19,22 @@ export const CORRECTION_SKILLS = new Set(['extract-materials', 'parse-budget'])
 /** Guarda una corrección del usuario. `corrected` es obligatorio (lo que quedó bien). */
 export async function recordCorrection({ orgId, skill, context, wrong, corrected }) {
   if (!orgId || !skill || corrected == null) return null
+  // Las columnas `wrong` y `corrected` son JSON NOT NULL. El shim (normVal en
+  // db/local.js) solo serializa OBJETOS a JSON; un escalar de texto plano
+  // ("cemento gris 25kg") pasaría crudo y MariaDB lo rechaza (json_valid).
+  // Por eso envolvemos aquí los escalares (string) con JSON.stringify, dejando
+  // los objetos intactos para que normVal los serialice una sola vez (sin
+  // doble-serializar). Un número ya es JSON válido, pero lo tratamos igual por
+  // consistencia.
+  const toJson = (v) => (v == null ? null : (typeof v === 'object' ? v : JSON.stringify(v)))
   const { data, error } = await supabase
     .from('cons_ai_corrections')
     .insert({
       organization_id: orgId,
       skill,
       context: context != null ? String(context).slice(0, 2000) : null,
-      wrong: wrong != null ? wrong : null,
-      corrected,
+      wrong: toJson(wrong),
+      corrected: toJson(corrected),
     })
     .select()
     .single()
