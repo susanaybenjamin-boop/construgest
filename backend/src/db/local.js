@@ -38,6 +38,63 @@ function normVal(v) {
 
 const OP_MAP = { eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=', like: 'LIKE', ilike: 'LIKE' }
 
+// ---- Parser de expresiones PostgREST para .or(...) ----
+// Soporta: átomos `col.op.value`, `col.is.null`, `col.not.is.null`, `col.not.op.value`;
+// grupos anidados `and(...)` / `or(...)`; y valores entrecomillados con comas dentro.
+// Trocea por `sep` de nivel superior respetando paréntesis y comillas dobles.
+function splitTopLevel(str, sep) {
+  const out = []; let depth = 0, inq = false, cur = ''
+  for (const ch of str) {
+    if (ch === '"') { inq = !inq; cur += ch; continue }
+    if (!inq) {
+      if (ch === '(') depth++
+      else if (ch === ')') depth--
+      else if (ch === sep && depth === 0) { out.push(cur); cur = ''; continue }
+    }
+    cur += ch
+  }
+  if (cur.length) out.push(cur)
+  return out
+}
+
+function parseOrAtom(term) {
+  const i1 = term.indexOf('.')
+  if (i1 < 0) return null
+  const col = term.slice(0, i1)
+  let rest = term.slice(i1 + 1)
+  let not = false
+  if (rest.startsWith('not.')) { not = true; rest = rest.slice(4) }
+  const i2 = rest.indexOf('.')
+  const op = i2 < 0 ? rest : rest.slice(0, i2)
+  let val = i2 < 0 ? undefined : rest.slice(i2 + 1)
+  if (op === 'is') {
+    if (val === 'null') return { frag: `${qi(col)} IS ${not ? 'NOT ' : ''}NULL`, params: [] }
+    if (val === 'true' || val === 'false') return { frag: `${qi(col)} IS ${not ? 'NOT ' : ''}${val.toUpperCase()}`, params: [] }
+  }
+  if (val === undefined) return null
+  if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1)
+  const sqlop = OP_MAP[op] || '='
+  return { frag: not ? `NOT (${qi(col)} ${sqlop} ?)` : `${qi(col)} ${sqlop} ?`, params: [normVal(val)] }
+}
+
+function parseOrExpr(str, joiner = 'OR') {
+  const frags = []; const params = []
+  for (const raw of splitTopLevel(str, ',')) {
+    const term = raw.trim()
+    if (!term) continue
+    const g = /^(and|or)\(([\s\S]*)\)$/i.exec(term)
+    if (g) {
+      const sub = parseOrExpr(g[2], g[1].toLowerCase() === 'and' ? 'AND' : 'OR')
+      if (sub.frag) { frags.push(sub.frag); params.push(...sub.params) }
+      continue
+    }
+    const atom = parseOrAtom(term)
+    if (atom) { frags.push(atom.frag); params.push(...atom.params) }
+  }
+  if (!frags.length) return { frag: '', params: [] }
+  return { frag: '(' + frags.join(` ${joiner} `) + ')', params }
+}
+
 // Entrecomilla la lista de columnas de un SELECT plano (sin anidados). Necesario
 // porque hay columnas con nombre reservado (key, value, order, read, date...).
 // Soporta "*", "a, b", y el renombrado de Supabase "nuevo:original".
@@ -145,20 +202,8 @@ class Builder {
 
   // Supabase .or('col.op.value,col.op.value') -> (col OP ? OR col OP ?)
   or(str) {
-    const frags = []
-    const params = []
-    for (const term of str.split(',').map((t) => t.trim()).filter(Boolean)) {
-      const i1 = term.indexOf('.')
-      const i2 = term.indexOf('.', i1 + 1)
-      if (i1 < 0 || i2 < 0) continue
-      const col = term.slice(0, i1)
-      const op = term.slice(i1 + 1, i2)
-      let val = term.slice(i2 + 1)
-      if (val.length >= 2 && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1)
-      frags.push(`${qi(col)} ${OP_MAP[op] || '='} ?`)
-      params.push(normVal(val))
-    }
-    if (frags.length) this.orClauses.push({ frag: '(' + frags.join(' OR ') + ')', params })
+    const parsed = parseOrExpr(str, 'OR')
+    if (parsed.frag) this.orClauses.push(parsed)
     return this
   }
 
@@ -215,7 +260,7 @@ class Builder {
         sql += ` RETURNING ${selectCols(this.cols)}`
       }
     } else if (this.op === 'update') {
-      const keys = Object.keys(this.values)
+      const keys = Object.keys(this.values).filter((k) => this.values[k] !== undefined)
       sql = `UPDATE ${qi(this.table)} SET ` + keys.map((k) => `${qi(k)} = ?`).join(', ')
       keys.forEach((k) => params.push(normVal(this.values[k])))
       sql += this._where(params)
@@ -276,7 +321,7 @@ class Builder {
       ;[rows] = await pool.query(sql, params)
     } else if (this.op === 'update') {
       const params = []
-      const keys = Object.keys(this.values)
+      const keys = Object.keys(this.values).filter((k) => this.values[k] !== undefined)
       let sql = `UPDATE ${qi(this.table)} SET ` + keys.map((k) => `${qi(k)} = ?`).join(', ')
       keys.forEach((k) => params.push(normVal(this.values[k])))
       sql += this._where(params)

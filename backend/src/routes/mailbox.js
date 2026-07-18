@@ -81,16 +81,16 @@ router.get('/search-users', async (req, res, next) => {
 // GET /api/mailbox/unread-count
 router.get('/unread-count', async (req, res, next) => {
   try {
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('cons_mailbox_messages')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .eq('to_user_id', req.user.id)
       .eq('read', false)
       .is('deleted_at_to', null)
       .is('purged_at_to', null)
 
     if (error) throw error
-    res.json({ count: count || 0 })
+    res.json({ count: (data || []).length })
   } catch (err) {
     next(err)
   }
@@ -519,13 +519,35 @@ router.get('/:id', async (req, res, next) => {
         .eq('id', message.id)
       message.read = true
 
-      // Marcar notificación vinculada como leída
-      await supabase
+      // Marcar notificación vinculada como leída.
+      // El shim no traduce el accessor JSON de Postgres (data->>message_id), así que
+      // traemos las notificaciones de buzón no leídas y filtramos en JS por message_id.
+      const { data: msgNotifs, error: notifErr } = await supabase
         .from('cons_notifications')
-        .update({ read: true })
+        .select('id, data')
         .eq('user_id', req.user.id)
         .eq('type', 'mailbox_message')
-        .eq('data->>message_id', message.id)
+        .eq('read', false)
+
+      if (notifErr) throw notifErr
+
+      const linkedIds = (msgNotifs || [])
+        .filter(n => {
+          let d = n.data
+          if (typeof d === 'string') {
+            try { d = JSON.parse(d) } catch { return false }
+          }
+          return d && d.message_id === message.id
+        })
+        .map(n => n.id)
+
+      if (linkedIds.length > 0) {
+        const { error: updErr } = await supabase
+          .from('cons_notifications')
+          .update({ read: true })
+          .in('id', linkedIds)
+        if (updErr) throw updErr
+      }
     }
 
     const userIds = [message.from_user_id, message.to_user_id]

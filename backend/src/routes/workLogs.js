@@ -128,12 +128,84 @@ router.put('/:id', async (req, res, next) => {
 })
 
 // DELETE /api/work-logs/:id — Delete work log (cascades to children)
+// The direct FK cons_certification_work_log_links.work_log_id is RESTRICT, so a
+// raw delete of a certified log aborts with a 500. Mirror the sibling
+// DELETE /budget-links/:linkId behaviour keyed by work_log_id:
+//   · Any non-draft cert consuming this log → 409 (locked).
+//   · Only drafts consume → discount their cert_items (deleting empty ones),
+//     delete the cert_links first (so the RESTRICT FK no longer blocks), then delete the log.
+//   · Nothing consumes → just delete.
 router.delete('/:id', async (req, res, next) => {
   try {
+    const workLogId = req.params.id
+
+    const { data: certLinks } = await supabase
+      .from('cons_certification_work_log_links')
+      .select('id, certification_id, certification_item_id, consumed_quantity')
+      .eq('work_log_id', workLogId)
+
+    if (certLinks && certLinks.length > 0) {
+      const certIds = [...new Set(certLinks.map(cl => cl.certification_id))]
+      const { data: certs } = await supabase
+        .from('cons_certifications')
+        .select('id, status')
+        .in('id', certIds)
+      const hasNonDraft = (certs || []).some(c => c.status !== 'draft')
+      if (hasNonDraft) {
+        return res.status(409).json({
+          error: 'link_locked_by_non_draft_cert',
+          message: 'Este parte está vinculado a una certificación aprobada/finalizada y no puede eliminarse.',
+        })
+      }
+
+      // Only drafts → discount their cert_items
+      const certItemIds = [...new Set(certLinks.map(cl => cl.certification_item_id))]
+      const { data: certItems } = await supabase
+        .from('cons_certification_items')
+        .select('id, certified_quantity, budget_item_id')
+        .in('id', certItemIds)
+      const certItemMap = Object.fromEntries((certItems || []).map(ci => [ci.id, ci]))
+      const biIds = [...new Set((certItems || []).map(ci => ci.budget_item_id))]
+      const { data: bis } = await supabase
+        .from('cons_budget_items')
+        .select('id, unit_price')
+        .in('id', biIds)
+      const biMap = Object.fromEntries((bis || []).map(b => [b.id, parseFloat(b.unit_price || 0)]))
+
+      const certItemDeltas = {}
+      for (const cl of certLinks) {
+        certItemDeltas[cl.certification_item_id] =
+          (certItemDeltas[cl.certification_item_id] || 0) + parseFloat(cl.consumed_quantity || 0)
+      }
+
+      // Delete all cert_links for this work_log_id first (clears the RESTRICT FK)
+      await supabase.from('cons_certification_work_log_links')
+        .delete()
+        .eq('work_log_id', workLogId)
+
+      // Reduce / delete cert_items
+      for (const [ciId, delta] of Object.entries(certItemDeltas)) {
+        const ci = certItemMap[ciId]
+        if (!ci) continue
+        const newCertQty = parseFloat(ci.certified_quantity || 0) - delta
+        const unitPrice = biMap[ci.budget_item_id] || 0
+        if (newCertQty <= 1e-6) {
+          await supabase.from('cons_certification_items').delete().eq('id', ciId)
+        } else {
+          await supabase.from('cons_certification_items')
+            .update({
+              certified_quantity: newCertQty,
+              certified_amount: newCertQty * unitPrice,
+            })
+            .eq('id', ciId)
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('cons_work_logs')
       .delete()
-      .eq('id', req.params.id)
+      .eq('id', workLogId)
 
     if (error) throw error
     res.json({ success: true })

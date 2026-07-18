@@ -3,7 +3,7 @@ import supabase from '../db/local.js'
 
 const JWT_SECRET = process.env.JWT_SECRET
 
-export function authMiddleware(req, res, next) {
+export async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token no proporcionado' })
@@ -11,20 +11,35 @@ export function authMiddleware(req, res, next) {
 
   const token = authHeader.split(' ')[1]
 
+  let decoded
   try {
-    const decoded = jwt.verify(token, JWT_SECRET)
-    req.user = decoded
-
-    // Sliding expiration: renew token on every authenticated request
-    // Only include the user payload, not jwt metadata (iat, exp)
-    const { iat, exp, ...payload } = decoded
-    const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' })
-    res.setHeader('X-Renewed-Token', newToken)
-
-    next()
+    decoded = jwt.verify(token, JWT_SECRET)
   } catch (err) {
     return res.status(401).json({ error: 'Token inválido o expirado' })
   }
+
+  // Revalidar que el usuario sigue activo en cada petición. El JWT no se puede
+  // revocar por sí solo (y la expiración deslizante lo renueva indefinidamente),
+  // así que desactivar un usuario debe cortarle el acceso en la siguiente llamada.
+  try {
+    const { data: user } = await supabase
+      .from('cons_users').select('is_active').eq('id', decoded.id).single()
+    if (!user || user.is_active === false) {
+      return res.status(401).json({ error: 'Sesión no válida' })
+    }
+  } catch (err) {
+    return next(err)
+  }
+
+  req.user = decoded
+
+  // Sliding expiration: renew token on every authenticated request.
+  // Only include the user payload, not jwt metadata (iat, exp).
+  const { iat, exp, ...payload } = decoded
+  const newToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' })
+  res.setHeader('X-Renewed-Token', newToken)
+
+  next()
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -95,23 +110,42 @@ export async function resolveProjectAccess(userId, userOrgId, projectId) {
   return null
 }
 
-export async function projectAccessMiddleware(req, res, next) {
-  const projectId = req.params.projectId || req.params.id
-  const userId = req.user.id
-  const userOrgId = req.user.organization_id
+// Compatible con dos usos:
+//   projectAccessMiddleware                       -> middleware directo (solo lectura)
+//   projectAccessMiddleware({ requireWrite: true }) -> factory que devuelve el middleware
+// Así las rutas de escritura pueden exigir permiso de edición (rechazar
+// branch_viewer / mailbox_guest) sin romper las rutas de lectura existentes.
+function makeProjectAccess(options = {}) {
+  const { requireWrite = false } = options
+  return async (req, res, next) => {
+    const projectId = req.params.projectId || req.params.id
+    const userId = req.user.id
+    const userOrgId = req.user.organization_id
 
-  if (!projectId) return next()
+    if (!projectId) return next()
 
-  const access = await resolveProjectAccess(userId, userOrgId, projectId)
-  if (!access) {
-    return res.status(403).json({ error: 'No tienes acceso a este proyecto' })
+    const access = await resolveProjectAccess(userId, userOrgId, projectId)
+    if (!access) {
+      return res.status(403).json({ error: 'No tienes acceso a este proyecto' })
+    }
+
+    if (requireWrite && (access.role === 'branch_viewer' || access.role === 'mailbox_guest')) {
+      return res.status(403).json({ error: 'Acceso de solo lectura' })
+    }
+
+    req.project = access.project
+    req.userRole = access.role
+    req.mailboxSharedKinds = access.sharedKinds
+    req.mailboxSharedRefs = access.sharedRefs
+    next()
   }
+}
 
-  req.project = access.project
-  req.userRole = access.role
-  req.mailboxSharedKinds = access.sharedKinds
-  req.mailboxSharedRefs = access.sharedRefs
-  next()
+export function projectAccessMiddleware(a, b, c) {
+  // Llamado por Express como middleware directo: (req, res, next)
+  if (a && b && typeof c === 'function') return makeProjectAccess({})(a, b, c)
+  // Llamado como factory: ({ requireWrite })
+  return makeProjectAccess(a || {})
 }
 
 // ────────────────────────────────────────────────────────────────────

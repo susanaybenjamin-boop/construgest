@@ -335,14 +335,17 @@ router.put('/:id', async (req, res, next) => {
 
     // If unit_price changed, log a price history entry
     if (req.body.unit_price !== undefined && current && Number(req.body.unit_price) !== Number(current.unit_price)) {
-      await supabase
+      const { error: historyError } = await supabase
         .from('cons_material_price_history')
         .insert({
           material_id: req.params.id,
           unit_price: Number(req.body.unit_price),
+          effective_date: new Date().toISOString().slice(0, 10),
           source: 'price_update',
           notes: `Precio actualizado de ${current.unit_price} a ${req.body.unit_price}`,
         })
+      // No romper el UPDATE del material si falla el histórico, pero dejar traza.
+      if (historyError) console.error('[materials] No se pudo guardar el histórico de precio:', historyError)
     }
 
     const { category_id, supplier_id, ...rest } = req.body
@@ -490,13 +493,16 @@ router.post('/smart-import', async (req, res, next) => {
           .single()
 
         if (current && Number(current.unit_price) !== price) {
-          await supabase.from('cons_material_price_history').insert({
+          const { error: historyError } = await supabase.from('cons_material_price_history').insert({
             material_id: materialId,
             unit_price: price,
             supplier_id: supplierId,
+            effective_date: new Date().toISOString().slice(0, 10),
             source: 'import',
             notes: 'Importado desde listado de proveedor',
           })
+          // No romper el import si falla el histórico, pero dejar traza.
+          if (historyError) console.error('[materials] No se pudo guardar el histórico de precio (import):', historyError)
           await supabase
             .from('cons_materials')
             .update({ unit_price: price, updated_at: new Date().toISOString() })

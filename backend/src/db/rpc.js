@@ -66,8 +66,15 @@ function hydrateWorker(row) {
 }
 
 // Ejecuta un SELECT * WHERE id=? y devuelve la fila (o null).
-async function selectById(table, id) {
-  const [rows] = await pool.query(`SELECT * FROM ${qi(table)} WHERE id = ? LIMIT 1`, [id])
+// Si se pasa orgId, acota además por organization_id (scope multi-tenant): una
+// fila de OTRA organización se comporta como inexistente (null). Si orgId es
+// undefined, no se aplica el filtro (p.ej. tras un INSERT propio).
+async function selectById(table, id, orgId) {
+  let sql = `SELECT * FROM ${qi(table)} WHERE id = ?`
+  const params = [id]
+  if (orgId !== undefined) { sql += ` AND organization_id = ?`; params.push(orgId) }
+  sql += ` LIMIT 1`
+  const [rows] = await pool.query(sql, params)
   return rows[0] || null
 }
 
@@ -83,14 +90,18 @@ async function insertReturning(table, cols) {
 
 // Construye el UPDATE a partir de una lista de asignaciones [col, value] y
 // re-lee la fila. `sets` ya viene filtrado (solo columnas a tocar).
-async function updateReturning(table, id, sets) {
+// Si se pasa orgId, el UPDATE y la re-lectura se acotan por organization_id:
+// una fila de otra organización no se toca y se devuelve null (no-encontrado).
+async function updateReturning(table, id, sets, orgId) {
   if (sets.length) {
     const assigns = sets.map(([c]) => `${qi(c)} = ?`).concat(['`updated_at` = NOW(3)'])
     const params = sets.map(([, v]) => v)
     params.push(id)
-    await pool.query(`UPDATE ${qi(table)} SET ${assigns.join(', ')} WHERE id = ?`, params)
+    let where = `WHERE id = ?`
+    if (orgId !== undefined) { where += ` AND organization_id = ?`; params.push(orgId) }
+    await pool.query(`UPDATE ${qi(table)} SET ${assigns.join(', ')} ${where}`, params)
   }
-  return selectById(table, id)
+  return selectById(table, id, orgId)
 }
 
 // COALESCE(p_data->>'col', col): incluir solo si el valor viene no-nulo.
@@ -125,8 +136,8 @@ async function rpc_list_equipment({ p_org_id, p_status = null, p_type = null, p_
   return rows
 }
 
-async function rpc_get_equipment({ p_id }) {
-  return selectById('cons_equipment_catalog', p_id)
+async function rpc_get_equipment({ p_id, p_org_id }) {
+  return selectById('cons_equipment_catalog', p_id, p_org_id)
 }
 
 async function rpc_create_equipment({ p_data: d }) {
@@ -148,19 +159,20 @@ async function rpc_create_equipment({ p_data: d }) {
   })
 }
 
-async function rpc_update_equipment({ p_id, p_data: d }) {
+async function rpc_update_equipment({ p_id, p_org_id, p_data: d }) {
   const sets = coalesceSets(d, [
     ['name'], ['code'], ['type'], ['category'],
     ['hourly_rate', (v) => num(v, 0)], ['daily_rate', (v) => num(v, 0)],
     ['license_plate'], ['serial_number'],
     ['status'], ['notes'], ['photo_url'],
   ]).concat(keySets(d, [['maintenance_next', date]]))
-  return updateReturning('cons_equipment_catalog', p_id, sets)
+  return updateReturning('cons_equipment_catalog', p_id, sets, p_org_id)
 }
 
-async function rpc_delete_equipment({ p_id }) {
-  await pool.query(`DELETE FROM cons_equipment_catalog WHERE id = ?`, [p_id])
-  return null
+async function rpc_delete_equipment({ p_id, p_org_id }) {
+  const [result] = await pool.query(
+    `DELETE FROM cons_equipment_catalog WHERE id = ? AND organization_id = ?`, [p_id, p_org_id])
+  return { affected: result.affectedRows }
 }
 
 // ============================================================================
@@ -177,8 +189,8 @@ async function rpc_list_workers({ p_org_id, p_status = null, p_role = null, p_se
   return rows.map(hydrateWorker)
 }
 
-async function rpc_get_worker({ p_id }) {
-  return hydrateWorker(await selectById('cons_workers', p_id))
+async function rpc_get_worker({ p_id, p_org_id }) {
+  return hydrateWorker(await selectById('cons_workers', p_id, p_org_id))
 }
 
 async function rpc_create_worker({ p_data: d }) {
@@ -204,7 +216,7 @@ async function rpc_create_worker({ p_data: d }) {
   return hydrateWorker(row)
 }
 
-async function rpc_update_worker({ p_id, p_data: d }) {
+async function rpc_update_worker({ p_id, p_org_id, p_data: d }) {
   const sets = coalesceSets(d, [
     ['name'], ['dni'], ['role'], ['specialty'],
     ['hourly_rate', (v) => num(v, 0)],
@@ -215,12 +227,13 @@ async function rpc_update_worker({ p_id, p_data: d }) {
   ]).concat(keySets(d, [
     ['subcontractor_id'], ['hire_date', date], ['end_date', date],
   ]))
-  return hydrateWorker(await updateReturning('cons_workers', p_id, sets))
+  return hydrateWorker(await updateReturning('cons_workers', p_id, sets, p_org_id))
 }
 
-async function rpc_delete_worker({ p_id }) {
-  await pool.query(`DELETE FROM cons_workers WHERE id = ?`, [p_id])
-  return null
+async function rpc_delete_worker({ p_id, p_org_id }) {
+  const [result] = await pool.query(
+    `DELETE FROM cons_workers WHERE id = ? AND organization_id = ?`, [p_id, p_org_id])
+  return { affected: result.affectedRows }
 }
 
 // ============================================================================
@@ -237,8 +250,9 @@ async function rpc_list_subcontractors({ p_org_id, p_specialty = null, p_is_acti
   return rows
 }
 
-async function rpc_get_subcontractor({ p_id }) {
-  const subcontractor = await selectById('cons_subcontractors', p_id)
+async function rpc_get_subcontractor({ p_id, p_org_id }) {
+  const subcontractor = await selectById('cons_subcontractors', p_id, p_org_id)
+  if (!subcontractor) return null
   const [documents] = await pool.query(
     `SELECT * FROM cons_subcontractor_documents WHERE subcontractor_id = ?`, [p_id])
   return { subcontractor, documents }
@@ -270,23 +284,54 @@ async function rpc_create_subcontractor({ p_data: d }) {
   })
 }
 
-async function rpc_update_subcontractor({ p_id, p_data: d }) {
+async function rpc_update_subcontractor({ p_id, p_org_id, p_data: d }) {
   const sets = coalesceSets(d, [
     ['name'], ['tax_id'], ['contact_name'], ['phone'], ['email'],
     ['address'], ['city'], ['province'], ['postal_code'], ['specialty'],
     ['rating', (v) => num(v, 3)], ['is_active', (v) => bool(v, true)], ['notes'],
   ])
-  return updateReturning('cons_subcontractors', p_id, sets)
+  return updateReturning('cons_subcontractors', p_id, sets, p_org_id)
 }
 
-async function rpc_delete_subcontractor({ p_id }) {
-  await pool.query(`DELETE FROM cons_subcontractors WHERE id = ?`, [p_id])
-  return null
+async function rpc_delete_subcontractor({ p_id, p_org_id }) {
+  const [result] = await pool.query(
+    `DELETE FROM cons_subcontractors WHERE id = ? AND organization_id = ?`, [p_id, p_org_id])
+  return { affected: result.affectedRows }
 }
 
 // --- Documentos PRL ---------------------------------------------------------
+// Los documentos no tienen organization_id propio: se acotan a través de su
+// subcontratista (cons_subcontractors.organization_id). Un documento colgado de
+// una subcontrata de OTRA org se comporta como inexistente.
 
-async function rpc_list_sub_documents({ p_sub_id, p_project_id = null }) {
+// Comprueba que una subcontrata pertenece a la org (o devuelve null).
+async function subcontractorInOrg(subId, orgId) {
+  if (orgId === undefined) return true
+  const [rows] = await pool.query(
+    `SELECT 1 FROM cons_subcontractors WHERE id = ? AND organization_id = ? LIMIT 1`,
+    [subId, orgId])
+  return rows.length > 0
+}
+
+// Re-lee un documento acotado por la org de su subcontratista.
+async function selectSubDocByIdOrg(docId, orgId) {
+  let sql = `SELECT d.* FROM cons_subcontractor_documents d`
+  const params = [docId]
+  if (orgId !== undefined) {
+    sql += ` JOIN cons_subcontractors s ON d.subcontractor_id = s.id
+             WHERE d.id = ? AND s.organization_id = ?`
+    params.push(orgId)
+  } else {
+    sql += ` WHERE d.id = ?`
+  }
+  sql += ` LIMIT 1`
+  const [rows] = await pool.query(sql, params)
+  return rows[0] || null
+}
+
+async function rpc_list_sub_documents({ p_sub_id, p_org_id, p_project_id = null }) {
+  // Si la subcontrata no es de la org, no listar sus documentos.
+  if (!(await subcontractorInOrg(p_sub_id, p_org_id))) return []
   let sql = `SELECT * FROM cons_subcontractor_documents WHERE subcontractor_id = ?`
   const params = [p_sub_id]
   if (p_project_id != null) { sql += ` AND project_id = ?`; params.push(p_project_id) }
@@ -294,7 +339,9 @@ async function rpc_list_sub_documents({ p_sub_id, p_project_id = null }) {
   return rows
 }
 
-async function rpc_create_sub_document({ p_data: d }) {
+async function rpc_create_sub_document({ p_org_id, p_data: d }) {
+  // No permitir colgar documentos de una subcontrata ajena a la org.
+  if (!(await subcontractorInOrg(d.subcontractor_id, p_org_id))) return null
   return insertReturning('cons_subcontractor_documents', {
     subcontractor_id: val(d.subcontractor_id),
     project_id: val(d.project_id),
@@ -307,16 +354,42 @@ async function rpc_create_sub_document({ p_data: d }) {
   })
 }
 
-async function rpc_update_sub_document({ p_id, p_data: d }) {
+async function rpc_update_sub_document({ p_id, p_org_id, p_data: d }) {
   const sets = coalesceSets(d, [
     ['doc_type'], ['name'], ['file_path'], ['status'], ['notes'],
   ]).concat(keySets(d, [['expiry_date', date]]))
-  return updateReturning('cons_subcontractor_documents', p_id, sets)
+  if (sets.length) {
+    const assigns = sets.map(([c]) => `d.${qi(c)} = ?`).concat(['d.`updated_at` = NOW(3)'])
+    const params = sets.map(([, v]) => v)
+    params.push(p_id)
+    let sql
+    if (p_org_id !== undefined) {
+      sql = `UPDATE cons_subcontractor_documents d
+               JOIN cons_subcontractors s ON d.subcontractor_id = s.id
+                SET ${assigns.join(', ')}
+              WHERE d.id = ? AND s.organization_id = ?`
+      params.push(p_org_id)
+    } else {
+      sql = `UPDATE cons_subcontractor_documents d SET ${assigns.join(', ')} WHERE d.id = ?`
+    }
+    await pool.query(sql, params)
+  }
+  return selectSubDocByIdOrg(p_id, p_org_id)
 }
 
-async function rpc_delete_sub_document({ p_id }) {
-  await pool.query(`DELETE FROM cons_subcontractor_documents WHERE id = ?`, [p_id])
-  return null
+async function rpc_delete_sub_document({ p_id, p_org_id }) {
+  let sql, params
+  if (p_org_id !== undefined) {
+    sql = `DELETE d FROM cons_subcontractor_documents d
+             JOIN cons_subcontractors s ON d.subcontractor_id = s.id
+            WHERE d.id = ? AND s.organization_id = ?`
+    params = [p_id, p_org_id]
+  } else {
+    sql = `DELETE FROM cons_subcontractor_documents WHERE id = ?`
+    params = [p_id]
+  }
+  const [result] = await pool.query(sql, params)
+  return { affected: result.affectedRows }
 }
 
 async function rpc_get_expiring_documents({ p_org_id, p_days = 30 }) {

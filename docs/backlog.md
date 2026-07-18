@@ -1,6 +1,34 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-15
+> ## 📍 ESTADO ACTUAL — 2026-07-18
+>
+> ### Último (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
+> Barrido multi-agente de TODO Construgest (41 agentes, estático + dinámico con curl real).
+> **27 bugs confirmados (0 falsos positivos), los 27 ARREGLADOS y verificados en ejecución**
+> contra la BD demo (backend dev nativo `node --watch`). Detalle y checklist en
+> [`docs/qa-v0.4.3-findings.md`](qa-v0.4.3-findings.md). Categorías: corrupción de datos
+> (patrón `undefined→NULL` del shim, arreglado de raíz), IDOR entre organizaciones (ficheros,
+> gastos, subcontratas/trabajadores/equipos, ajustes, analítica IA), badges/contadores rotos,
+> planos que no dibujaban, certificaciones, partes, materiales, y el cambio de estado desde la
+> lista. 17 commits por área en `feat/benjamin` (pusheados) + bump a **v0.4.3**. `.msi` construido y
+> **release v0.4.3 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.3.msi` adjunto). Regresión OK.
+> **Próximo:** que Benjamin actualice su app instalada (banner de nueva versión) y confirme que sus
+> 10 proyectos reales siguen; luego REL-CLEAN (borrar `desktop/dist/ConstruGest-0.4.1.msi`, conservar
+> 0.4.2 y 0.4.3) y merge `--no-ff` de `feat/benjamin` a `develop`.
+> Nota: los BUGs "restore duplicado", "clobber de backups" y "cambio de estado" que estaban en
+> Pendientes quedan CUBIERTOS por este barrido (estado ya arreglado; restore/clobber siguen
+> pendientes de decidir su rediseño, ver Pendientes).
+>
+> ### Anterior (2026-07-18): DATOS REALES importados a la app instalada
+> Migrados los **10 proyectos reales** de la web (backups `_backup/` en
+> `C:\Users\benja\Documents\CONSTRUGEST-DESKTOP`) a la MariaDB de la app instalada
+> (`%APPDATA%\construgest-desktop\data`), dentro de la organización real de Benjamin
+> (`susanaybenjamin@gmail.com`). Se borró el OGIJARES de prueba y se reconstruyó su ficha
+> real (estaba pisada, ver BUG clobber). Ficheros copiados al storage local. Verificado en
+> BD (10 proyectos, presupuestos/partidas/certs/partes/gastos correctos) y en disco. **Objetivo:
+> poder desinstalar la web.** Script one-off en el scratchpad de esa sesión (no commiteado);
+> snapshot previo de la BD guardado por si hay que revertir. Pendiente: que Benjamin confirme
+> que los ve al recargar la app. Ver BUGs nuevos en "Pendientes conocidos".
 >
 > ### Qué es Construgest y de dónde viene
 > App de gestión de construcción (presupuestos, certificaciones, obras, materiales,
@@ -56,7 +84,20 @@
 > suspensión, backend/MariaDB/frontend quedaban agarrando sus puertos y al reabrir el backend nuevo
 > chocaba con EADDRINUSE (parecía "sin BD/sin backend", no dejaba entrar). Ahora `freeOwnedPorts()`
 > libera 3308/5000/3000 al arrancar (netstat+taskkill, solo empaquetado/Windows) y `shutdown()` mata
-> el árbol de procesos con `taskkill /T /F`.
+> el árbol de procesos con `taskkill /T /F`. · **`v0.4.3`** barrido de QA pre-release: **27 bugs**
+> arreglados (corrupción de datos por `undefined→NULL` del shim, IDOR entre organizaciones, badges/
+> contadores, planos, certificaciones, partes, materiales, cambio de estado desde la lista). Ver
+> [`docs/qa-v0.4.3-findings.md`](qa-v0.4.3-findings.md).
+>
+> ### Para la próxima RELEASE (v0.4.3) — arreglo ya en código, falta empaquetar
+> - **BUG cambio de estado desde la LISTA** (arreglado en `feat/benjamin`, sin commitear/publicar):
+>   el desplegable de estado del dashboard manda solo `{ status }`; el PUT `/:id` de
+>   `backend/src/routes/projects.js` reconstruía el objeto entero y el shim metía los campos
+>   ausentes como NULL → `SET name=NULL` sobre columna NOT NULL → fallaba ("Error al cambiar el
+>   estado"). Fix: el PUT ahora solo actualiza los campos presentes en el body. Verificado el fallo
+>   en ejecución (`ER_BAD_NULL_ERROR`) y la sintaxis del fix; **falta e2e en la app instalada** (necesita
+>   release). Mientras tanto, cambiar estado funciona desde Ajustes del proyecto (manda el form completo).
+>   (Los 2 proyectos pausados de Benjamin se archivaron a mano en la BD para desbloquearle.)
 >
 > ### Principios básicos (SIEMPRE — detalle en `CLAUDE.md`)
 > 1. **¿Lo he VISTO funcionar?** "Compila" y "los tests pasan" NO es "funciona". Ejercitar el
@@ -93,6 +134,15 @@
 >    `backend/data/price-bases/`; tesseract/poppler en el `.msi` de Windows (hoy OCR solo en Docker);
 >    endpoint de import por lotes (hoy el import hace ~cientos de llamadas seguidas); e2e real del PIN
 >    y del bloqueo de update dentro del `.msi` (compilan y typecheck OK, faltan probar instalados).
+>    - **BUG restore duplicado:** `POST /:id/restore` está declarado DOS veces en
+>      `backend/src/routes/projects.js` (la de papelera, ~línea 293, tapa a la de backup, ~línea 967).
+>      La de backup queda muerta → el "restaurar desde carpeta" de la UI nunca se ejecuta. Renombrar
+>      una de las dos rutas (p.ej. `/:id/restore-backup`) y cablear la UI a la correcta.
+>    - **BUG clobber de backups:** cuando un proyecto tiene `folder_path` apuntando a una carpeta con
+>      `_backup`, el sync/backup de la app **sobrescribe** ahí `project.json` (y potencialmente otros
+>      JSON). Riesgo de pisar un backup REAL con datos de prueba (le pasó a OGIJARES el 14-jul).
+>      Revisar `syncService.ts` + rutas `sync-file`/`backup`: no escribir sobre un `_backup` ajeno,
+>      o avisar/separar por `project_id`.
 >
 > ---
 >

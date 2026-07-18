@@ -44,8 +44,10 @@ router.get('/:id', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_get_subcontractor', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Subcontractor not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -72,9 +74,11 @@ router.put('/:id', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_update_subcontractor', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
       p_data: req.body,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Subcontractor not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -84,10 +88,12 @@ router.put('/:id', async (req, res, next) => {
 // DELETE /api/subcontractors/:id — Delete subcontractor (cascades docs)
 router.delete('/:id', async (req, res, next) => {
   try {
-    const { error } = await supabase.rpc('rpc_delete_subcontractor', {
+    const { data, error } = await supabase.rpc('rpc_delete_subcontractor', {
       p_id: req.params.id,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data || !data.affected) return res.status(404).json({ error: 'Subcontractor not found' })
     res.json({ success: true })
   } catch (err) {
     next(err)
@@ -102,6 +108,7 @@ router.get('/:id/documents', async (req, res, next) => {
     const { project_id } = req.query
     const { data, error } = await supabase.rpc('rpc_list_sub_documents', {
       p_sub_id: req.params.id,
+      p_org_id: req.user.organization_id,
       p_project_id: project_id || null,
     })
     if (error) throw error
@@ -116,9 +123,11 @@ router.post('/:id/documents', async (req, res, next) => {
   try {
     const payload = { ...req.body, subcontractor_id: req.params.id }
     const { data, error } = await supabase.rpc('rpc_create_sub_document', {
+      p_org_id: req.user.organization_id,
       p_data: payload,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Subcontractor not found' })
     res.status(201).json(data)
   } catch (err) {
     next(err)
@@ -130,9 +139,11 @@ router.put('/documents/:docId', async (req, res, next) => {
   try {
     const { data, error } = await supabase.rpc('rpc_update_sub_document', {
       p_id: req.params.docId,
+      p_org_id: req.user.organization_id,
       p_data: req.body,
     })
     if (error) throw error
+    if (!data) return res.status(404).json({ error: 'Document not found' })
     res.json(data)
   } catch (err) {
     next(err)
@@ -142,10 +153,12 @@ router.put('/documents/:docId', async (req, res, next) => {
 // DELETE /api/subcontractors/documents/:docId — Delete document
 router.delete('/documents/:docId', async (req, res, next) => {
   try {
-    const { error } = await supabase.rpc('rpc_delete_sub_document', {
+    const { data, error } = await supabase.rpc('rpc_delete_sub_document', {
       p_id: req.params.docId,
+      p_org_id: req.user.organization_id,
     })
     if (error) throw error
+    if (!data || !data.affected) return res.status(404).json({ error: 'Document not found' })
     res.json({ success: true })
   } catch (err) {
     next(err)
