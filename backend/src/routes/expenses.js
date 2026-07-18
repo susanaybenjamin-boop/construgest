@@ -1,15 +1,94 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { randomUUID } from 'crypto'
-import { authMiddleware } from '../middlewares/auth.js'
+import { authMiddleware, projectAccessMiddleware, resolveProjectAccess } from '../middlewares/auth.js'
 import supabase from '../db/local.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
 router.use(authMiddleware)
 
+// ────────────────────────────────────────────────────────────────────
+// Helpers de acceso. NO se confía en organization_id del cliente:
+// siempre se usa req.user.organization_id (viene del JWT verificado).
+// ────────────────────────────────────────────────────────────────────
+
+// Valida acceso a un projectId concreto. Devuelve el access o null (y ya
+// ha respondido 403 si null). requireWrite rechaza branch_viewer/mailbox_guest.
+async function ensureProjectAccess(req, res, projectId, { requireWrite = false } = {}) {
+  const access = await resolveProjectAccess(req.user.id, req.user.organization_id, projectId)
+  if (!access) {
+    res.status(403).json({ error: 'No tienes acceso a este proyecto' })
+    return null
+  }
+  if (requireWrite && (access.role === 'branch_viewer' || access.role === 'mailbox_guest')) {
+    res.status(403).json({ error: 'Acceso de solo lectura' })
+    return null
+  }
+  return access
+}
+
+// Middleware: valida acceso usando project_id del BODY (POST crea gasto).
+function projectAccessFromBody({ requireWrite = false } = {}) {
+  return async (req, res, next) => {
+    try {
+      const projectId = req.body?.project_id
+      if (!projectId) {
+        return res.status(400).json({ error: 'missing_fields', message: 'Faltan campos obligatorios (project_id)' })
+      }
+      const access = await ensureProjectAccess(req, res, projectId, { requireWrite })
+      if (!access) return
+      next()
+    } catch (err) {
+      next(err)
+    }
+  }
+}
+
+// Middleware: el :id es el ID del GASTO. Resuelve su project_id y valida acceso.
+function expenseAccessMiddleware({ requireWrite = false } = {}) {
+  return async (req, res, next) => {
+    try {
+      const { data: expense } = await supabase
+        .from('cons_project_expenses')
+        .select('project_id')
+        .eq('id', req.params.id)
+        .single()
+
+      if (!expense) return res.status(404).json({ error: 'Gasto no encontrado' })
+
+      const access = await ensureProjectAccess(req, res, expense.project_id, { requireWrite })
+      if (!access) return
+      next()
+    } catch (err) {
+      next(err)
+    }
+  }
+}
+
+// Middleware: el :workLogId es el ID de un parte. Resuelve su project_id y valida acceso.
+function workLogAccessMiddleware({ requireWrite = false } = {}) {
+  return async (req, res, next) => {
+    try {
+      const { data: workLog } = await supabase
+        .from('cons_work_logs')
+        .select('project_id')
+        .eq('id', req.params.workLogId)
+        .single()
+
+      if (!workLog) return res.status(404).json({ error: 'Parte no encontrado' })
+
+      const access = await ensureProjectAccess(req, res, workLog.project_id, { requireWrite })
+      if (!access) return
+      next()
+    } catch (err) {
+      next(err)
+    }
+  }
+}
+
 // GET /api/expenses/project/:projectId
-router.get('/project/:projectId', async (req, res, next) => {
+router.get('/project/:projectId', projectAccessMiddleware, async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('cons_project_expenses')
@@ -25,7 +104,7 @@ router.get('/project/:projectId', async (req, res, next) => {
 })
 
 // POST /api/expenses
-router.post('/', upload.single('receipt'), async (req, res, next) => {
+router.post('/', upload.single('receipt'), projectAccessFromBody({ requireWrite: true }), async (req, res, next) => {
   try {
     const { project_id, date, supplier_name, supplier_id, concept, amount, tax_amount, budget_chapter_id, work_log_id, notes } = req.body
 
@@ -36,6 +115,15 @@ router.post('/', upload.single('receipt'), async (req, res, next) => {
     }
     if (!project_id || !concept) {
       return res.status(400).json({ error: 'missing_fields', message: 'Faltan campos obligatorios (project_id, concept)' })
+    }
+    // date es DATE NOT NULL sin default en BD: sin fecha el INSERT revienta con 500.
+    if (!date) {
+      return res.status(400).json({ error: 'date_required', message: 'La fecha del gasto es obligatoria' })
+    }
+    // tax_amount es DECIMAL: sanear para no mandar NaN → "Unknown column 'NaN'".
+    const taxNum = (tax_amount === undefined || tax_amount === null || tax_amount === '') ? 0 : parseFloat(tax_amount)
+    if (!Number.isFinite(taxNum)) {
+      return res.status(400).json({ error: 'tax_amount_invalid', message: 'El IVA/impuesto no es un número válido' })
     }
 
     let image_path = null
@@ -65,8 +153,8 @@ router.post('/', upload.single('receipt'), async (req, res, next) => {
         supplier_name,
         supplier_id: supplier_id || null,
         concept,
-        amount: parseFloat(amount),
-        tax_amount: parseFloat(tax_amount || '0'),
+        amount: amountNum,
+        tax_amount: taxNum,
         budget_chapter_id: budget_chapter_id || null,
         work_log_id: work_log_id || null,
         notes,
@@ -83,7 +171,7 @@ router.post('/', upload.single('receipt'), async (req, res, next) => {
 })
 
 // PUT /api/expenses/:id
-router.put('/:id', upload.single('receipt'), async (req, res, next) => {
+router.put('/:id', upload.single('receipt'), expenseAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     const body = req.body || {}
 
@@ -92,7 +180,13 @@ router.put('/:id', upload.single('receipt'), async (req, res, next) => {
     // lo que rompía el NOT NULL de "amount" al vincular/desvincular
     // un gasto a un parte (el cliente solo envía work_log_id).
     const updateData = { updated_at: new Date().toISOString() }
-    if ('date' in body) updateData.date = body.date
+    if ('date' in body) {
+      // date es DATE NOT NULL: '' → "Incorrect date value: ''". Rechazar vacía.
+      if (body.date === '' || body.date === null) {
+        return res.status(400).json({ error: 'date_required', message: 'La fecha del gasto no puede estar vacía' })
+      }
+      updateData.date = body.date
+    }
     if ('supplier_name' in body) updateData.supplier_name = body.supplier_name
     if ('supplier_id' in body) updateData.supplier_id = body.supplier_id || null
     if ('concept' in body) updateData.concept = body.concept
@@ -152,7 +246,7 @@ router.put('/:id', upload.single('receipt'), async (req, res, next) => {
 })
 
 // GET /api/expenses/:id/receipt-url - Get signed URL for receipt image
-router.get('/:id/receipt-url', async (req, res, next) => {
+router.get('/:id/receipt-url', expenseAccessMiddleware(), async (req, res, next) => {
   try {
     const { data: expense, error } = await supabase
       .from('cons_project_expenses')
@@ -177,7 +271,7 @@ router.get('/:id/receipt-url', async (req, res, next) => {
 })
 
 // GET /api/expenses/work-log/:workLogId - Expenses linked to a work log
-router.get('/work-log/:workLogId', async (req, res, next) => {
+router.get('/work-log/:workLogId', workLogAccessMiddleware(), async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('cons_project_expenses')
@@ -193,7 +287,7 @@ router.get('/work-log/:workLogId', async (req, res, next) => {
 })
 
 // DELETE /api/expenses/:id
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', expenseAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
     const { error } = await supabase
       .from('cons_project_expenses')
