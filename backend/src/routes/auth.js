@@ -70,6 +70,12 @@ router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ error: "Email y contraseña son obligatorios" });
+    }
+
     const { data: user, error } = await supabase
       .from("cons_users")
       .select("id, email, full_name, password_hash, avatar_url, is_active")
