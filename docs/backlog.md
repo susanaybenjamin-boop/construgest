@@ -1,6 +1,17 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-15
+> ## 📍 ESTADO ACTUAL — 2026-07-18
+>
+> ### Último (2026-07-18): DATOS REALES importados a la app instalada
+> Migrados los **10 proyectos reales** de la web (backups `_backup/` en
+> `C:\Users\benja\Documents\CONSTRUGEST-DESKTOP`) a la MariaDB de la app instalada
+> (`%APPDATA%\construgest-desktop\data`), dentro de la organización real de Benjamin
+> (`susanaybenjamin@gmail.com`). Se borró el OGIJARES de prueba y se reconstruyó su ficha
+> real (estaba pisada, ver BUG clobber). Ficheros copiados al storage local. Verificado en
+> BD (10 proyectos, presupuestos/partidas/certs/partes/gastos correctos) y en disco. **Objetivo:
+> poder desinstalar la web.** Script one-off en el scratchpad de esa sesión (no commiteado);
+> snapshot previo de la BD guardado por si hay que revertir. Pendiente: que Benjamin confirme
+> que los ve al recargar la app. Ver BUGs nuevos en "Pendientes conocidos".
 >
 > ### Qué es Construgest y de dónde viene
 > App de gestión de construcción (presupuestos, certificaciones, obras, materiales,
@@ -58,6 +69,16 @@
 > libera 3308/5000/3000 al arrancar (netstat+taskkill, solo empaquetado/Windows) y `shutdown()` mata
 > el árbol de procesos con `taskkill /T /F`.
 >
+> ### Para la próxima RELEASE (v0.4.3) — arreglo ya en código, falta empaquetar
+> - **BUG cambio de estado desde la LISTA** (arreglado en `feat/benjamin`, sin commitear/publicar):
+>   el desplegable de estado del dashboard manda solo `{ status }`; el PUT `/:id` de
+>   `backend/src/routes/projects.js` reconstruía el objeto entero y el shim metía los campos
+>   ausentes como NULL → `SET name=NULL` sobre columna NOT NULL → fallaba ("Error al cambiar el
+>   estado"). Fix: el PUT ahora solo actualiza los campos presentes en el body. Verificado el fallo
+>   en ejecución (`ER_BAD_NULL_ERROR`) y la sintaxis del fix; **falta e2e en la app instalada** (necesita
+>   release). Mientras tanto, cambiar estado funciona desde Ajustes del proyecto (manda el form completo).
+>   (Los 2 proyectos pausados de Benjamin se archivaron a mano en la BD para desbloquearle.)
+>
 > ### Principios básicos (SIEMPRE — detalle en `CLAUDE.md`)
 > 1. **¿Lo he VISTO funcionar?** "Compila" y "los tests pasan" NO es "funciona". Ejercitar el
 >    camino real antes de dar algo por bueno; si no se pudo verificar, decírselo a Benjamin.
@@ -93,6 +114,15 @@
 >    `backend/data/price-bases/`; tesseract/poppler en el `.msi` de Windows (hoy OCR solo en Docker);
 >    endpoint de import por lotes (hoy el import hace ~cientos de llamadas seguidas); e2e real del PIN
 >    y del bloqueo de update dentro del `.msi` (compilan y typecheck OK, faltan probar instalados).
+>    - **BUG restore duplicado:** `POST /:id/restore` está declarado DOS veces en
+>      `backend/src/routes/projects.js` (la de papelera, ~línea 293, tapa a la de backup, ~línea 967).
+>      La de backup queda muerta → el "restaurar desde carpeta" de la UI nunca se ejecuta. Renombrar
+>      una de las dos rutas (p.ej. `/:id/restore-backup`) y cablear la UI a la correcta.
+>    - **BUG clobber de backups:** cuando un proyecto tiene `folder_path` apuntando a una carpeta con
+>      `_backup`, el sync/backup de la app **sobrescribe** ahí `project.json` (y potencialmente otros
+>      JSON). Riesgo de pisar un backup REAL con datos de prueba (le pasó a OGIJARES el 14-jul).
+>      Revisar `syncService.ts` + rutas `sync-file`/`backup`: no escribir sobre un `_backup` ajeno,
+>      o avisar/separar por `project_id`.
 >
 > ---
 >
