@@ -1,8 +1,9 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { randomUUID } from 'crypto'
-import { readdir, stat, writeFile, unlink } from 'fs/promises'
+import { readdir, stat, writeFile, unlink, mkdir } from 'fs/promises'
 import { join, resolve, dirname } from 'path'
+import { homedir } from 'os'
 import { fileURLToPath } from 'url'
 import { authMiddleware } from '../middlewares/auth.js'
 import supabase from '../db/local.js'
@@ -11,6 +12,41 @@ const router = Router()
 
 
 router.use(authMiddleware)
+
+// ── Seguridad (A9): resolver la organización efectiva contra el JWT ──
+// Nunca se confía en el orgId que manda el cliente. Solo se permite operar
+// sobre la organización del propio usuario o sobre una en la que sea miembro
+// explícito (cons_organization_members). En cualquier otro caso -> 403.
+async function resolveOrgAccess(req, requestedOrgId) {
+  const userOrgId = req.user.organization_id
+  if (!requestedOrgId || requestedOrgId === userOrgId) return userOrgId
+
+  const { data: member } = await supabase
+    .from('cons_organization_members')
+    .select('organization_id')
+    .eq('organization_id', requestedOrgId)
+    .eq('user_id', req.user.id)
+    .limit(1)
+
+  if (member && member.length > 0) return requestedOrgId
+  return null
+}
+
+// ── Seguridad (M9): el explorador de disco solo para el DUEÑO de la organización ──
+// El backend corre en la máquina del propio usuario (modelo escritorio), así que
+// navegar el disco local ES la función (elegir la carpeta de un proyecto). No se
+// confina la ruta —rompería el selector—, pero para que un invitado de OTRA
+// organización (sucursal/buzón) no pueda enumerar el disco ni sondear rutas, estos
+// endpoints exigen que el usuario sea 'owner' de su propia organización.
+async function requireOrgOwner(req) {
+  const { data: member } = await supabase
+    .from('cons_organization_members')
+    .select('role')
+    .eq('organization_id', req.user.organization_id)
+    .eq('user_id', req.user.id)
+    .limit(1)
+  return !!(member && member.length && member[0].role === 'owner')
+}
 
 const logoUpload = multer({
   storage: multer.memoryStorage(),
@@ -50,10 +86,13 @@ const SECTIONS = {
 // GET /api/settings/organization/:orgId
 router.get('/organization/:orgId', async (req, res, next) => {
   try {
+    const orgId = await resolveOrgAccess(req, req.params.orgId)
+    if (!orgId) return res.status(403).json({ error: 'No tienes acceso a esta organización' })
+
     const { data, error } = await supabase
       .from('cons_app_settings')
       .select('key, value')
-      .eq('organization_id', req.params.orgId)
+      .eq('organization_id', orgId)
 
     if (error) throw error
 
@@ -84,7 +123,8 @@ router.get('/organization/:orgId', async (req, res, next) => {
 // PUT /api/settings/organization/:orgId
 router.put('/organization/:orgId', async (req, res, next) => {
   try {
-    const orgId = req.params.orgId
+    const orgId = await resolveOrgAccess(req, req.params.orgId)
+    if (!orgId) return res.status(403).json({ error: 'No tienes acceso a esta organización' })
     const body = req.body // { company: {...}, defaults: {...}, ai: {...}, appearance: {...} }
 
     // Flatten all sections into key-value pairs
@@ -156,10 +196,11 @@ router.post('/logo/upload', logoUpload.single('logo'), async (req, res, next) =>
       return res.status(400).json({ error: 'No se ha proporcionado ninguna imagen' })
     }
 
-    const orgId = req.body.organization_id
-    if (!orgId) {
+    if (!req.body.organization_id) {
       return res.status(400).json({ error: 'organization_id es requerido' })
     }
+    const orgId = await resolveOrgAccess(req, req.body.organization_id)
+    if (!orgId) return res.status(403).json({ error: 'No tienes acceso a esta organización' })
 
     const ext = req.file.originalname.split('.').pop()?.toLowerCase() || 'png'
     const storagePath = `logos/${orgId}/logo_${randomUUID()}.${ext}`
@@ -196,10 +237,11 @@ router.post('/logo/upload', logoUpload.single('logo'), async (req, res, next) =>
 // DELETE /api/settings/logo
 router.delete('/logo', async (req, res, next) => {
   try {
-    const orgId = req.query.organization_id
-    if (!orgId) {
+    if (!req.query.organization_id) {
       return res.status(400).json({ error: 'organization_id es requerido' })
     }
+    const orgId = await resolveOrgAccess(req, req.query.organization_id)
+    if (!orgId) return res.status(403).json({ error: 'No tienes acceso a esta organización' })
 
     // Read current storage path
     const { data: pathRow } = await supabase
@@ -229,15 +271,16 @@ router.delete('/logo', async (req, res, next) => {
 // GET /api/settings/browse-directories - List directories at a given path
 router.get('/browse-directories', async (req, res, next) => {
   try {
-    const defaultRoot = process.platform === 'win32' ? 'C:\\' : '/'
-    const rawPath = req.query.path || defaultRoot
-    // Use the path as-is on Windows, resolve only on matching platform
-    const requestedPath = rawPath.match(/^[A-Za-z]:/) && process.platform !== 'win32'
-      ? rawPath  // Windows path on Linux - use as-is (will fail with ENOENT)
-      : resolve(rawPath)
+    if (!(await requireOrgOwner(req))) {
+      return res.status(403).json({ error: 'Solo el propietario de la organización puede explorar carpetas' })
+    }
+    // Modelo escritorio: se navega el disco local del usuario para elegir carpeta.
+    const requestedPath = req.query.path && String(req.query.path).trim()
+      ? resolve(String(req.query.path))
+      : homedir()
 
-    const parentPath = dirname(requestedPath)
-    const isRoot = parentPath === requestedPath
+    // parent = null cuando ya estamos en la raíz de una unidad (dirname === self).
+    const parentPath = dirname(requestedPath) === requestedPath ? null : dirname(requestedPath)
 
     const entries = await readdir(requestedPath, { withFileTypes: true })
     const dirs = []
@@ -257,7 +300,7 @@ router.get('/browse-directories', async (req, res, next) => {
     }
 
     dirs.sort((a, b) => a.name.localeCompare(b.name))
-    res.json({ path: requestedPath, parent: isRoot ? null : parentPath, directories: dirs })
+    res.json({ path: requestedPath, parent: parentPath, directories: dirs })
   } catch (err) {
     if (err.code === 'ENOENT' || err.code === 'EACCES' || err.code === 'EPERM') {
       return res.status(400).json({ error: 'No se puede acceder a esta ruta' })
@@ -269,10 +312,13 @@ router.get('/browse-directories', async (req, res, next) => {
 // POST /api/settings/verify-path - Verify a folder path exists and is writable
 router.post('/verify-path', async (req, res, next) => {
   try {
+    if (!(await requireOrgOwner(req))) {
+      return res.status(403).json({ valid: false, message: 'Solo el propietario de la organización puede validar rutas' })
+    }
     const { path: targetPath } = req.body
     if (!targetPath) return res.status(400).json({ valid: false, message: 'Ruta no proporcionada' })
 
-    const resolved = resolve(targetPath)
+    const resolved = resolve(String(targetPath))
     const info = await stat(resolved)
     if (!info.isDirectory()) {
       return res.json({ valid: false, message: 'La ruta no es un directorio' })
