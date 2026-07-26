@@ -12,7 +12,7 @@
 // host). Backend y frontend se ejecutan con el propio Node de Electron
 // (ELECTRON_RUN_AS_NODE) → no hace falta bundlear Node aparte.
 // ============================================================================
-const { app, BrowserWindow, dialog, shell, ipcMain, safeStorage } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain, safeStorage, screen } = require('electron')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
 const http = require('http')
@@ -20,6 +20,7 @@ const https = require('https')
 const net = require('net')
 const path = require('path')
 const fs = require('fs')
+const windowState = require('./window-state')
 
 const PORTS = { mariadb: 3308, backend: 5000, frontend: 3000, ollama: 11434 }
 const DB = { name: 'construgest', user: 'construgest', password: 'construgest' }
@@ -419,15 +420,25 @@ async function startServices() {
 }
 
 function createWindow() {
+  // MULTIMON: reabrir en la pantalla/posición donde se cerró (si sigue
+  // conectada); sin dato válido → tamaño por defecto centrado en la primaria.
+  const state = windowState.restore()
   win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: state ? state.w : 1400,
+    height: state ? state.h : 900,
+    ...(state ? { x: state.x, y: state.y } : {}),
     show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   })
   win.removeMenu()
   win.loadURL(`http://localhost:${PORTS.frontend}`)
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    // Maximizar aquí y no antes: maximize() muestra la ventana, y hacerlo
+    // antes de ready-to-show provocaría un destello en blanco.
+    if (state && state.maximized) win.maximize()
+    win.show()
+  })
+  windowState.track(win)
   // Las ventanas internas de la app (visor de referencia, comparador, PDF, impresión)
   // deben abrirse DENTRO de Electron, no en el navegador del sistema. Solo las URLs
   // realmente externas (otro host http/https) se delegan al navegador del usuario.
@@ -463,7 +474,11 @@ function createWindow() {
     if (updating) {
       e.preventDefault()
       if (!win.isDestroyed()) win.webContents.send('update:progress', { pct: -1, blocked: true })
+      return
     }
+    // Cierre real (X, Alt+F4, menú): guardar pantalla/posición ANTES de que
+    // muera la ventana, para reabrir ahí la próxima vez.
+    windowState.saveNow(win)
   })
 }
 
