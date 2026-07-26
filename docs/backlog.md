@@ -20,9 +20,16 @@
 > scratchpad de la sesión, no commiteado). `node --check` OK en `main.js`/`window-state.js`
 > (no se tocó backend/frontend). Bump **v0.4.4** en los 3 `package.json` + lock del backend.
 > Commits MON-1/2/3/4 + chore en `feat/benjamin`, merge `--no-ff` a `develop`, todo pusheado.
-> **PENDIENTE**: smoke visual de Benjamin con la app completa (mover al 2º monitor, cerrar,
-> reabrir; maximizada; abrir visor PDF/comparador) — cuando toque, construir el `.msi` 0.4.4
-> con `desktop/build-msi.ps1` y publicar release.
+> **`.msi` 0.4.4 construido y RELEASE v0.4.4 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.4.msi`
+> 453 MB adjunto, target = merge de develop `76d7f88`). **El gate pre-release cazó una avería**:
+> `build-msi.ps1` copiaba a `resources/app` una lista a mano (main.js, preload.js) y dejaba fuera
+> el nuevo `window-state.js` → el primer .msi habría roto la app al arrancar (require sin
+> resolver, patrón 0.1.19 de Benjagest). Arreglado (`f606da7`: se copian TODOS los `*.js` de
+> `desktop/`), reconstruido y verificado el stage (window-state.js idéntico, main.js idéntico,
+> package.json 0.4.4) antes de publicar.
+> **PENDIENTE**: Benjamin actualiza su app instalada a 0.4.4 (banner de actualización) y hace el
+> smoke visual MULTIMON: mover al 2º monitor, cerrar con la X, reabrir (debe volver ahí);
+> lo mismo maximizada; abrir visor PDF/comparador con la app en el 2º monitor.
 >
 > ### Anterior (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
 > Barrido multi-agente de TODO Construgest (41 agentes, estático + dinámico con curl real).
