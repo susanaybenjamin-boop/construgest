@@ -452,11 +452,19 @@ function createWindow() {
       url.startsWith(`http://localhost:${PORTS.backend}`) ||
       url.startsWith(`http://127.0.0.1:${PORTS.backend}`)
     if (isInternal) {
+      // MULTIMON: la subventana se abre CENTRADA en el monitor donde esta la
+      // app (sin x/y Electron decide, y con 2 monitores puede caer en el otro).
+      // Si el monitor es mas pequeno que 1200x800, se recorta a su area util.
+      const wa = screen.getDisplayMatching(win.getBounds()).workArea
+      const cw = Math.min(1200, wa.width)
+      const ch = Math.min(800, wa.height)
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          width: 1200,
-          height: 800,
+          width: cw,
+          height: ch,
+          x: Math.round(wa.x + (wa.width - cw) / 2),
+          y: Math.round(wa.y + (wa.height - ch) / 2),
           autoHideMenuBar: true,
           webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
