@@ -419,6 +419,22 @@ async function startServices() {
   ensureOllamaModel()
 }
 
+/**
+ * MULTIMON: bounds para una subventana (1200x800, recortada al area util)
+ * CENTRADA en el monitor donde esta la ventana principal.
+ */
+function childBoundsOnAppDisplay() {
+  const wa = screen.getDisplayMatching(win.getBounds()).workArea
+  const width = Math.min(1200, wa.width)
+  const height = Math.min(800, wa.height)
+  return {
+    x: Math.round(wa.x + (wa.width - width) / 2),
+    y: Math.round(wa.y + (wa.height - height) / 2),
+    width,
+    height,
+  }
+}
+
 function createWindow() {
   // MULTIMON: reabrir en la pantalla/posición donde se cerró (si sigue
   // conectada); sin dato válido → tamaño por defecto centrado en la primaria.
@@ -426,10 +442,20 @@ function createWindow() {
   win = new BrowserWindow({
     width: state ? state.w : 1400,
     height: state ? state.h : 900,
-    ...(state ? { x: state.x, y: state.y } : {}),
     show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   })
+  if (state) {
+    // DPI mixto (monitores con distinta escala de Windows): pasar x/y/tamano
+    // al constructor aplica MAL el tamano si la posicion cae en un monitor de
+    // escala distinta al primario (verificado aqui: pedir 1000x700 en el 2o
+    // monitor daba 800x561, dividido por el 1.25 del primario). Workaround
+    // verificado: setBounds DOS veces — la 1a lleva la ventana a ese monitor,
+    // la 2a, ya alli, aplica el tamano exacto.
+    const bounds = { x: state.x, y: state.y, width: state.w, height: state.h }
+    win.setBounds(bounds)
+    win.setBounds(bounds)
+  }
   win.removeMenu()
   win.loadURL(`http://localhost:${PORTS.frontend}`)
   win.once('ready-to-show', () => {
@@ -455,16 +481,10 @@ function createWindow() {
       // MULTIMON: la subventana se abre CENTRADA en el monitor donde esta la
       // app (sin x/y Electron decide, y con 2 monitores puede caer en el otro).
       // Si el monitor es mas pequeno que 1200x800, se recorta a su area util.
-      const wa = screen.getDisplayMatching(win.getBounds()).workArea
-      const cw = Math.min(1200, wa.width)
-      const ch = Math.min(800, wa.height)
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          width: cw,
-          height: ch,
-          x: Math.round(wa.x + (wa.width - cw) / 2),
-          y: Math.round(wa.y + (wa.height - ch) / 2),
+          ...childBoundsOnAppDisplay(),
           autoHideMenuBar: true,
           webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -475,6 +495,15 @@ function createWindow() {
     }
     shell.openExternal(url)
     return { action: 'deny' }
+  })
+  // DPI mixto: el tamano de overrideBrowserWindowOptions tambien se aplica mal
+  // si la subventana cae en un monitor de escala distinta al primario (1200x800
+  // salia 960x640). Mismo workaround que en la ventana principal: reaplicar los
+  // bounds DOS veces con la subventana ya creada.
+  win.webContents.on('did-create-window', (child) => {
+    const bounds = childBoundsOnAppDisplay()
+    child.setBounds(bounds)
+    child.setBounds(bounds)
   })
   // Mientras se descarga una actualización (453 MB), impedir cerrar la ventana:
   // si el proceso principal muere, la descarga se corta y el .msi queda a medias.
