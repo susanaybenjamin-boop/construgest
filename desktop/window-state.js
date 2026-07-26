@@ -42,11 +42,18 @@ function restore() {
     const s = JSON.parse(fs.readFileSync(FILE(), 'utf-8'))
     if (![s.x, s.y, s.w, s.h].every(Number.isFinite) || s.w <= 0 || s.h <= 0) return null
     if (!intersectsAnyDisplay(s)) return null
+    // Ajuste al monitor actual: si el tamano guardado no cabe en el monitor
+    // donde cae la ventana (se cerro en un monitor grande y se abre en uno
+    // pequeno), se recorta a su area de trabajo. La posicion no se toca
+    // (criterio leniente).
+    const wa = screen.getDisplayMatching({
+      x: Math.round(s.x), y: Math.round(s.y), width: Math.round(s.w), height: Math.round(s.h),
+    }).workArea
     return {
       x: Math.round(s.x),
       y: Math.round(s.y),
-      w: Math.round(s.w),
-      h: Math.round(s.h),
+      w: Math.min(Math.round(s.w), wa.width),
+      h: Math.min(Math.round(s.h), wa.height),
       maximized: !!s.maximized,
     }
   } catch {
