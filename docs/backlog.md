@@ -1,8 +1,30 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-18
+> ## 📍 ESTADO ACTUAL — 2026-07-26
 >
-> ### Último (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
+> ### Último (2026-07-26): MULTIMON portado de Benjagest + bump v0.4.4 (sin release aún)
+> Bloque **MON-1..4** en `desktop/`: la app **reabre en la pantalla y posición donde se
+> cerró** (nuevo `desktop/window-state.js`, portado del `WindowGeometry` de Benjagest:
+> persiste en `userData/window-state.json` al cerrar + debounce en move/resize; criterio
+> LENIENTE — solo descarta si el rectángulo no toca ninguna pantalla conectada; guarda
+> posición actual aunque esté maximizada + tamaño restaurado con `getNormalBounds`),
+> las **subventanas** (`window.open`: visor PDF, comparador, planos, buzón) abren
+> **centradas en el monitor de la app** (`childBoundsOnAppDisplay` en el
+> `setWindowOpenHandler`), y el tamaño guardado se **recorta al monitor** donde reabre si
+> no cabe. **Hallazgo importante (MON-4)**: bug de Electron con **DPI mixto** (monitores
+> 125%+100%, exactamente los de Benjamin) — pasar posición+tamaño al constructor o a
+> `overrideBrowserWindowOptions` aplica el tamaño dividido por la escala del primario si
+> la ventana cae en el otro monitor (1000×700→800×561). Workaround verificado: **`setBounds`
+> DOS veces** con la ventana ya creada; aplicado a principal y subventanas. **Verificado en
+> ejecución** con arnés Electron real sobre los 2 monitores reales: **14/14 PASS** (arnés en
+> scratchpad de la sesión, no commiteado). `node --check` OK en `main.js`/`window-state.js`
+> (no se tocó backend/frontend). Bump **v0.4.4** en los 3 `package.json` + lock del backend.
+> Commits MON-1/2/3/4 + chore en `feat/benjamin`, merge `--no-ff` a `develop`, todo pusheado.
+> **PENDIENTE**: smoke visual de Benjamin con la app completa (mover al 2º monitor, cerrar,
+> reabrir; maximizada; abrir visor PDF/comparador) — cuando toque, construir el `.msi` 0.4.4
+> con `desktop/build-msi.ps1` y publicar release.
+>
+> ### Anterior (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
 > Barrido multi-agente de TODO Construgest (41 agentes, estático + dinámico con curl real).
 > **27 bugs confirmados (0 falsos positivos), los 27 ARREGLADOS y verificados en ejecución**
 > contra la BD demo (backend dev nativo `node --watch`). Detalle y checklist en
