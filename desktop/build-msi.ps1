@@ -64,8 +64,11 @@ $Res = Join-Path $Stage "resources"
 $App = Join-Path $Res "app"
 New-Item -ItemType Directory -Force $App | Out-Null
 
-# Nuestro código del shell -> resources\app
-Copy-Item -Force "$Desktop\main.js","$Desktop\preload.js","$Desktop\package.json" $App
+# Nuestro código del shell -> resources\app (TODOS los .js de la raíz de
+# desktop\: con la lista a mano se quedó fuera window-state.js y el .msi
+# habría roto la app al arrancar — cazado en el gate pre-release de 0.4.4).
+Copy-Item -Force "$Desktop\*.js" $App
+Copy-Item -Force "$Desktop\package.json" $App
 
 # Backend (sin .env local ni caché) -> resources\backend
 Invoke-Robocopy (Join-Path $Root "backend") (Join-Path $Res "backend") @("/E","/XD","node_modules\.cache","/XF",".env",".env.example",".env.sample")
