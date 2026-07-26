@@ -12,7 +12,7 @@
 // host). Backend y frontend se ejecutan con el propio Node de Electron
 // (ELECTRON_RUN_AS_NODE) → no hace falta bundlear Node aparte.
 // ============================================================================
-const { app, BrowserWindow, dialog, shell, ipcMain, safeStorage } = require('electron')
+const { app, BrowserWindow, dialog, shell, ipcMain, safeStorage, screen } = require('electron')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
 const http = require('http')
@@ -20,6 +20,7 @@ const https = require('https')
 const net = require('net')
 const path = require('path')
 const fs = require('fs')
+const windowState = require('./window-state')
 
 const PORTS = { mariadb: 3308, backend: 5000, frontend: 3000, ollama: 11434 }
 const DB = { name: 'construgest', user: 'construgest', password: 'construgest' }
@@ -418,16 +419,52 @@ async function startServices() {
   ensureOllamaModel()
 }
 
+/**
+ * MULTIMON: bounds para una subventana (1200x800, recortada al area util)
+ * CENTRADA en el monitor donde esta la ventana principal.
+ */
+function childBoundsOnAppDisplay() {
+  const wa = screen.getDisplayMatching(win.getBounds()).workArea
+  const width = Math.min(1200, wa.width)
+  const height = Math.min(800, wa.height)
+  return {
+    x: Math.round(wa.x + (wa.width - width) / 2),
+    y: Math.round(wa.y + (wa.height - height) / 2),
+    width,
+    height,
+  }
+}
+
 function createWindow() {
+  // MULTIMON: reabrir en la pantalla/posición donde se cerró (si sigue
+  // conectada); sin dato válido → tamaño por defecto centrado en la primaria.
+  const state = windowState.restore()
   win = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: state ? state.w : 1400,
+    height: state ? state.h : 900,
     show: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true },
   })
+  if (state) {
+    // DPI mixto (monitores con distinta escala de Windows): pasar x/y/tamano
+    // al constructor aplica MAL el tamano si la posicion cae en un monitor de
+    // escala distinta al primario (verificado aqui: pedir 1000x700 en el 2o
+    // monitor daba 800x561, dividido por el 1.25 del primario). Workaround
+    // verificado: setBounds DOS veces — la 1a lleva la ventana a ese monitor,
+    // la 2a, ya alli, aplica el tamano exacto.
+    const bounds = { x: state.x, y: state.y, width: state.w, height: state.h }
+    win.setBounds(bounds)
+    win.setBounds(bounds)
+  }
   win.removeMenu()
   win.loadURL(`http://localhost:${PORTS.frontend}`)
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    // Maximizar aquí y no antes: maximize() muestra la ventana, y hacerlo
+    // antes de ready-to-show provocaría un destello en blanco.
+    if (state && state.maximized) win.maximize()
+    win.show()
+  })
+  windowState.track(win)
   // Las ventanas internas de la app (visor de referencia, comparador, PDF, impresión)
   // deben abrirse DENTRO de Electron, no en el navegador del sistema. Solo las URLs
   // realmente externas (otro host http/https) se delegan al navegador del usuario.
@@ -441,11 +478,13 @@ function createWindow() {
       url.startsWith(`http://localhost:${PORTS.backend}`) ||
       url.startsWith(`http://127.0.0.1:${PORTS.backend}`)
     if (isInternal) {
+      // MULTIMON: la subventana se abre CENTRADA en el monitor donde esta la
+      // app (sin x/y Electron decide, y con 2 monitores puede caer en el otro).
+      // Si el monitor es mas pequeno que 1200x800, se recorta a su area util.
       return {
         action: 'allow',
         overrideBrowserWindowOptions: {
-          width: 1200,
-          height: 800,
+          ...childBoundsOnAppDisplay(),
           autoHideMenuBar: true,
           webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -457,13 +496,26 @@ function createWindow() {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+  // DPI mixto: el tamano de overrideBrowserWindowOptions tambien se aplica mal
+  // si la subventana cae en un monitor de escala distinta al primario (1200x800
+  // salia 960x640). Mismo workaround que en la ventana principal: reaplicar los
+  // bounds DOS veces con la subventana ya creada.
+  win.webContents.on('did-create-window', (child) => {
+    const bounds = childBoundsOnAppDisplay()
+    child.setBounds(bounds)
+    child.setBounds(bounds)
+  })
   // Mientras se descarga una actualización (453 MB), impedir cerrar la ventana:
   // si el proceso principal muere, la descarga se corta y el .msi queda a medias.
   win.on('close', (e) => {
     if (updating) {
       e.preventDefault()
       if (!win.isDestroyed()) win.webContents.send('update:progress', { pct: -1, blocked: true })
+      return
     }
+    // Cierre real (X, Alt+F4, menú): guardar pantalla/posición ANTES de que
+    // muera la ventana, para reabrir ahí la próxima vez.
+    windowState.saveNow(win)
   })
 }
 

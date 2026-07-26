@@ -1,8 +1,30 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-18
+> ## 📍 ESTADO ACTUAL — 2026-07-26
 >
-> ### Último (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
+> ### Último (2026-07-26): MULTIMON portado de Benjagest + bump v0.4.4 (sin release aún)
+> Bloque **MON-1..4** en `desktop/`: la app **reabre en la pantalla y posición donde se
+> cerró** (nuevo `desktop/window-state.js`, portado del `WindowGeometry` de Benjagest:
+> persiste en `userData/window-state.json` al cerrar + debounce en move/resize; criterio
+> LENIENTE — solo descarta si el rectángulo no toca ninguna pantalla conectada; guarda
+> posición actual aunque esté maximizada + tamaño restaurado con `getNormalBounds`),
+> las **subventanas** (`window.open`: visor PDF, comparador, planos, buzón) abren
+> **centradas en el monitor de la app** (`childBoundsOnAppDisplay` en el
+> `setWindowOpenHandler`), y el tamaño guardado se **recorta al monitor** donde reabre si
+> no cabe. **Hallazgo importante (MON-4)**: bug de Electron con **DPI mixto** (monitores
+> 125%+100%, exactamente los de Benjamin) — pasar posición+tamaño al constructor o a
+> `overrideBrowserWindowOptions` aplica el tamaño dividido por la escala del primario si
+> la ventana cae en el otro monitor (1000×700→800×561). Workaround verificado: **`setBounds`
+> DOS veces** con la ventana ya creada; aplicado a principal y subventanas. **Verificado en
+> ejecución** con arnés Electron real sobre los 2 monitores reales: **14/14 PASS** (arnés en
+> scratchpad de la sesión, no commiteado). `node --check` OK en `main.js`/`window-state.js`
+> (no se tocó backend/frontend). Bump **v0.4.4** en los 3 `package.json` + lock del backend.
+> Commits MON-1/2/3/4 + chore en `feat/benjamin`, merge `--no-ff` a `develop`, todo pusheado.
+> **PENDIENTE**: smoke visual de Benjamin con la app completa (mover al 2º monitor, cerrar,
+> reabrir; maximizada; abrir visor PDF/comparador) — cuando toque, construir el `.msi` 0.4.4
+> con `desktop/build-msi.ps1` y publicar release.
+>
+> ### Anterior (2026-07-18): AUDITORÍA PRE-v0.4.3 — 27 bugs arreglados
 > Barrido multi-agente de TODO Construgest (41 agentes, estático + dinámico con curl real).
 > **27 bugs confirmados (0 falsos positivos), los 27 ARREGLADOS y verificados en ejecución**
 > contra la BD demo (backend dev nativo `node --watch`). Detalle y checklist en
@@ -10,11 +32,12 @@
 > (patrón `undefined→NULL` del shim, arreglado de raíz), IDOR entre organizaciones (ficheros,
 > gastos, subcontratas/trabajadores/equipos, ajustes, analítica IA), badges/contadores rotos,
 > planos que no dibujaban, certificaciones, partes, materiales, y el cambio de estado desde la
-> lista. 17 commits por área en `feat/benjamin` (pusheados) + bump a **v0.4.3**. `.msi` construido y
+> lista. 19 commits por área en `feat/benjamin` + bump a **v0.4.3**. `.msi` construido y
 > **release v0.4.3 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.3.msi` adjunto). Regresión OK.
-> **Próximo:** que Benjamin actualice su app instalada (banner de nueva versión) y confirme que sus
-> 10 proyectos reales siguen; luego REL-CLEAN (borrar `desktop/dist/ConstruGest-0.4.1.msi`, conservar
-> 0.4.2 y 0.4.3) y merge `--no-ff` de `feat/benjamin` a `develop`.
+> **Benjamin actualizó su app instalada a 0.4.3 y confirmó que todo va bien** (sus 10 proyectos siguen).
+> HECHO: REL-CLEAN (borrado `ConstruGest-0.4.1.msi`, conservados 0.4.2+0.4.3) y **merge `--no-ff` a
+> `develop`** (pusheado). **Pendiente aparte** (no bloqueante): rediseñar el endpoint `/restore`
+> duplicado y el clobber de `_backup` ajeno (ver Pendientes conocidos); volver a pruebas en producción.
 > Nota: los BUGs "restore duplicado", "clobber de backups" y "cambio de estado" que estaban en
 > Pendientes quedan CUBIERTOS por este barrido (estado ya arreglado; restore/clobber siguen
 > pendientes de decidir su rediseño, ver Pendientes).
