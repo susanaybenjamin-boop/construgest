@@ -5,7 +5,7 @@
 //
 // Soportado:
 //   .from(tabla)
-//   .select(cols) .insert(obj|obj[]) .update(obj) .delete() .upsert(obj|obj[],{onConflict})
+//   .select(cols,{count,head}) .insert(obj|obj[]) .update(obj) .delete() .upsert(obj|obj[],{onConflict})
 //   .eq .neq .gt .gte .lt .lte .is .in .like .ilike .or('col.op.val,col.op.val')
 //   .order(col,{ascending}) .limit(n) .single() .maybeSingle()
 //   insert/delete + .select() => RETURNING (MariaDB 10.5+)
@@ -173,11 +173,22 @@ class Builder {
     this.single_ = false
     this.maybe = false
     this.returning = false
+    this.countMode = null     // 'exact' | 'planned' | 'estimated'
+    this.head = false         // true => solo el contador, sin filas
   }
 
-  select(cols = '*') {
+  // select(cols, { count, head }) — el 2º argumento es el de PostgREST:
+  //   count: 'exact'  => devuelve además { count } con las filas que casan el WHERE
+  //   head: true      => NO devuelve filas (data: null), solo el contador
+  // Sin esto, `const { count } = await supabase.from(t).select('id', { count:'exact',
+  // head:true })` daba SIEMPRE undefined y los guardarraíles que dependen de un
+  // contador (p.ej. el aviso de "partida con datos vinculados" antes de borrarla)
+  // quedaban inertes.
+  select(cols = '*', opts = {}) {
     if (this.op === 'insert' || this.op === 'update' || this.op === 'delete' || this.op === 'upsert') this.returning = true
     this.cols = cols
+    if (opts && opts.count) this.countMode = opts.count
+    if (opts && opts.head) this.head = true
     return this
   }
   insert(obj) { this.op = 'insert'; this.values = obj; return this }
@@ -357,6 +368,18 @@ class Builder {
 
   async exec() {
     try {
+      // COUNT: mismo WHERE que la consulta, sin ORDER/LIMIT. Con head:true no se
+      // pide ninguna fila (es el uso habitual: solo interesa cuántas hay).
+      if (this.op === 'select' && this.countMode && !this.cols.includes('(')) {
+        const cparams = []
+        const [crows] = await pool.query(
+          `SELECT COUNT(*) AS c FROM ${qi(this.table)}` + this._where(cparams), cparams)
+        const count = Number(crows[0]?.c || 0)
+        if (this.head) return { data: null, count, error: null }
+        const { sql, params } = this._sql()
+        const [rows] = await pool.query(sql, params)
+        return { data: rows || [], count, error: null }
+      }
       if (this.op === 'select' && this.cols.includes('(')) return await this._execNested()
       if (this.op !== 'select' && this.returning && this.cols.includes('(')) return await this._execNestedMutation()
       const { sql, params } = this._sql()

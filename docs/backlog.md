@@ -1,8 +1,61 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-07-26
+> ## 📍 ESTADO ACTUAL — 2026-08-18
 >
-> ### Último (2026-07-26): MULTIMON portado de Benjagest + bump v0.4.4 (sin release aún)
+> ### Último (2026-08-18): CYPE-1 + BUD-1 + SHIM-1 y bump v0.4.5 (sin release aún)
+> **CYPE-1 — importación de PDF de CYPE/Arquímedes.** El listado "Presupuesto y
+> mediciones" no daba **ni un capítulo**. Cuatro causas, medidas ejecutando el parser
+> sobre el PDF real (M03 Huetor Vega, 137 pág.): (1) el PDF es el proyecto entero
+> —memoria + pliego + ESS + presupuesto— y el parser genérico sacaba **85 capítulos
+> fantasma** del índice del pliego; (2) el capítulo se escribe `Presupuesto parcial nº 2
+> Cimentaciones` y `cleanPdfText()` lo borraba como ruido de página; (3) la partida lleva
+> **dos** tokens antes de la unidad (`2.1.1 CRL010  m² Capa de hormigón…`) y
+> `detectPartidaStart()` espera CÓDIGO+unidad+título; (4) la cantidad y el precio van en
+> `Total m² ......: 97,510 7,12 694,27`, que `isTotalLine()` borraba por empezar por
+> "Total". Solución: **parser dedicado** en [`backend/src/services/cype-parser.js`](../backend/src/services/cype-parser.js)
+> + un "Paso 0" de 22 líneas en `budget-parser.js` que desvía **antes** de `cleanPdfText`.
+> No se toca el parser genérico → **cero riesgo para Presto/TCQ/Menfis** (comprobado que un
+> listado Presto no entra por este perfil). Detalle fino: las cabeceras `(Continuación...)`
+> que CYPE repite al cruzar página se comían **3 partidas y 13.001,21 €**.
+> **Verificado E2E**: `POST /api/ai/parse-budget-pdf` (HTTP 200, 0,1 s) → importación por
+> los mismos endpoints del diálogo → **11 capítulos, 127 partidas, 352 mediciones, 0 fallos**
+> y **PEM 164.680,71 €** en pantalla (el PDF dice 164.680,76 € para los capítulos 1–11;
+> 5 céntimos de redondeo por calcular cantidad × precio).
+> *Del documento*: los capítulos **12/13/14** (Seguridad y salud, Control de calidad,
+> Demolición) **no traen partidas** en el PDF, sólo importe en el resumen → no importables.
+> 7 partidas pierden el desglose de mediciones (el sello del visado va rotado en la misma
+> capa de texto y descoloca las columnas); cae a medición sintética con la cantidad correcta,
+> igual que `bc3-parser.js`.
+>
+> **BUD-1 — el borrado múltiple fallaba en silencio.** `handleBatchDelete()` no tenía
+> `try/catch`: un fallo puntual (red, 500, permisos) salía del bucle sin toast, sin
+> deseleccionar y sin borrar nada. Por eso unas veces iba y otras no, y una por una desde el
+> icono de la fila sí funcionaba (ese camino no pasa por ahí). Ahora cada partida va en su
+> `try/catch`, se cuentan borradas y fallidas y **siempre** se informa. Verificado con el
+> backend **parado a propósito**: antes no ocurría nada, ahora sale "Una partida no se pudo
+> eliminar".
+>
+> **SHIM-1 — guardarraíl de datos vinculados, que estaba INERTE.** Encontrado al verificar
+> BUD-1: se borraba una partida con 14 mediciones sin ningún aviso y el backend respondía
+> `measurements: 0`. `db/local.js` ignoraba el 2º argumento de `.select()`, así que los
+> `{ count: 'exact', head: true }` devolvían `undefined → 0` (5 usos, todos en
+> `routes/budgets.js`). **Lo grave**: `work_log_links` y `certifications` contaban igual de
+> mal → se podía borrar de un clic una partida **ya certificada o imputada en partes**,
+> arrastrando esos registros y sin aviso. Llevaba así desde la migración a MariaDB.
+> Verificado: 409 con contador exacto, `force` limpia sin huérfanos, partida sin
+> dependencias no molesta, y `/budgets/for-reference` cuenta bien.
+>
+> **Entorno**: contenedores `construgest-mariadb` + `construgest-backend` **recreados**
+> (`docker compose up -d --build`). Los volúmenes seguían existiendo → **no se perdieron
+> datos**. Presupuesto de prueba `CYPE Huetor Vega (E2E2)` dejado en "Obra Demo" para
+> inspección; se puede borrar cuando no haga falta.
+>
+> Bump **v0.4.5** en los 3 `package.json` + lock del backend.
+> **PENDIENTE**: construir el `.msi` 0.4.5 y publicar la release (con el gate pre-release:
+> verificar el stage de `resources/app` antes de publicar). Sigue pendiente de la sesión
+> anterior el **smoke visual MULTIMON** de Benjamin.
+>
+> ### Anterior (2026-07-26): MULTIMON portado de Benjagest + bump v0.4.4 (sin release aún)
 > Bloque **MON-1..4** en `desktop/`: la app **reabre en la pantalla y posición donde se
 > cerró** (nuevo `desktop/window-state.js`, portado del `WindowGeometry` de Benjagest:
 > persiste en `userData/window-state.json` al cerrar + debounce en move/resize; criterio
