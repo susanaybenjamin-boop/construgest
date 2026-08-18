@@ -578,36 +578,63 @@ export default function BudgetPage() {
 
   const handleBatchDelete = async () => {
     if (selectedItems.size === 0) return
-    if (!confirm(`¿Eliminar ${selectedItems.size} partidas seleccionadas?`)) return
+    const n = selectedItems.size
+    if (!confirm(n === 1 ? '¿Eliminar la partida seleccionada?' : `¿Eliminar ${n} partidas seleccionadas?`)) return
+
     const { deleteItem } = useBudgetStore.getState()
-    let needsForce = false
-    let forced = 0
-    for (const itemId of selectedItems) {
-      const first = await deleteItem(itemId)
-      if (!first.success) {
-        needsForce = true
-        const d = first.dependencies
-        const msg = `Una o más partidas tienen datos vinculados (` +
-          `${d.measurements} mediciones, ${d.breakdown} lineas desglose, ` +
-          `${d.work_log_links} ejecuciones en partes, ${d.certifications} certificaciones). ` +
-          `¿Eliminar igualmente? Se borrarán también esos datos.`
-        if (!confirm(msg)) {
-          setSelectedItems(new Set())
-          setLastClickedItem(null)
-          return
+    const ids = Array.from(selectedItems)
+    let deleted = 0
+    let failed = 0
+    let force = false        // el usuario ya autorizó arrastrar los datos vinculados
+    let cancelled = false
+
+    for (const id of ids) {
+      try {
+        let res = await deleteItem(id, { force })
+
+        // 409: la partida tiene datos vinculados y hace falta confirmación explícita.
+        // Se pregunta UNA vez y a partir de ahí se aplica force al resto del lote.
+        if (!res.success) {
+          const d = res.dependencies
+          const bits: string[] = []
+          if (d.measurements) bits.push(`${d.measurements} mediciones`)
+          if (d.breakdown) bits.push(`${d.breakdown} líneas de desglose`)
+          if (d.work_log_links) bits.push(`${d.work_log_links} ejecuciones en partes`)
+          if (d.certifications) bits.push(`${d.certifications} certificaciones`)
+          const ok = confirm(
+            `Una o más partidas tienen datos vinculados (${bits.join(', ')}).\n\n` +
+            `¿Eliminar igualmente? Se borrarán también esos registros y los totales se recalcularán.`
+          )
+          if (!ok) { cancelled = true; break }
+          force = true
+          res = await deleteItem(id, { force: true })
+          if (!res.success) { failed++; continue }
         }
-        // forzar borrado de TODOS los seleccionados desde cero
-        for (const id of selectedItems) {
-          const r = await deleteItem(id, { force: true })
-          if (r.success) forced++
-        }
-        break
+        deleted++
+      } catch (err) {
+        // Un fallo puntual (red, 500, permisos) NO debe abortar el lote en
+        // silencio: antes la excepción salía de aquí sin toast ni deselección y
+        // parecía que el botón no hacía nada.
+        console.error('[batch-delete] fallo al eliminar', id, err)
+        failed++
       }
     }
-    await autoRenumberAll()
+
+    if (deleted > 0) await autoRenumberAll()
     setSelectedItems(new Set())
     setLastClickedItem(null)
-    addToast('success', `${needsForce ? forced : selectedItems.size} partidas eliminadas`)
+
+    if (deleted > 0) {
+      addToast('success', `${deleted} partida${deleted !== 1 ? 's' : ''} eliminada${deleted !== 1 ? 's' : ''}`)
+    }
+    if (failed > 0) {
+      addToast('error', failed === 1
+        ? 'Una partida no se pudo eliminar'
+        : `${failed} partidas no se pudieron eliminar`)
+    }
+    if (cancelled && deleted === 0 && failed === 0) {
+      addToast('info', 'Borrado cancelado')
+    }
   }
 
   // Compute selected items total (excluye desactivadas)
