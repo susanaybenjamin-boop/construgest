@@ -25,6 +25,7 @@
  */
 
 import { callAI } from './ai-service.js'
+import { isCypeBudget, parseCypeBudget } from './cype-parser.js'
 
 // ═══════════════════════════════════════════════════════
 // PROMPT EXPERTO PARA IA
@@ -1279,6 +1280,27 @@ function validateAndClean(chapters) {
  */
 export async function parseBudgetFromText(rawText, useAI = true, organizationId = null, userId = null) {
   const allLogs = []
+
+  // Paso 0: perfil CYPE/Arquímedes ("Presupuesto parcial nº N Nombre").
+  // Va ANTES de cleanPdfText porque esa limpieza borra justo los dos marcadores
+  // de este formato: la cabecera de capítulo (isPageNoise la ve como
+  // "PRESUPUESTO PARCIAL") y la línea "Total <ud> ...: cant precio importe"
+  // (isTotalLine la ve como un total). Ver cype-parser.js.
+  if (isCypeBudget(rawText)) {
+    const cype = parseCypeBudget(rawText)
+    allLogs.push(...cype.logs)
+    const cypeItems = cype.chapters.reduce((s, ch) => s + ch.items.length, 0)
+    if (cypeItems > 0) {
+      const { chapters, errors } = validateAndClean(cype.chapters)
+      if (errors.length) allLogs.push(`❌ ${errors.length} errores: ${errors.slice(0, 3).join('; ')}`)
+      const finalItems = chapters.reduce((s, ch) => s + ch.items.length, 0)
+      const finalMeas = chapters.reduce((s, ch) =>
+        s + ch.items.reduce((si, it) => si + (it.measurements?.length || 0), 0), 0)
+      allLogs.push(`✅ Resultado: ${chapters.length} capítulos, ${finalItems} partidas, ${finalMeas} mediciones (perfil CYPE)`)
+      return { chapters, logs: allLogs }
+    }
+    allLogs.push('⚠️ Formato CYPE detectado pero sin partidas — se sigue con el parser genérico')
+  }
 
   // Paso 1: Limpiar texto
   const { text: cleanedText, logs: cleanLogs } = cleanPdfText(rawText)
