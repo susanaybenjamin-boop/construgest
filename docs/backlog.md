@@ -50,10 +50,40 @@
 > datos**. Presupuesto de prueba `CYPE Huetor Vega (E2E2)` dejado en "Obra Demo" para
 > inspección; se puede borrar cuando no haga falta.
 >
-> Bump **v0.4.5** en los 3 `package.json` + lock del backend.
-> **PENDIENTE**: construir el `.msi` 0.4.5 y publicar la release (con el gate pre-release:
-> verificar el stage de `resources/app` antes de publicar). Sigue pendiente de la sesión
-> anterior el **smoke visual MULTIMON** de Benjamin.
+> Bump **v0.4.5** en los 3 `package.json` + lock del backend. Merge `--no-ff` a `develop`,
+> ambas ramas pusheadas, `.msi` construido y **RELEASE v0.4.5 PUBLICADA** (GitHub, Latest,
+> `ConstruGest-0.4.5.msi` 452 MB, target = merge de develop `db0bac3`).
+>
+> ### 🔴 SEC-1 (2026-08-18): el instalador llevaba dentro una clave privada de Google Cloud
+> **Cazado en el gate pre-release, antes de publicar 0.4.5.** `build-msi.ps1` copiaba
+> `backend/` entera excluyendo sólo `.env*`, así que `backend/google-vision-key.json` —una
+> **service account key REAL** de `construgest-ocr@construgest-web.iam.gserviceaccount.com`—
+> se empaquetaba en el `.msi`. Confirmado leyendo la tabla `File` de cada instalador (no por
+> suposición): estaba en **0.4.2, 0.4.3 y 0.4.4, ya publicados**, y el repo
+> `susanaybenjamin-boop/construgest` es **PÚBLICO**. Los ficheros estaban bien en
+> `.gitignore` y nunca llegaron a git; el agujero era **sólo** el empaquetado.
+>
+> Resuelto: (1) **Benjamin revocó la clave** — es lo único que cierra de verdad el agujero,
+> porque borrar adjuntos no deshace descargas ya hechas; (2) `.msi` borrados de las releases
+> 0.4.2/0.4.3/0.4.4 (hay copia local en `desktop/dist`, es reversible); (3) `build-msi.ps1`
+> excluye ahora **los mismos patrones que el `.gitignore`** y tiene un **gate de secretos**
+> (paso 3.5/4) que **aborta el build**: busca por nombre **y por contenido**
+> (`BEGIN PRIVATE KEY`, `service_account`…), ignorando `node_modules` para no chocar con las
+> claves de prueba de las dependencias.
+>
+> **Lección**: excluir por nombre NO basta. El gate destapó una segunda copia de la misma
+> clave, `backend/construgest-web-23e7ee55f786.json`, que no encaja con ningún patrón de
+> nombre obvio y sólo se pilla escaneando el contenido. Sobre 1498 ficheros dio **0 falsos
+> positivos**. El `.msi` 0.4.5 publicado tiene 4906 ficheros, exactamente **2 menos** que el
+> primer intento: los dos de la clave.
+>
+> **PENDIENTE**: decidir qué hacer con los `.msi` de **v0.4.0 y v0.4.1**, que siguen
+> publicados y casi con seguridad llevan la clave (la clave es de marzo, esas releases de
+> julio). **No verificados**: esos dos `.msi` no están en disco, así que borrarlos sería
+> irreversible. La clave ya está revocada, así que no es urgente.
+> Los dos ficheros de credenciales **siguen en `backend/`** (ya inútiles: el backend no usa
+> Google Vision, el OCR es local) — conviene borrarlos del disco.
+> Sigue pendiente de la sesión anterior el **smoke visual MULTIMON** de Benjamin.
 >
 > ### Anterior (2026-07-26): MULTIMON portado de Benjagest + bump v0.4.4 (sin release aún)
 > Bloque **MON-1..4** en `desktop/`: la app **reabre en la pantalla y posición donde se

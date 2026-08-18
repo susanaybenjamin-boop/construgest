@@ -70,8 +70,12 @@ New-Item -ItemType Directory -Force $App | Out-Null
 Copy-Item -Force "$Desktop\*.js" $App
 Copy-Item -Force "$Desktop\package.json" $App
 
-# Backend (sin .env local ni caché) -> resources\backend
-Invoke-Robocopy (Join-Path $Root "backend") (Join-Path $Res "backend") @("/E","/XD","node_modules\.cache","/XF",".env",".env.example",".env.sample")
+# Backend (sin .env local, credenciales ni caché) -> resources\backend
+# El .msi se publica en un repo PUBLICO: aqui solo se excluye por nombre, y
+# ademas el gate de secretos de abajo revienta el build si se cuela algo.
+# Las exclusiones de credenciales son LAS MISMAS del .gitignore (bloque
+# "Credenciales / secretos"): si algo no se sube a git, tampoco se empaqueta.
+Invoke-Robocopy (Join-Path $Root "backend") (Join-Path $Res "backend") @("/E","/XD","node_modules\.cache","/XF",".env",".env.example",".env.sample","google-vision-key.json","*-credentials.json","construgest-web-*.json","*service-account*.json","*.p12","*.pfx")
 
 # Frontend standalone -> resources\frontend (server.js en la raíz)
 Invoke-Robocopy (Join-Path $Root "frontend\.next\standalone") (Join-Path $Res "frontend") @("/E")
@@ -85,6 +89,53 @@ Copy-Item -Force (Join-Path $Root "database\init\*.sql") $Db
 if (Test-Path "$Desktop\runtime") {
   Invoke-Robocopy "$Desktop\runtime" (Join-Path $Res "runtime") @("/E","/XF","README.md")
 }
+
+# ---------------------------------------------------------------------------
+# GATE DE SECRETOS. El .msi se publica en un repositorio PUBLICO, asi que nada
+# que parezca una credencial puede entrar en el payload.
+#
+# Por que existe: hasta la 0.4.5 el robocopy del backend solo excluia .env*, y
+# backend\google-vision-key.json (service account REAL de Google Cloud) se
+# empaqueto en los .msi 0.4.2, 0.4.3 y 0.4.4, que estan publicados. Excluir por
+# nombre no basta: cualquier credencial nueva con otro nombre volveria a colarse.
+#
+# Se ignora node_modules a proposito: las dependencias traen claves de prueba en
+# sus tests y no son secretos nuestros.
+# ---------------------------------------------------------------------------
+Write-Host "==> 3.5/4  Gate de secretos sobre el payload"
+
+$NamePatterns = @('*credential*.json','*-key.json','google-vision-key.json','.env','.env.*','*.p12','*.pfx','*.pem','id_rsa','*.keystore')
+$ContentMarks = @('BEGIN PRIVATE KEY','BEGIN RSA PRIVATE KEY','BEGIN OPENSSH PRIVATE KEY','"type": "service_account"','"private_key"')
+$TextExt      = @('.json','.env','.txt','.yml','.yaml','.js','.cjs','.mjs','.ts','.ps1','.sh','.cfg','.ini','.conf')
+
+$Suspects = @()
+$candidates = Get-ChildItem -Path $Stage -Recurse -File -Force -ErrorAction SilentlyContinue |
+  Where-Object { $_.FullName -notmatch '\\node_modules\\' }
+
+foreach ($f in $candidates) {
+  $rel = $f.FullName.Substring($Stage.Length).TrimStart('\')
+  foreach ($p in $NamePatterns) {
+    if ($f.Name -like $p) { $Suspects += "$rel  (nombre: $p)"; break }
+  }
+  if ($f.Length -lt 1MB -and $TextExt -contains $f.Extension.ToLower()) {
+    $head = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
+    if ($head) {
+      foreach ($m in $ContentMarks) {
+        if ($head.Contains($m)) { $Suspects += "$rel  (contenido: $m)"; break }
+      }
+    }
+  }
+}
+
+$Suspects = $Suspects | Sort-Object -Unique
+if ($Suspects.Count -gt 0) {
+  Write-Host ""
+  Write-Host "GATE DE SECRETOS: el payload contiene posibles credenciales." -ForegroundColor Red
+  $Suspects | ForEach-Object { Write-Host "   - $_" -ForegroundColor Red }
+  Write-Host ""
+  throw "Build abortado: quita esos ficheros o anadelos a las exclusiones del robocopy. NO publiques este .msi."
+}
+Write-Host "    OK: $($candidates.Count) ficheros revisados (node_modules excluido), sin credenciales."
 
 Write-Host "==> 4/4  WiX: heat + candle + light"
 $AppFiles = Join-Path $Desktop "installer\AppFiles.wxs"
