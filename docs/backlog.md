@@ -38,7 +38,18 @@
 > espacios. Y `@tiptap/extension-subscript`/`superscript` están instalados pero **no
 > registrados** en `RichTextEditor.tsx` (el conversor ya los soporta si algún día se activan).
 >
-> Bump **v0.4.6** en los 3 `package.json` + lock del backend.
+> Bump **v0.4.6** en los 3 `package.json` + lock del backend. Merge `--no-ff` a `develop`
+> (`e22652f`), ambas ramas pusheadas, `.msi` construido (gate de secretos OK: 1496 ficheros,
+> sin credenciales) y **RELEASE v0.4.6 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.6.msi`
+> 474,7 MB, target = merge de develop `e22652f`). Verificado **antes de publicar** que el
+> payload empaquetado lleva el arreglo (marcador del conversor presente en el chunk del
+> frontend compilado) y `package.json` 0.4.6 en `resources/app`. La API de GitHub ya da
+> `v0.4.6` como *latest* → el banner de actualización lo verá.
+>
+> **PENDIENTE**: que Benjamin actualice su app instalada a 0.4.6 y compruebe el PDF de un
+> presupuesto con capítulo "Condiciones Generales" con formatos. Después, **REL-CLEAN**:
+> `desktop/dist` tiene ya **5 `.msi` (~2,3 GB)** — 0.4.2/0.4.3/0.4.4 se pueden borrar
+> conservando 0.4.5 (anterior) y 0.4.6 (nueva). No borrados aún: se decide con Benjamin.
 >
 > ### Anterior (2026-08-18): CYPE-1 + BUD-1 + SHIM-1 y bump v0.4.5 (sin release aún)
 > **CYPE-1 — importación de PDF de CYPE/Arquímedes.** El listado "Presupuesto y
@@ -238,7 +249,12 @@
 > el árbol de procesos con `taskkill /T /F`. · **`v0.4.3`** barrido de QA pre-release: **27 bugs**
 > arreglados (corrupción de datos por `undefined→NULL` del shim, IDOR entre organizaciones, badges/
 > contadores, planos, certificaciones, partes, materiales, cambio de estado desde la lista). Ver
-> [`docs/qa-v0.4.3-findings.md`](qa-v0.4.3-findings.md).
+> [`docs/qa-v0.4.3-findings.md`](qa-v0.4.3-findings.md). · **`v0.4.4`** MULTIMON (la app reabre
+> en el monitor donde se cerró) · **`v0.4.5`** parser de PDF de CYPE/Arquímedes, borrado múltiple
+> que fallaba en silencio, guardarraíl de datos vinculados que estaba inerte, y gate de secretos
+> en el build del `.msi` · **`v0.4.6`** el capítulo de texto libre ("Condiciones Generales") ya
+> imprime su formato en el PDF: negrita/cursiva/subrayado/tachado/resaltado, color, listas
+> anidadas, citas y sangrías (PDF-1).
 >
 > ### Para la próxima RELEASE (v0.4.3) — arreglo ya en código, falta empaquetar
 > - **BUG cambio de estado desde la LISTA** (arreglado en `feat/benjamin`, sin commitear/publicar):
