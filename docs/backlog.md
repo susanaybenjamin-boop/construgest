@@ -2,7 +2,46 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-08-21
 >
-> ### Último (2026-08-21): PDF-1 — el capítulo de texto libre perdía TODO el formato
+> ### Último (2026-08-21): PDF-2 — la negrita del PDF era Medium (500), no Bold (700)
+> Benjamin probó la 0.4.6 y avisó: la negrita **se ve, pero más floja que en pantalla**
+> ("se oscurece un poco, casi imperceptible"). **No era del conversor de PDF-1: es pdfmake.**
+> Su `vfs` solo empaqueta Roboto Regular, Medium, Italic y MediumItalic, y su
+> `defaultClientFonts` mapea `bold` → **Roboto-Medium** (`pdfmake.js:44209`). Confirmado
+> leyendo la tabla OS/2 de los ficheros, no suponiendo: `Roboto-Medium.ttf` declara
+> `usWeightClass` **500**, mientras el editor pinta `<strong>` a 700. Le pasaba a **toda** la
+> negrita del PDF (banners de capítulo, cabeceras de tabla, subtotales, TOTAL), no solo al
+> capítulo libre; venía así desde la primera release.
+>
+> Solución: incrustar **Roboto-Bold y Roboto-BoldItalic** (peso 700 verificado en OS/2, name
+> table "Roboto Bold"/"Roboto Bold Italic") en
+> [`frontend/src/services/robotoBoldData.ts`](../frontend/src/services/robotoBoldData.ts),
+> siguiendo el patrón de `afmData.ts`, y que `getFonts()` devuelva un dict Roboto que apunte
+> a ellas. Los **3 exportadores** (presupuesto, certificación y muestra de Ajustes) pasan por
+> `getFonts()`, así que la negrita queda igual en los tres.
+>
+> **Riesgo de caracteres perdidos: descartado midiendo.** Se parseó la tabla `cmap` de las
+> fuentes nuevas → **927 code points, exactamente los mismos** que la Roboto-Medium que se
+> usaba antes para la negrita (**0 pérdidas**). El primer intento sí era peligroso: el TTF que
+> sirve gstatic por defecto viene **subseteado** (44 KB, faltaban ‡ ≈ ≠ ≤ ≥ y 516 code points
+> más); se rehízo pidiendo todos los subconjuntos (128 KB). Verificado además generando un PDF
+> con acentos, ñ, ü, ç, ¿?¡!, «», €, º, ª, —, •, ≤, ≥, ≈, ½, ²³, ©®™ y § en negrita y
+> negrita-cursiva: salen todos.
+>
+> **Verificado en ejecución (prueba diferencial)**: la línea en negrita pasa de **415,70 a
+> 419,36 pt** de ancho (fuente más pesada) y la línea normal queda **IDÉNTICA** (411,33) → el
+> cambio afecta solo a la negrita. E2E por el servicio real (`generateBudgetPdfBlob`) sobre un
+> presupuesto: "SUBTOTAL:" 43,94 → 44,41 y "Concepto" 34,28 → 34,34. `tsc --noEmit` limpio.
+> Fuente: Roboto de Google Fonts, **SIL Open Font License 1.1**.
+>
+> **Limpieza de releases (REL-CLEAN, hecha)**: borrados los `.msi` locales de 0.4.2/0.4.3/0.4.4
+> (**−1,36 GB**), conservados 0.4.5 (anterior) y 0.4.6. Y **cerrado el pendiente de SEC-1**:
+> borrados de GitHub los `.msi` de **v0.4.0 y v0.4.1**, los dos últimos que llevaban dentro la
+> clave de Google (ya revocada); las releases y sus notas siguen ahí, solo se quitó el adjunto.
+> Quedan con `.msi` publicado 0.4.5 (para revertir) y la última.
+>
+> Bump **v0.4.7** en los 3 `package.json` + lock del backend.
+>
+> ### Anterior (2026-08-21): PDF-1 — el capítulo de texto libre perdía TODO el formato
 > **Síntoma de Benjamin**: en el capítulo libre "Condiciones Generales" se escribe con
 > formatos y sangrías, y el PDF del presupuesto lo saca en plano. **Auditado midiendo, no
 > suponiendo**: se generaron PDFs reales con el pdfmake que empaqueta la app (0.2.23) y se
@@ -46,10 +85,8 @@
 > frontend compilado) y `package.json` 0.4.6 en `resources/app`. La API de GitHub ya da
 > `v0.4.6` como *latest* → el banner de actualización lo verá.
 >
-> **PENDIENTE**: que Benjamin actualice su app instalada a 0.4.6 y compruebe el PDF de un
-> presupuesto con capítulo "Condiciones Generales" con formatos. Después, **REL-CLEAN**:
-> `desktop/dist` tiene ya **5 `.msi` (~2,3 GB)** — 0.4.2/0.4.3/0.4.4 se pueden borrar
-> conservando 0.4.5 (anterior) y 0.4.6 (nueva). No borrados aún: se decide con Benjamin.
+> **HECHO**: Benjamin actualizó a 0.4.6 y confirmó que los formatos salen; el único reparo
+> fue la negrita → PDF-2. REL-CLEAN hecho (ver arriba).
 >
 > ### Anterior (2026-08-18): CYPE-1 + BUD-1 + SHIM-1 y bump v0.4.5 (sin release aún)
 > **CYPE-1 — importación de PDF de CYPE/Arquímedes.** El listado "Presupuesto y
@@ -254,7 +291,8 @@
 > que fallaba en silencio, guardarraíl de datos vinculados que estaba inerte, y gate de secretos
 > en el build del `.msi` · **`v0.4.6`** el capítulo de texto libre ("Condiciones Generales") ya
 > imprime su formato en el PDF: negrita/cursiva/subrayado/tachado/resaltado, color, listas
-> anidadas, citas y sangrías (PDF-1).
+> anidadas, citas y sangrías (PDF-1). · **`v0.4.7`** la negrita del PDF pasa a Roboto Bold
+> real (700) en vez de Medium (500), que se veía más floja que en pantalla (PDF-2).
 >
 > ### Para la próxima RELEASE (v0.4.3) — arreglo ya en código, falta empaquetar
 > - **BUG cambio de estado desde la LISTA** (arreglado en `feat/benjamin`, sin commitear/publicar):
