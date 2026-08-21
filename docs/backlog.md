@@ -39,7 +39,15 @@
 > clave de Google (ya revocada); las releases y sus notas siguen ahí, solo se quitó el adjunto.
 > Quedan con `.msi` publicado 0.4.5 (para revertir) y la última.
 >
-> Bump **v0.4.7** en los 3 `package.json` + lock del backend.
+> Bump **v0.4.7** en los 3 `package.json` + lock del backend. Merge `--no-ff` a `develop`
+> (`6fe1114`), ambas ramas pusheadas, `.msi` construido (gate de secretos OK: 1496 ficheros,
+> sin credenciales) y **RELEASE v0.4.7 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.7.msi`
+> 474,9 MB, target = merge de develop `6fe1114`). Verificado **antes de publicar** que el
+> payload lleva la fuente nueva Y el conversor de PDF-1, y `package.json` 0.4.7 en
+> `resources/app`. La API de GitHub ya da `v0.4.7` como *latest*.
+> **REL-CLEAN al día**: Benjamin confirmó la 0.4.7 y se borró el `.msi` local de 0.4.5;
+> en `desktop/dist` quedan solo **0.4.6 (anterior) y 0.4.7 (actual)**. En GitHub conservan
+> `.msi` 0.4.5, 0.4.6 y 0.4.7; el resto de releases ya no tienen adjunto.
 >
 > ### Anterior (2026-08-21): PDF-1 — el capítulo de texto libre perdía TODO el formato
 > **Síntoma de Benjamin**: en el capítulo libre "Condiciones Generales" se escribe con
