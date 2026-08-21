@@ -1,8 +1,46 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-08-18
+> ## 📍 ESTADO ACTUAL — 2026-08-21
 >
-> ### Último (2026-08-18): CYPE-1 + BUD-1 + SHIM-1 y bump v0.4.5 (sin release aún)
+> ### Último (2026-08-21): PDF-1 — el capítulo de texto libre perdía TODO el formato
+> **Síntoma de Benjamin**: en el capítulo libre "Condiciones Generales" se escribe con
+> formatos y sangrías, y el PDF del presupuesto lo saca en plano. **Auditado midiendo, no
+> suponiendo**: se generaron PDFs reales con el pdfmake que empaqueta la app (0.2.23) y se
+> leyeron de vuelta con pdfjs **fuente, color y posición de cada glifo**. El fallo está
+> entero en `htmlToPdfmake()` de
+> [`frontend/src/services/budgetPdfExport.ts`](../frontend/src/services/budgetPdfExport.ts);
+> el resto del PDF (portada, índice, capítulos con partidas, resumen, firmas) usa objetos
+> `text` planos y **no estaba afectado**. Seis fallos:
+> 1. **Negrita, cursiva, subrayado, tachado y resaltado no se aplicaban.** El conversor
+>    envolvía siempre los hijos en un array y ponía el estilo en la envoltura
+>    (`{text:[{text:'x'}], bold:true}`), y **pdfmake solo respeta el estilo en la HOJA**.
+>    Medido: la palabra en negrita usaba el MISMO recurso de fuente que el texto normal.
+>    Por eso los encabezados H1/H2/H3 y la alineación sí salían (son estilo de bloque).
+> 2. **El color de texto se perdía siempre**: el navegador normaliza `style.color` a
+>    `rgb(255, 0, 0)` y pdfkit solo entiende hex/nombres → lo descartaba en silencio (el PDF
+>    no emitía ni operador de color). Nuevo `cssColorToPdf()`.
+> 3. **Las listas anidadas (sangría con Tab) DESAPARECÍAN**: el `<li>` metía párrafo + `<ul>`
+>    hijo dentro de `text`. Ahora van en `stack`.
+> 4. **`<blockquote>` no tenía caso** → sin sangría (salía en x=40 como un párrafo normal).
+> 5. **La sangría escrita a mano se perdía**: pdfmake recorta los espacios (y los `&nbsp;`
+>    que mete el navegador) al principio de línea. Ahora se convierten en **margen izquierdo
+>    real** (`extractIndent`).
+> 6. `<pre>/<code>` salían a 12pt sin estilo; no había `<hr>` ni `sub`/`sup`.
+>
+> **Verificado E2E contra el servicio real** (`generateBudgetPdfBlob`, página temporal en el
+> dev server, sin BD): en el PDF resultante negrita / cursiva / negrita+cursiva usan **tres
+> recursos de fuente distintos**, el color sale `#dc2626`, el resaltado dibuja su rectángulo
+> `#fef08a`, el subítem anidado indenta a x=60.4 (padre x=50.2), la cita a x=56.0 y la
+> sangría manual a x=50.0. `tsc --noEmit` limpio.
+>
+> *De la auditoría, no arreglado (decisión de producto)*: **el editor no tiene botón de
+> sangría** (indentar/desindentar), así que hoy solo se puede sangrar con listas, cita o
+> espacios. Y `@tiptap/extension-subscript`/`superscript` están instalados pero **no
+> registrados** en `RichTextEditor.tsx` (el conversor ya los soporta si algún día se activan).
+>
+> Bump **v0.4.6** en los 3 `package.json` + lock del backend.
+>
+> ### Anterior (2026-08-18): CYPE-1 + BUD-1 + SHIM-1 y bump v0.4.5 (sin release aún)
 > **CYPE-1 — importación de PDF de CYPE/Arquímedes.** El listado "Presupuesto y
 > mediciones" no daba **ni un capítulo**. Cuatro causas, medidas ejecutando el parser
 > sobre el PDF real (M03 Huetor Vega, 137 pág.): (1) el PDF es el proyecto entero

@@ -107,7 +107,49 @@ const numberToWords = (n: number): string => {
 }
 
 // ─── HTML → pdfmake converter (for rich text chapters) ─────────────────
-function htmlToPdfmake(html: string): any[] {
+
+/** CSS color → algo que pdfmake (pdfkit) entienda.
+ *  El navegador normaliza `style.color` a `rgb(r, g, b)`, formato que pdfkit NO parsea:
+ *  lo descarta en silencio y el texto sale en negro. */
+function cssColorToPdf(value?: string | null): string | undefined {
+  if (!value) return undefined
+  const v = value.trim().toLowerCase()
+  if (!v || ['inherit', 'initial', 'unset', 'currentcolor', 'transparent', 'none'].includes(v)) return undefined
+  if (v.startsWith('#')) return v
+  const m = v.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/)
+  if (m) {
+    const hex = (n: string) =>
+      Math.max(0, Math.min(255, Math.round(parseFloat(n)))).toString(16).padStart(2, '0')
+    return '#' + hex(m[1]) + hex(m[2]) + hex(m[3])
+  }
+  // Nombres CSS ('red', 'blue'…): pdfkit los resuelve; cualquier otra cosa, fuera.
+  return /^[a-z]+$/.test(v) ? v : undefined
+}
+
+/** pdfmake solo aplica un estilo si está en la HOJA (`{text: 'x', bold: true}`).
+ *  Si `text` es un array, IGNORA el estilo de la envoltura — por eso las marcas del
+ *  editor (negrita, cursiva, color…) desaparecían del PDF. Se empujan a las hojas.
+ *  Los props propios del hijo mandan, así `<strong><em>` conserva ambas marcas. */
+function applyInlineStyle(children: any[], style: Record<string, any>): any[] {
+  return children.map((c) =>
+    c && typeof c === 'object' && !Array.isArray(c) ? { ...style, ...c } : c
+  )
+}
+
+/** Sangría escrita a mano: pdfmake recorta los espacios (y los `&nbsp;` que mete el
+ *  navegador) al principio de línea, así que se convierten en margen izquierdo real.
+ *  Devuelve el margen en puntos y quita esos espacios del texto. */
+function extractIndent(children: any[]): number {
+  const first = children[0]
+  if (!first || typeof first !== 'object' || typeof first.text !== 'string') return 0
+  const m = /^[ \u00A0\t]+/.exec(first.text)
+  if (!m) return 0
+  const spaces = m[0].replace(/\t/g, '    ').length
+  first.text = first.text.slice(m[0].length)
+  return Math.round(spaces * 2.4)
+}
+
+function htmlToPdfmake(html: string, contentWidth = 515): any[] {
   if (!html || html === '<p></p>') return []
 
   // Parse HTML using a temporary DOM element
@@ -127,46 +169,59 @@ function htmlToPdfmake(html: string): any[] {
     const el = node as HTMLElement
     const tag = el.tagName.toLowerCase()
 
-    // Collect children content
+    // Collect children content (aplanando: las marcas inline devuelven arrays)
     const children: any[] = []
     el.childNodes.forEach((child) => {
       const r = processNode(child)
-      if (r) children.push(r)
+      if (!r) return
+      if (Array.isArray(r)) children.push(...r)
+      else children.push(r)
     })
 
     // Extract text-align from style
-    const align = el.style?.textAlign as 'left' | 'center' | 'right' | 'justify' | undefined
+    const align = (el.style?.textAlign || undefined) as 'left' | 'center' | 'right' | 'justify' | undefined
 
     switch (tag) {
       case 'p': {
-        const para: any = { text: children.length ? children : '', margin: [0, 2, 0, 2] as [number, number, number, number], fontSize: 9.5, color: '#1e293b' }
+        const indent = extractIndent(children)
+        const para: any = { text: children.length ? children : '', margin: [indent, 2, 0, 2] as [number, number, number, number], fontSize: 9.5, color: '#1e293b' }
         if (align) para.alignment = align
         return para
       }
-      case 'h1': return { text: children, fontSize: 14, bold: true, color: '#111827', margin: [0, 8, 0, 4] as [number, number, number, number], alignment: align }
-      case 'h2': return { text: children, fontSize: 12, bold: true, color: '#1f2937', margin: [0, 6, 0, 3] as [number, number, number, number], alignment: align }
-      case 'h3': return { text: children, fontSize: 10.5, bold: true, color: '#374151', margin: [0, 4, 0, 2] as [number, number, number, number], alignment: align }
+      case 'h1': return { text: children, fontSize: 14, bold: true, color: '#111827', margin: [extractIndent(children), 8, 0, 4] as [number, number, number, number], ...(align ? { alignment: align } : {}) }
+      case 'h2': return { text: children, fontSize: 12, bold: true, color: '#1f2937', margin: [extractIndent(children), 6, 0, 3] as [number, number, number, number], ...(align ? { alignment: align } : {}) }
+      case 'h3': return { text: children, fontSize: 10.5, bold: true, color: '#374151', margin: [extractIndent(children), 4, 0, 2] as [number, number, number, number], ...(align ? { alignment: align } : {}) }
       case 'strong':
-      case 'b': return { text: children, bold: true }
+      case 'b': return applyInlineStyle(children, { bold: true })
       case 'em':
-      case 'i': return { text: children, italics: true }
-      case 'u': return { text: children, decoration: 'underline' }
+      case 'i': return applyInlineStyle(children, { italics: true })
+      case 'u': return applyInlineStyle(children, { decoration: 'underline' })
       case 's':
-      case 'del': return { text: children, decoration: 'lineThrough' }
+      case 'del': return applyInlineStyle(children, { decoration: 'lineThrough' })
+      case 'sub': return applyInlineStyle(children, { sub: true })
+      case 'sup': return applyInlineStyle(children, { sup: true })
       case 'mark': {
-        const bg = el.getAttribute('data-color') || el.style?.backgroundColor || '#fef08a'
-        return { text: children, background: bg }
+        const bg = cssColorToPdf(el.getAttribute('data-color')) || cssColorToPdf(el.style?.backgroundColor) || '#fef08a'
+        return applyInlineStyle(children, { background: bg })
       }
       case 'span': {
-        const style: any = { text: children }
-        if (el.style?.color) style.color = el.style.color
-        return style
+        const color = cssColorToPdf(el.style?.color)
+        return color ? applyInlineStyle(children, { color }) : children
       }
-      case 'ul': return { ul: children.filter(Boolean).map((c: any) => c._liContent || c), margin: [0, 2, 0, 2] as [number, number, number, number], fontSize: 9.5 }
-      case 'ol': return { ol: children.filter(Boolean).map((c: any) => c._liContent || c), margin: [0, 2, 0, 2] as [number, number, number, number], fontSize: 9.5 }
+      case 'code': return applyInlineStyle(children, { fontSize: 9, background: '#f1f5f9' })
+      case 'pre': return { stack: children, margin: [10, 4, 0, 4] as [number, number, number, number], fontSize: 9, color: '#334155' }
+      case 'blockquote': return { stack: children, margin: [16, 2, 0, 2] as [number, number, number, number] }
+      case 'ul': return { ul: children.filter(Boolean), margin: [0, 2, 0, 2] as [number, number, number, number], fontSize: 9.5 }
+      case 'ol': return { ol: children.filter(Boolean), margin: [0, 2, 0, 2] as [number, number, number, number], fontSize: 9.5 }
       case 'li': {
-        const content = children.length === 1 ? children[0] : { text: children }
-        return { _liContent: content, ...content }
+        // Un <li> puede llevar párrafo + lista anidada (la sangría con Tab). Metiéndolo
+        // todo en `text` pdfmake tiraba la lista anidada; con `stack` se respeta.
+        if (children.length === 0) return null
+        return children.length === 1 ? children[0] : { stack: children }
+      }
+      case 'hr': return {
+        canvas: [{ type: 'line', x1: 0, y1: 0, x2: contentWidth, y2: 0, lineWidth: 0.5, lineColor: '#cbd5e1' }],
+        margin: [0, 6, 0, 6] as [number, number, number, number],
       }
       case 'br': return { text: '\n' }
       default: return children.length === 1 ? children[0] : children.length > 0 ? { text: children } : null
@@ -547,7 +602,7 @@ function buildBudgetDocDefinition(
     }
 
     if (isLegalText && ch.chapter.description) {
-      const richContent = htmlToPdfmake(ch.chapter.description)
+      const richContent = htmlToPdfmake(ch.chapter.description, contentWidth)
       if (richContent.length > 0) {
         chapterPages.push(...richContent)
         if (ch.items.length > 0) {
