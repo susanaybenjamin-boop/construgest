@@ -5,6 +5,7 @@
  */
 import type { FullBudget, ChapterWithItems } from '@/types'
 import { AFM_DATA } from './afmData'
+import { ROBOTO_BOLD_DATA } from './robotoBoldData'
 
 // Dynamic import for pdfmake (browser-only) — shared singleton used by all PDF modules
 let pdfMake: any = null
@@ -24,6 +25,9 @@ export async function loadPdfMake() {
       pm.vfs = pf?.pdfMake?.vfs ?? pf?.vfs ?? pf ?? {}
       // Embed AFM font metrics for standard fonts (Courier, Helvetica, Times)
       Object.assign(pm.vfs, AFM_DATA)
+      // Roboto Bold real (700). El vfs de pdfmake solo trae Medium (500) y la usa
+      // como «bold», por eso la negrita salía más floja que en pantalla.
+      Object.assign(pm.vfs, ROBOTO_BOLD_DATA)
       pdfMake = pm
       return pm
     })()
@@ -298,10 +302,21 @@ export function buildStandardFonts(fontFamily: string): Record<string, any> | un
   return def ? { [fontFamily]: def } : undefined
 }
 
-/** Returns the fonts dict for a given family — does NOT mutate global pdfMake.fonts.
- *  Returns null for Roboto so pdfmake uses its built-in defaultClientFonts fallback. */
+/** Roboto con la negrita CORREGIDA. El `defaultClientFonts` de pdfmake mapea
+ *  bold → Roboto-Medium (peso 500); aquí apunta a la Roboto-Bold real (700) que
+ *  `loadPdfMake()` mete en el vfs, para que la negrita del PDF se vea como en pantalla. */
+const ROBOTO_FONTS = {
+  Roboto: {
+    normal: 'Roboto-Regular.ttf',
+    bold: 'Roboto-Bold.ttf',
+    italics: 'Roboto-Italic.ttf',
+    bolditalics: 'Roboto-BoldItalic.ttf',
+  },
+}
+
+/** Returns the fonts dict for a given family — does NOT mutate global pdfMake.fonts. */
 export function getFonts(fontFamily: string): Record<string, any> | null {
-  return buildStandardFonts(fontFamily) ?? null
+  return buildStandardFonts(fontFamily) ?? ROBOTO_FONTS
 }
 
 // ─── Options Interface ──────────────────────────────────────────────────
