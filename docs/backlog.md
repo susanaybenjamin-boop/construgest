@@ -49,10 +49,10 @@
 > da 0.4.8, `/projects/backups`, backup y restore-backup OK; Ajustes responde 200.
 > **build-msi.ps1**: WiX 3.14 ya no está en Program Files en este equipo → ahora usa también el de
 > Tauri (`%LOCALAPPDATA%	auriWixTools314`).
-> **PENDIENTE**: Benjamin instala la 0.4.8 (banner de actualización) y prueba backup + restaurar en
-> su app. Después, REL-CLEAN: borrar el `.msi` local de 0.4.6 (quedan 0.4.7 anterior y 0.4.8).
-> Restos de la prueba en `C:Usersenjaconstrugest-smoke` (copia de BD y carpetas): borrar
-> cuando se confirme la 0.4.8.
+> **HECHO**: Benjamin instaló la 0.4.8 y confirmó que backup y restaurar funcionan. **REL-CLEAN al
+> día**: borrado el `.msi` local de 0.4.6; en `desktop/dist` quedan **0.4.7 (anterior) y 0.4.8
+> (actual)**. Borrada la carpeta de pruebas `C:Usersenjaconstrugest-smoke` (215 MB). Los
+> `.msi` publicados en GitHub no se han tocado.
 >
 > ### Anterior (2026-08-21): PDF-2 — la negrita del PDF era Medium (500), no Bold (700)
 > Benjamin probó la 0.4.6 y avisó: la negrita **se ve, pero más floja que en pantalla**
