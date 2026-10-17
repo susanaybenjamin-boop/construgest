@@ -51,7 +51,7 @@
 > Tauri (`%LOCALAPPDATA%\tauri\WixTools314`).
 > **HECHO**: Benjamin instaló la 0.4.8 y confirmó que backup y restaurar funcionan. **REL-CLEAN al
 > día**: borrado el `.msi` local de 0.4.6; en `desktop/dist` quedan **0.4.7 (anterior) y 0.4.8
-> (actual)**. Borrada la carpeta de pruebas `C:Usersenjaconstrugest-smoke` (215 MB). Los
+> (actual)**. Borrada la carpeta de pruebas `C:\Users\benja\construgest-smoke` (215 MB). Los
 > `.msi` publicados en GitHub no se han tocado.
 >
 > ### Anterior (2026-08-21): PDF-2 — la negrita del PDF era Medium (500), no Bold (700)
