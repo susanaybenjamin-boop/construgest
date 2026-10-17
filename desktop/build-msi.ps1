@@ -16,7 +16,10 @@ $Root    = Split-Path -Parent $Desktop
 $Stage   = Join-Path $Desktop "build\stage"
 $ObjDir  = Join-Path $Desktop "build\obj"
 $Dist    = Join-Path $Desktop "dist"
-$Wix     = "C:\Program Files (x86)\WiX Toolset v3.14\bin"
+# WiX v3.14: instalado en Program Files, o el que trae Tauri en %LOCALAPPDATA% (el de este equipo).
+$Wix     = @("C:\Program Files (x86)\WiX Toolset v3.14\bin", (Join-Path $env:LOCALAPPDATA "tauri\WixTools314")) |
+           Where-Object { Test-Path (Join-Path $_ "candle.exe") } | Select-Object -First 1
+if (-not $Wix) { $Wix = "C:\Program Files (x86)\WiX Toolset v3.14\bin" }
 
 if (-not (Test-Path "$Wix\candle.exe")) { throw "No se encuentra WiX v3.14 en $Wix" }
 
