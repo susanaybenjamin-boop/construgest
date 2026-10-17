@@ -48,7 +48,7 @@
 > backend y el frontend EMPAQUETADOS (runtime de Electron, contra la BD de prueba): `/api/version`
 > da 0.4.8, `/projects/backups`, backup y restore-backup OK; Ajustes responde 200.
 > **build-msi.ps1**: WiX 3.14 ya no está en Program Files en este equipo → ahora usa también el de
-> Tauri (`%LOCALAPPDATA%	auriWixTools314`).
+> Tauri (`%LOCALAPPDATA%\tauri\WixTools314`).
 > **HECHO**: Benjamin instaló la 0.4.8 y confirmó que backup y restaurar funcionan. **REL-CLEAN al
 > día**: borrado el `.msi` local de 0.4.6; en `desktop/dist` quedan **0.4.7 (anterior) y 0.4.8
 > (actual)**. Borrada la carpeta de pruebas `C:Usersenjaconstrugest-smoke` (215 MB). Los
