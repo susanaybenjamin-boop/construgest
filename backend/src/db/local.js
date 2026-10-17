@@ -413,4 +413,5 @@ const local = {
   storage,
 }
 
+export { normVal }
 export default local

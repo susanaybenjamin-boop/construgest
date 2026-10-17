@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import multer from 'multer'
 import { randomUUID } from 'crypto'
-import { mkdir, writeFile, readFile, readdir } from 'fs/promises'
+import { mkdir, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { authMiddleware, projectAccessMiddleware } from '../middlewares/auth.js'
 import supabase from '../db/local.js'
 import { parseDxf, formatEntitiesForAI } from '../services/dxf-service.js'
 import { notifyProjectsChange } from '../services/realtimeBroadcast.js'
+import { backupProject, restoreProject, readBackupInfo } from '../services/project-backup.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
@@ -216,6 +217,27 @@ router.get('/trash', async (req, res, next) => {
       .order('deleted_at', { ascending: false })
     if (error) throw error
     res.json(data || [])
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/projects/backups - Proyectos de mi org con la fecha de su último backup.
+// Declarado antes de GET /:id (igual que /trash).
+router.get('/backups', async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('cons_projects')
+      .select('id, name, folder_path')
+      .eq('organization_id', req.user.organization_id)
+      .is('deleted_at', null)
+      .order('name', { ascending: true })
+    if (error) throw error
+    const out = []
+    for (const p of data || []) {
+      out.push({ id: p.id, name: p.name, folder_path: p.folder_path, backup: await readBackupInfo(p.folder_path) })
+    }
+    res.json(out)
   } catch (err) {
     next(err)
   }
@@ -831,296 +853,30 @@ router.delete('/:id/files/:fileId', projectAccessMiddleware({ requireWrite: true
   }
 })
 
-// POST /api/projects/:id/backup - Export full project backup to folder_path
+// POST /api/projects/:id/backup - Copia de seguridad completa en <folder_path>/_backup
 router.post('/:id/backup', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
-    const projectId = req.params.id
-
-    // Get project
-    const { data: project, error: projErr } = await supabase
-      .from('cons_projects').select('*').eq('id', projectId).single()
-    if (projErr) throw projErr
-
-    if (!project.folder_path) {
-      return res.status(400).json({ error: 'El proyecto no tiene carpeta asignada' })
-    }
-
-    const backupDir = join(project.folder_path, '_backup')
-    await mkdir(backupDir, { recursive: true })
-
-    // Helper to query and save
-    const exportTable = async (table, filter, filename) => {
-      const { data, error } = await supabase.from(table).select('*').match(filter)
-      if (error) throw error
-      await writeFile(join(backupDir, filename), JSON.stringify(data || [], null, 2), 'utf-8')
-      return data || []
-    }
-
-    // 1. Project metadata
-    await writeFile(join(backupDir, 'project.json'), JSON.stringify(project, null, 2), 'utf-8')
-
-    // 2. Project files metadata
-    const files = await exportTable('cons_project_files', { project_id: projectId }, 'files.json')
-
-    // 3. Budgets
-    const budgets = await exportTable('cons_budgets', { project_id: projectId }, 'budgets.json')
-
-    // 4. Chapters (for each budget)
-    const allChapters = []
-    const allItems = []
-    const allMeasurements = []
-    const allBreakdowns = []
-    for (const budget of budgets) {
-      const { data: chapters } = await supabase.from('cons_chapters').select('*').eq('budget_id', budget.id)
-      if (chapters) {
-        allChapters.push(...chapters)
-        for (const ch of chapters) {
-          const { data: items } = await supabase.from('cons_budget_items').select('*').eq('chapter_id', ch.id)
-          if (items) {
-            allItems.push(...items)
-            for (const item of items) {
-              const { data: measurements } = await supabase.from('cons_measurements').select('*').eq('budget_item_id', item.id)
-              if (measurements) allMeasurements.push(...measurements)
-              const { data: breakdowns } = await supabase.from('cons_price_breakdown').select('*').eq('budget_item_id', item.id)
-              if (breakdowns) allBreakdowns.push(...breakdowns)
-            }
-          }
-        }
-      }
-    }
-    await writeFile(join(backupDir, 'chapters.json'), JSON.stringify(allChapters, null, 2), 'utf-8')
-    await writeFile(join(backupDir, 'budget_items.json'), JSON.stringify(allItems, null, 2), 'utf-8')
-    await writeFile(join(backupDir, 'measurements.json'), JSON.stringify(allMeasurements, null, 2), 'utf-8')
-    await writeFile(join(backupDir, 'price_breakdowns.json'), JSON.stringify(allBreakdowns, null, 2), 'utf-8')
-
-    // 5. Certifications
-    const certs = await exportTable('cons_certifications', {}, 'certifications.json')
-      .catch(() => []) // table might not exist
-    // Filter by budget_ids
-    const budgetIds = budgets.map(b => b.id)
-    const filteredCerts = certs.filter(c => budgetIds.includes(c.budget_id))
-    await writeFile(join(backupDir, 'certifications.json'), JSON.stringify(filteredCerts, null, 2), 'utf-8')
-
-    if (filteredCerts.length > 0) {
-      const certIds = filteredCerts.map(c => c.id)
-      const { data: certItems } = await supabase.from('cons_certification_items').select('*').in('certification_id', certIds)
-      await writeFile(join(backupDir, 'certification_items.json'), JSON.stringify(certItems || [], null, 2), 'utf-8')
-    }
-
-    // 6. Work logs
-    const workLogs = await exportTable('cons_work_logs', { project_id: projectId }, 'work_logs.json')
-    if (workLogs.length > 0) {
-      const wlIds = workLogs.map(w => w.id)
-      const tables = ['cons_work_log_labor', 'cons_work_log_materials', 'cons_work_log_equipment', 'cons_work_log_budget_links']
-      for (const table of tables) {
-        const { data } = await supabase.from(table).select('*').in('work_log_id', wlIds)
-        const filename = table.replace('cons_', '') + '.json'
-        await writeFile(join(backupDir, filename), JSON.stringify(data || [], null, 2), 'utf-8')
-      }
-    }
-
-    // 7. Expenses
-    await exportTable('cons_project_expenses', { project_id: projectId }, 'expenses.json')
-
-    // 8. Plan annotations & calibrations (by file_id)
-    if (files.length > 0) {
-      const fileIds = files.map(f => f.id)
-      const { data: annotations } = await supabase.from('cons_plan_annotations').select('*').in('file_id', fileIds)
-      await writeFile(join(backupDir, 'plan_annotations.json'), JSON.stringify(annotations || [], null, 2), 'utf-8')
-      const { data: calibrations } = await supabase.from('cons_plan_calibrations').select('*').in('file_id', fileIds)
-      await writeFile(join(backupDir, 'plan_calibrations.json'), JSON.stringify(calibrations || [], null, 2), 'utf-8')
-    }
-
-    // 9. Download actual files from Supabase Storage
-    const filesDir = join(backupDir, 'files')
-    await mkdir(filesDir, { recursive: true })
-    let downloadedCount = 0
-    for (const file of files) {
-      try {
-        const { data: fileData } = await supabase.storage
-          .from('construgest-files')
-          .download(file.storage_path)
-        if (fileData) {
-          const buffer = Buffer.from(await fileData.arrayBuffer())
-          await writeFile(join(filesDir, file.original_name), buffer)
-          downloadedCount++
-        }
-      } catch {
-        // Skip files that can't be downloaded
-      }
-    }
-
-    // Write backup metadata
-    const meta = {
-      backup_date: new Date().toISOString(),
-      project_id: projectId,
-      project_name: project.name,
-      tables: {
-        budgets: budgets.length,
-        chapters: allChapters.length,
-        budget_items: allItems.length,
-        measurements: allMeasurements.length,
-        price_breakdowns: allBreakdowns.length,
-        certifications: filteredCerts.length,
-        work_logs: workLogs.length,
-        expenses: 0,
-        files: files.length,
-        files_downloaded: downloadedCount,
-      }
-    }
-    await writeFile(join(backupDir, '_backup_meta.json'), JSON.stringify(meta, null, 2), 'utf-8')
-
-    res.json({ success: true, path: backupDir, meta })
+    const { data: project } = await supabase
+      .from('cons_projects').select('id, folder_path').eq('id', req.params.id).single()
+    if (!project) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const { path, meta } = await backupProject(project.id, project.folder_path)
+    res.json({ success: true, path, meta: { backup_date: meta.backup_date, tables: meta.tables, files_saved: meta.files_saved, files_missing: meta.files_missing } })
   } catch (err) {
     next(err)
   }
 })
 
-// POST /api/projects/:id/restore - Restore project data from backup folder
-router.post('/:id/restore', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
+// POST /api/projects/:id/restore-backup - SUSTITUYE los datos del proyecto por los
+// de su backup (antes guarda una copia del estado actual). Es otra ruta que la de
+// /:id/restore (sacar de la papelera): antes se llamaban igual y esta nunca se ejecutaba.
+router.post('/:id/restore-backup', projectAccessMiddleware({ requireWrite: true }), async (req, res, next) => {
   try {
-    const projectId = req.params.id
-
-    const { data: project, error: projErr } = await supabase
-      .from('cons_projects').select('*').eq('id', projectId).single()
-    if (projErr) throw projErr
-
-    if (!project.folder_path) {
-      return res.status(400).json({ error: 'El proyecto no tiene carpeta asignada' })
-    }
-
-    const backupDir = join(project.folder_path, '_backup')
-
-    // Read backup metadata
-    let meta
-    try {
-      const metaRaw = await readFile(join(backupDir, '_backup_meta.json'), 'utf-8')
-      meta = JSON.parse(metaRaw)
-    } catch {
-      return res.status(400).json({ error: 'No se encontró un backup válido en la carpeta del proyecto' })
-    }
-
-    // Helper to read JSON file
-    const readJson = async (filename) => {
-      try {
-        const raw = await readFile(join(backupDir, filename), 'utf-8')
-        return JSON.parse(raw)
-      } catch {
-        return []
-      }
-    }
-
-    const restored = {}
-
-    // Restore budgets
-    const budgets = await readJson('budgets.json')
-    if (budgets.length > 0) {
-      const { error } = await supabase.from('cons_budgets').upsert(budgets, { onConflict: 'id' })
-      if (error) console.warn('Restore budgets error:', error.message)
-      restored.budgets = budgets.length
-    }
-
-    // Restore chapters
-    const chapters = await readJson('chapters.json')
-    if (chapters.length > 0) {
-      const { error } = await supabase.from('cons_chapters').upsert(chapters, { onConflict: 'id' })
-      if (error) console.warn('Restore chapters error:', error.message)
-      restored.chapters = chapters.length
-    }
-
-    // Restore budget items
-    const items = await readJson('budget_items.json')
-    if (items.length > 0) {
-      const { error } = await supabase.from('cons_budget_items').upsert(items, { onConflict: 'id' })
-      if (error) console.warn('Restore items error:', error.message)
-      restored.budget_items = items.length
-    }
-
-    // Restore measurements
-    const measurements = await readJson('measurements.json')
-    if (measurements.length > 0) {
-      const { error } = await supabase.from('cons_measurements').upsert(measurements, { onConflict: 'id' })
-      if (error) console.warn('Restore measurements error:', error.message)
-      restored.measurements = measurements.length
-    }
-
-    // Restore price breakdowns
-    const breakdowns = await readJson('price_breakdowns.json')
-    if (breakdowns.length > 0) {
-      const { error } = await supabase.from('cons_price_breakdown').upsert(breakdowns, { onConflict: 'id' })
-      if (error) console.warn('Restore breakdowns error:', error.message)
-      restored.price_breakdowns = breakdowns.length
-    }
-
-    // Restore work logs
-    const workLogs = await readJson('work_logs.json')
-    if (workLogs.length > 0) {
-      const { error } = await supabase.from('cons_work_logs').upsert(workLogs, { onConflict: 'id' })
-      if (error) console.warn('Restore work_logs error:', error.message)
-      restored.work_logs = workLogs.length
-
-      for (const table of ['work_log_labor', 'work_log_materials', 'work_log_equipment', 'work_log_budget_links']) {
-        const data = await readJson(`${table}.json`)
-        if (data.length > 0) {
-          const { error } = await supabase.from(`cons_${table}`).upsert(data, { onConflict: 'id' })
-          if (error) console.warn(`Restore ${table} error:`, error.message)
-          restored[table] = data.length
-        }
-      }
-    }
-
-    // Restore expenses
-    const expenses = await readJson('expenses.json')
-    if (expenses.length > 0) {
-      const { error } = await supabase.from('cons_project_expenses').upsert(expenses, { onConflict: 'id' })
-      if (error) console.warn('Restore expenses error:', error.message)
-      restored.expenses = expenses.length
-    }
-
-    // Restore certifications
-    const certs = await readJson('certifications.json')
-    if (certs.length > 0) {
-      const { error } = await supabase.from('cons_certifications').upsert(certs, { onConflict: 'id' })
-      if (error) console.warn('Restore certifications error:', error.message)
-      restored.certifications = certs.length
-
-      const certItems = await readJson('certification_items.json')
-      if (certItems.length > 0) {
-        const { error } = await supabase.from('cons_certification_items').upsert(certItems, { onConflict: 'id' })
-        if (error) console.warn('Restore cert_items error:', error.message)
-        restored.certification_items = certItems.length
-      }
-    }
-
-    // Restore files to Supabase Storage
-    const filesMeta = await readJson('files.json')
-    const filesDir = join(backupDir, 'files')
-    let uploadedCount = 0
-    for (const fileMeta of filesMeta) {
-      try {
-        const localPath = join(filesDir, fileMeta.original_name)
-        const buffer = await readFile(localPath)
-        await supabase.storage
-          .from('construgest-files')
-          .upload(fileMeta.storage_path, buffer, {
-            contentType: 'application/octet-stream',
-            upsert: true,
-          })
-        uploadedCount++
-      } catch {
-        // Skip files that can't be uploaded
-      }
-    }
-
-    // Restore file metadata
-    if (filesMeta.length > 0) {
-      const { error } = await supabase.from('cons_project_files').upsert(filesMeta, { onConflict: 'id' })
-      if (error) console.warn('Restore files metadata error:', error.message)
-      restored.files = filesMeta.length
-      restored.files_uploaded = uploadedCount
-    }
-
-    res.json({ success: true, backup_date: meta.backup_date, restored })
+    const { data: project } = await supabase
+      .from('cons_projects').select('id, organization_id, folder_path').eq('id', req.params.id).single()
+    if (!project) return res.status(404).json({ error: 'Proyecto no encontrado' })
+    const result = await restoreProject(project.id, project.folder_path)
+    res.json({ success: true, ...result })
+    notifyProjectsChange(project.organization_id, 'project-restore-backup')
   } catch (err) {
     next(err)
   }
