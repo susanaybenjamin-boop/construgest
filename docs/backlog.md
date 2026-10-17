@@ -41,7 +41,18 @@
 > `_backup_antes_de_restaurar_*` se acumulan (una por restauración); no se limpian solas.
 > Benjamin decidió dejar que los backups viejos de la nube se sustituyan.
 >
-> Bump **v0.4.8** (3 `package.json` + lock del backend) para la release.
+> Bump **v0.4.8** en los 3 `package.json` + lock del backend. Merge `--no-ff` a `develop`
+> (`7d9606a` y `5019fb7`), ambas ramas pusheadas, `.msi` construido (gate de secretos OK: 1497
+> ficheros, sin credenciales) y **RELEASE v0.4.8 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.8.msi`
+> 474,9 MB, target = merge de develop `5019fb7`). Verificado **antes de publicar** arrancando el
+> backend y el frontend EMPAQUETADOS (runtime de Electron, contra la BD de prueba): `/api/version`
+> da 0.4.8, `/projects/backups`, backup y restore-backup OK; Ajustes responde 200.
+> **build-msi.ps1**: WiX 3.14 ya no está en Program Files en este equipo → ahora usa también el de
+> Tauri (`%LOCALAPPDATA%	auriWixTools314`).
+> **PENDIENTE**: Benjamin instala la 0.4.8 (banner de actualización) y prueba backup + restaurar en
+> su app. Después, REL-CLEAN: borrar el `.msi` local de 0.4.6 (quedan 0.4.7 anterior y 0.4.8).
+> Restos de la prueba en `C:Usersenjaconstrugest-smoke` (copia de BD y carpetas): borrar
+> cuando se confirme la 0.4.8.
 >
 > ### Anterior (2026-08-21): PDF-2 — la negrita del PDF era Medium (500), no Bold (700)
 > Benjamin probó la 0.4.6 y avisó: la negrita **se ve, pero más floja que en pantalla**
