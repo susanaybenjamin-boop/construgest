@@ -10,12 +10,13 @@ import {
   Globe, Percent, DollarSign,
   Eye, EyeOff, CheckCircle2,
   Printer, Info, FileText, Upload, Trash2, RefreshCw, Image as ImageIcon,
-  Lock, User as UserIcon, FolderOpen, Download, UploadCloud,
+  Lock, User as UserIcon, FolderOpen,
 } from 'lucide-react'
 import api from '@/lib/api'
 import localApi from '@/lib/localApi'
 import { DecimalInput } from '@/components/ui/DecimalInput'
 import { FolderPicker } from '@/components/ui/FolderPicker'
+import { BackupSection } from '@/components/settings/BackupSection'
 import { useProjectStore } from '@/stores/projectStore'
 import { useVersionStore } from '@/stores/versionStore'
 
@@ -75,7 +76,7 @@ export default function AdminSettingsPage() {
   const { t, i18n } = useTranslation()
   const { user, organizationId, checkAuth } = useAuthStore()
   const settings = useSettingsStore()
-  const { projects, loadProjects } = useProjectStore()
+  const { loadProjects } = useProjectStore()
   const { addToast } = useNotificationStore()
 
   const [activeTab, setActiveTab] = useState<Tab>('company')
@@ -100,8 +101,6 @@ export default function AdminSettingsPage() {
 
   // ── Sync folders & backup state ──
   const [syncingFolders, setSyncingFolders] = useState(false)
-  const [backingUp, setBackingUp] = useState(false)
-  const [restoring, setRestoring] = useState(false)
   const [verifyingPath, setVerifyingPath] = useState(false)
   const [pathVerification, setPathVerification] = useState<{ valid: boolean; message: string } | null>(null)
 
@@ -521,68 +520,7 @@ export default function AdminSettingsPage() {
                         <p className="text-xs text-gray-400 mt-1">Crea subcarpetas en disco para todos los proyectos que aún no las tengan.</p>
 
                         {/* Backup & Restore */}
-                        <div className="mt-5 pt-5 border-t border-gray-200">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                          <Download className="w-4 h-4 text-green-600" /> Copias de seguridad
-                        </h4>
-                        <p className="text-sm text-gray-500 mb-3">Exporta todos los datos de los proyectos a sus carpetas locales como backup.</p>
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              setBackingUp(true)
-                              try {
-                                let ok = 0, errors = 0
-                                for (const p of projects) {
-                                  if (!p.folder_path) continue
-                                  try {
-                                    await localApi.post(`/projects/${p.id}/backup`)
-                                    ok++
-                                  } catch { errors++ }
-                                }
-                                addToast('success', `Backup completado: ${ok} proyectos exportados${errors > 0 ? `, ${errors} errores` : ''}`)
-                              } catch {
-                                addToast('error', 'Error al realizar backup')
-                              } finally {
-                                setBackingUp(false)
-                              }
-                            }}
-                            disabled={backingUp || projects.length === 0}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
-                          >
-                            {backingUp ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                            Backup de todos los proyectos
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              if (!confirm('¿Restaurar todos los proyectos desde sus backups locales? Los datos actuales se sobrescribirán.')) return
-                              setRestoring(true)
-                              try {
-                                let ok = 0, errors = 0
-                                for (const p of projects) {
-                                  if (!p.folder_path) continue
-                                  try {
-                                    await localApi.post(`/projects/${p.id}/restore`)
-                                    ok++
-                                  } catch { errors++ }
-                                }
-                                addToast('success', `Restauración completada: ${ok} proyectos${errors > 0 ? `, ${errors} sin backup` : ''}`)
-                              } catch {
-                                addToast('error', 'Error al restaurar')
-                              } finally {
-                                setRestoring(false)
-                              }
-                            }}
-                            disabled={restoring || projects.length === 0}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
-                          >
-                            {restoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
-                            Restaurar desde backup
-                          </button>
-                        </div>
-                          <p className="text-xs text-gray-400 mt-1">Los backups se guardan en una subcarpeta _backup dentro de cada proyecto.</p>
-                        </div>
+                        <BackupSection />
                       </div>
                     )}
                   </div>
