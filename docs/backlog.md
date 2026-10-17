@@ -1,8 +1,49 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-08-21
+> ## 📍 ESTADO ACTUAL — 2026-10-17
 >
-> ### Último (2026-08-21): PDF-2 — la negrita del PDF era Medium (500), no Bold (700)
+> ### Último (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
+> **Síntomas de Benjamin**: "Backup de todos los proyectos" da error, y restaurar solo deja
+> hacerlo con todos a la vez.
+>
+> **BAK-1 — causa real (vista en `construgest.log` de la app instalada y reproducida con curl):**
+> la ruta de backup usaba `.match()`, que `db/local.js` **nunca implementó** →
+> `supabase.from(...).select(...).match is not a function` en TODOS los proyectos (solo llegaba
+> a escribir `project.json`). El auto-backup de `useAutoSync` fallaba igual, en silencio.
+> **Desde la migración a MariaDB (julio) no se hizo ningún backup**; los `_backup` que había en
+> las carpetas eran de la nube (22-mar → 1-jul). Y el restaurar **nunca se ejecutaba**:
+> `POST /:id/restore` estaba duplicado y ganaba el de la papelera (cerrado el BUG "restore
+> duplicado" de Pendientes conocidos). Nuevo [`services/project-backup.js`](../backend/src/services/project-backup.js),
+> directo a MariaDB:
+> - Backup de **21 tablas** (antes faltaban enlaces certificación↔parte, comparaciones y
+>   extracciones de planos) + ficheros por `storage_path`. Carpeta temporal y cambio al final
+>   (un backup a medias no machaca el bueno). ~0,15 s por proyecto.
+> - Restaurar **SUSTITUYE** los datos del proyecto (decisión de Benjamin) en UNA transacción,
+>   tras guardar copia del estado actual en `_backup_antes_de_restaurar_<fecha>`. Lee también
+>   los backups de la nube (filtra columnas que ya no existen; ficheros por `original_name`).
+>   Referencias externas desaparecidas (material, proveedor) → NULL + aviso.
+> - Rutas: `POST /:id/backup`, `POST /:id/restore-backup` (nueva), `GET /projects/backups`.
+>
+> **BAK-2 — UI** ([`components/settings/BackupSection.tsx`](../frontend/src/components/settings/BackupSection.tsx)):
+> lista de proyectos con fecha del último backup (marca "copia antigua (nube)"), casillas +
+> "Seleccionar todos", "Restaurar seleccionados (N)" con confirmación. Fuera el restaurar-todos.
+> Timeout largo (localApi tenía 5 s) y error real por proyecto en el aviso.
+>
+> **Verificado** sobre una COPIA de la BD de producción (MariaDB aparte en :3318, datadir
+> copiado con la app cerrada) y de las carpetas (`C:\Users\benja\construgest-smoke`): los 14
+> proyectos hacen backup→restore→backup **byte a byte idénticos**; subcapítulos, descompuestos,
+> comparaciones, enlaces RESTRICT parte↔certificación y material borrado; backup de la nube con
+> PDF; 400 sin backup / de otro proyecto; backup corrupto → rollback (datos intactos). En el
+> navegador: backup de todos, restaurar 2 marcados, seleccionar todos, aviso de éxito.
+>
+> *A saber*: con el auto-backup funcionando, `_backup` se reescribe 5 s después de cada cambio
+> → sirve para recuperar tras perder la BD/reinstalar, no para "deshacer lo de ayer". Las copias
+> `_backup_antes_de_restaurar_*` se acumulan (una por restauración); no se limpian solas.
+> Benjamin decidió dejar que los backups viejos de la nube se sustituyan.
+>
+> Bump **v0.4.8** (3 `package.json` + lock del backend) para la release.
+>
+> ### Anterior (2026-08-21): PDF-2 — la negrita del PDF era Medium (500), no Bold (700)
 > Benjamin probó la 0.4.6 y avisó: la negrita **se ve, pero más floja que en pantalla**
 > ("se oscurece un poco, casi imperceptible"). **No era del conversor de PDF-1: es pdfmake.**
 > Su `vfs` solo empaqueta Roboto Regular, Medium, Italic y MediumItalic, y su
@@ -347,15 +388,14 @@
 >    `backend/data/price-bases/`; tesseract/poppler en el `.msi` de Windows (hoy OCR solo en Docker);
 >    endpoint de import por lotes (hoy el import hace ~cientos de llamadas seguidas); e2e real del PIN
 >    y del bloqueo de update dentro del `.msi` (compilan y typecheck OK, faltan probar instalados).
->    - **BUG restore duplicado:** `POST /:id/restore` está declarado DOS veces en
->      `backend/src/routes/projects.js` (la de papelera, ~línea 293, tapa a la de backup, ~línea 967).
->      La de backup queda muerta → el "restaurar desde carpeta" de la UI nunca se ejecuta. Renombrar
->      una de las dos rutas (p.ej. `/:id/restore-backup`) y cablear la UI a la correcta.
+>    - ~~**BUG restore duplicado**~~ **HECHO 2026-10-17 (BAK-1)**: la ruta de backup es ahora
+>      `POST /:id/restore-backup` y la UI la usa.
 >    - **BUG clobber de backups:** cuando un proyecto tiene `folder_path` apuntando a una carpeta con
 >      `_backup`, el sync/backup de la app **sobrescribe** ahí `project.json` (y potencialmente otros
 >      JSON). Riesgo de pisar un backup REAL con datos de prueba (le pasó a OGIJARES el 14-jul).
 >      Revisar `syncService.ts` + rutas `sync-file`/`backup`: no escribir sobre un `_backup` ajeno,
->      o avisar/separar por `project_id`.
+>      o avisar/separar por `project_id`. *(2026-10-17, BAK-1: el RESTAURAR ya rechaza un `_backup`
+>      cuyo `project_id` es de otro proyecto; el BACKUP sigue escribiendo en la carpeta asignada.)*
 >
 > ---
 >
