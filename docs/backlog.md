@@ -1,8 +1,62 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-10-17
+> ## 📍 ESTADO ACTUAL — 2026-11-07
 >
-> ### Último (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
+> ### Último (2026-11-07): LOGIN roto — un backend VIEJO ocupaba el puerto 5000
+> **Síntoma de Benjamin**: "no me deja entrar; meto el PIN y vuelve a la pantalla del PIN,
+> pruebo con email y contraseña y vuelve al inicio de sesión, como si no se ejecutara el
+> proceso". Hasta ese día sí entraba.
+>
+> **Causa real (vista en el log de la app instalada y reproducida con curl, no supuesta):**
+> en la carpeta de Inicio de Windows había `ConstruGest-Backend.lnk` **del 22/03/2026** (de la
+> época en la nube) que arrancaba `%LOCALAPPDATA%\ConstruGest\backend\start-local.vbs` →
+> el **backend v0.1.0 con `src/db/supabase.js`**. Ese proceso cogía el **puerto 5000** al iniciar
+> sesión en Windows. Cadena completa:
+> 1. El backend de la 0.4.8 moría con `EADDRINUSE :::5000` (`app.js:147`).
+> 2. El lanzador **decía "backend listo" igualmente**: `waitForHttp` aceptaba *cualquier*
+>    respuesta HTTP del puerto, y nadie vigilaba la muerte del hijo. `killPortWindows` no
+>    consiguió identificar al okupa (el log: "sigue ocupado", sin línea de PID) y **seguía**.
+> 3. El login iba al backend de la nube → `401 {"error":"Credenciales incorrectas"}` (los
+>    usuarios están en la MariaDB local del 3308). Comprobado con curl contra el okupa.
+> 4. `api.ts:33-38` trataba ese 401 como sesión caducada → `window.location.href='/login'`,
+>    y la **recarga borraba el mensaje** antes de verse; con PIN, de vuelta a la pantalla del PIN.
+>
+> **En el equipo de Benjamin (hecho, con su OK):** muerto el proceso viejo, borrado el acceso
+> directo del Inicio (copia de seguridad guardada) y reabierta la app → `/api/version` da 0.4.8
+> y el log dice `API running on port 5000`. **Entra.** El histórico del log confirma que todos
+> los arranques anteriores levantaron su propio backend (el último limpio, 30-oct 16:32) y que
+> los fallos empiezan el 7-nov a las 11:12.
+>
+> **Arreglos en código (4 slices, verificados en ejecución):**
+> - **LAUNCH-1** (`desktop/main.js`): "backend listo" solo si contesta NUESTRO backend
+>   (`INSTANCE_ID` por env que `/api/health` devuelve) y si el hijo sigue vivo; `netstat` sin
+>   `-p tcp` (sólo listaba IPv4) + respaldo por PowerShell `Get-NetTCPConnection`; si el puerto
+>   sigue ocupado **se aborta con un aviso** que dice qué hacer (antes solo se escribía en el
+>   log); instancia única; `shutdown` con flag y sin matar hijos ya muertos.
+> - **BACK-1** (`app.js`, `realtimeHub.js`): `server.on('error')` → mensaje claro y salida 1 en
+>   vez del volcado de Node por el `'error'` sin manejar del WebSocketServer.
+> - **BACK-2** (`routes/auth.js`, `middlewares/auth.js`): un fallo de BD ya no se disfraza de
+>   "Credenciales incorrectas" → **503** + causa real en el log. `/auth/me` solo da 401 si el
+>   problema es el token.
+> - **UI-1** (`api.ts`, `authStore.ts`, `PinGate.tsx`, `admin/layout.tsx`): el 401 del login se
+>   VE en pantalla (sin recarga); `checkAuth` solo cierra sesión con 401 y reintenta una vez;
+>   el PIN distingue "PIN mal" de "login falló" y, si las credenciales guardadas caducaron,
+>   borra el vault y lo dice; backend caído → aviso con "Reintentar" en vez de spinner eterno.
+>
+> **Verificado**: contra una COPIA de la BD de producción (MariaDB aparte en :3318, datadir
+> copiado con la app cerrada) — login 200 / contraseña mala 401 / BD inalcanzable 503 /
+> `/auth/me` y `/api/projects` 200; puerto ocupado → mensaje claro y exit 1; y en el navegador
+> (frontend dev) el mensaje de error sin recarga, el camino feliz, el backend caído con
+> "Reintentar" y los dos caminos del PIN. `tsc --noEmit` limpio.
+>
+> **PENDIENTE**: esto está en `feat/benjamin`, **NO en la 0.4.8 instalada**. Hace falta
+> merge a `develop` + bump a **v0.4.9** + `.msi` + release para que le llegue. Y queda sin
+> probar dentro del `.msi` empaquetado (`app.isPackaged`): `freeOwnedPorts` solo corre ahí.
+> *A saber*: sigue existiendo `%LOCALAPPDATA%\ConstruGest\` (instalación de marzo) con un
+> `.env` que lleva la **service-role key de Supabase en claro** → decidir si se borra la
+> carpeta y se revoca la clave (línea de SEC-1).
+>
+> ### Anterior (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
 > **Síntomas de Benjamin**: "Backup de todos los proyectos" da error, y restaurar solo deja
 > hacerlo con todos a la vez.
 >
