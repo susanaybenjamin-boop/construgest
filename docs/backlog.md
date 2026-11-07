@@ -49,15 +49,36 @@
 > (frontend dev) el mensaje de error sin recarga, el camino feliz, el backend caído con
 > "Reintentar" y los dos caminos del PIN. `tsc --noEmit` limpio.
 >
-> Bump **v0.4.9** en los 3 `package.json` + lock del backend. Merge `--no-ff` a `develop`
-> (`d08aee2`), ambas ramas pusheadas, `.msi` construido (gate de secretos OK: 1497 ficheros,
-> sin credenciales) y **RELEASE v0.4.9 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.9.msi`
-> 452,9 MB, target = merge de develop `d08aee2`). Verificado **antes de publicar** arrancando
-> el backend y el frontend **EMPAQUETADOS** (runtime de Electron, contra una copia de la BD en
-> :3319): `/api/version` da 0.4.9, login con contraseña mala → "Credenciales incorrectas" en
-> pantalla y SIN recarga, login correcto → entra al panel, y un segundo backend sobre el 5000
-> ocupado → "FATAL: el puerto 5000 ya está ocupado…" y exit 1 sin volcado. Tras publicar, la
-> API de GitHub ya da `v0.4.9` como *latest* y `/api/version` lo ve.
+> **VER-1 (mismo día, encontrado al publicar)**: nada más publicar, Benjamin pulsó
+> **Comprobar** en *Acerca de* y le seguía diciendo que no había actualización. Causa:
+> `version.js` guarda la respuesta de GitHub **1 hora en memoria** y no había forma de
+> saltarse esa copia; el botón solo saltaba la comprobación del cliente (`versionStore`).
+> Arreglado: `fetchLatestRelease({force})` / `getVersionStatus({force})`,
+> `GET /api/version?force=1` y `load(true)` manda `force=1` al servidor. El banner automático
+> sigue usando la caché (no más tráfico a GitHub del necesario). Verificado en ejecución:
+> con un repo inexistente, 3 peticiones (sin force, sin force, con force) hacen **solo 2
+> consultas reales** a GitHub.
+>
+> Bump **v0.4.9** en los 3 `package.json` + lock del backend. **La 0.4.9 se publicó dos
+> veces**: la primera (target `d08aee2`) se borró con `gh release delete --cleanup-tag`
+> cuando apareció VER-1, porque tenía **0 descargas** y nadie la había instalado; se
+> reconstruyó el `.msi` con el arreglo dentro y se republicó. Merge `--no-ff` a `develop`
+> (`d08aee2` + `0336d6b`), ambas ramas pusheadas, `.msi` construido (gate de secretos OK:
+> 1497 ficheros, sin credenciales) y **RELEASE v0.4.9 PUBLICADA** (GitHub, Latest,
+> `ConstruGest-0.4.9.msi` 452,9 MB, target = merge de develop `0336d6b`).
+>
+> Verificado **antes de publicar** arrancando el backend y el frontend **EMPAQUETADOS**
+> (runtime de Electron, contra copias de la BD en :3319 y :3320): `/api/version` da 0.4.9 y
+> `?force=1` consulta a GitHub de verdad; login correcto 200, contraseña mala 401 (y en el
+> navegador, "Credenciales incorrectas" **en pantalla y SIN recarga**), `/auth/me` y
+> `/api/projects` 200, y un segundo backend sobre el 5000 ocupado → "FATAL: el puerto 5000 ya
+> está ocupado…" y exit 1 sin volcado. Tras publicar, la API de GitHub da `v0.4.9` como
+> *latest* (los primeros segundos aún devolvía la anterior: desfase de la CDN, se pasa solo).
+>
+> *A saber*: durante las pruebas, una consulta al backend empaquetado contra la BD de la app
+> dio **503 "No se puede acceder a la base de datos"** con `ECONNREFUSED 127.0.0.1:3308` en
+> el log, porque Benjamin acababa de cerrar la app. Es BACK-2 funcionando en vivo: antes eso
+> habría salido como "Credenciales incorrectas".
 >
 > **PENDIENTE**:
 > - **Que Benjamin instale la 0.4.9 y confirme** que entra. Hasta entonces **no** hacer
