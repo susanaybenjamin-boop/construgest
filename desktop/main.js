@@ -25,6 +25,9 @@ const windowState = require('./window-state')
 const PORTS = { mariadb: 3308, backend: 5000, frontend: 3000, ollama: 11434 }
 const DB = { name: 'construgest', user: 'construgest', password: 'construgest' }
 const OLLAMA_MODEL = 'qwen2.5:3b'
+// Id único de ESTE arranque: se le pasa al backend y /api/health lo devuelve, para
+// comprobar que quien contesta en el puerto 5000 es nuestro hijo y no un extraño.
+const INSTANCE_ID = crypto.randomUUID()
 const children = []
 let win = null
 let updating = false   // true mientras se descarga la actualización (bloquea el cierre)
@@ -66,16 +69,48 @@ const clientBin = firstExisting([
 
 // ── Helpers de procesos / espera ────────────────────────────────────────────
 
-/** Espera a que una URL HTTP responda. */
-function waitForHttp(url, { timeoutMs = 60000, intervalMs = 500 } = {}) {
+/**
+ * Espera a que una URL HTTP responda.
+ *
+ * OJO (bug de login del 2026-11-07): esto NO puede conformarse con "algo
+ * contesta en el puerto". Si un proceso AJENO tiene el puerto (un backend viejo,
+ * otra copia de la app, un proyecto de desarrollo), nuestro hijo muere con
+ * EADDRINUSE y el ajeno contesta igual → dábamos "backend listo" y la app
+ * trabajaba contra el backend equivocado (login imposible y sin mensaje).
+ * Por eso:
+ *   - `child`          → si el hijo ha muerto, se falla al instante.
+ *   - `expectInstance` → el health check debe devolver NUESTRO id de instancia.
+ */
+function waitForHttp(url, { timeoutMs = 60000, intervalMs = 500, child = null, expectInstance = null } = {}) {
   const start = Date.now()
   return new Promise((resolve, reject) => {
+    const retry = (err) => {
+      if (Date.now() - start > timeoutMs) reject(err)
+      else setTimeout(tick, intervalMs)
+    }
     const tick = () => {
-      const req = http.get(url, (res) => { res.resume(); resolve(true) })
-      req.on('error', () => {
-        if (Date.now() - start > timeoutMs) reject(new Error(`timeout esperando ${url}`))
-        else setTimeout(tick, intervalMs)
+      if (child && child.exited) {
+        return reject(new Error(`el proceso de ${child.tag} murió al arrancar (código ${child.exitInfo})`))
+      }
+      const req = http.get(url, (res) => {
+        if (!expectInstance) { res.resume(); return resolve(true) }
+        let body = ''
+        res.on('data', (d) => { body += d })
+        res.on('end', () => {
+          if (res.statusCode !== 200) return retry(new Error(`${url} responde HTTP ${res.statusCode}`))
+          let instance = null
+          try { instance = JSON.parse(body).instance } catch { /* respuesta no JSON */ }
+          if (instance !== expectInstance) {
+            // No reintentamos: quien contesta no es nuestro proceso y no va a cambiar.
+            return reject(new Error(
+              `el puerto de ${url.replace(/\/api\/.*$/, '')} lo tiene OTRO programa `
+              + '(no es el backend de esta app). Ciérralo y vuelve a abrir ConstruGest.',
+            ))
+          }
+          resolve(true)
+        })
       })
+      req.on('error', () => retry(new Error(`timeout esperando ${url}`)))
       req.setTimeout(2000, () => req.destroy())
     }
     tick()
@@ -132,30 +167,80 @@ function portInUse(port) {
  * el puerto tras un cierre forzado, una suspensión o un crash: sin esto, el arranque
  * siguiente choca con EADDRINUSE y la app parece "sin BD/sin backend").
  */
-function killPortWindows(port) {
+/**
+ * Windows: PIDs que escuchan en un puerto, preguntándoselo a PowerShell. Es la
+ * red de seguridad de `netstat`: el 2026-11-07 el lanzador NO consiguió
+ * identificar al proceso que tenía el 5000 (el log dice "sigue ocupado" sin
+ * ningún PID), así que hay una segunda vía para no quedarse a ciegas.
+ */
+function listenerPidsPowerShell(port) {
   return new Promise((resolve) => {
     let out = ''
-    const ns = spawn('netstat', ['-ano', '-p', 'tcp'], { stdio: ['ignore', 'pipe', 'ignore'] })
+    const ps = spawn('powershell', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `Get-NetTCPConnection -LocalPort ${port} -ErrorAction SilentlyContinue `
+      + "| Where-Object { $_.State -eq 'Listen' -or $_.State -eq 'Bound' } "
+      + '| Select-Object -ExpandProperty OwningProcess',
+    ], { stdio: ['ignore', 'pipe', 'ignore'] })
+    ps.stdout.on('data', (d) => { out += d })
+    ps.on('error', () => resolve([]))
+    ps.on('close', () => {
+      const pids = out.split(/\s+/).map((s) => s.trim()).filter((s) => /^\d+$/.test(s) && s !== '0')
+      resolve([...new Set(pids)])
+    })
+  })
+}
+
+/** Mata un conjunto de PIDs con taskkill /T /F. */
+function taskkillAll(port, pids) {
+  return new Promise((resolve) => {
+    if (!pids.length) return resolve(false)
+    let pending = pids.length
+    for (const pid of pids) {
+      log(`Puerto ${port} ocupado por un proceso huérfano (PID ${pid}) → terminándolo`)
+      const tk = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
+      const done = () => { if (--pending === 0) resolve(true) }
+      tk.on('error', done)
+      tk.on('close', done)
+    }
+  })
+}
+
+function netstatListenerPids(port) {
+  return new Promise((resolve) => {
+    let out = ''
+    // SIN `-p tcp`: ese filtro lista SOLO IPv4 y se perdía la fila `[::]` de un
+    // listener IPv6. `netstat -ano` saca ambas; las líneas UDP no traen LISTENING.
+    const ns = spawn('netstat', ['-ano'], { stdio: ['ignore', 'pipe', 'ignore'] })
     ns.stdout.on('data', (d) => { out += d })
-    ns.on('error', () => resolve(false))
+    ns.on('error', () => resolve([]))
     ns.on('close', () => {
       const pids = new Set()
       for (const line of out.split('\n')) {
         // "  TCP    127.0.0.1:5000   0.0.0.0:0   LISTENING   21188"
+        // "  TCP    [::]:5000        [::]:0      LISTENING   7856"
         const m = line.match(/:(\d+)\s+\S+\s+LISTENING\s+(\d+)/i)
         if (m && Number(m[1]) === port && m[2] !== '0') pids.add(m[2])
       }
-      if (!pids.size) return resolve(false)
-      let pending = pids.size
-      for (const pid of pids) {
-        log(`Puerto ${port} ocupado por un proceso huérfano (PID ${pid}) → terminándolo`)
-        const tk = spawn('taskkill', ['/PID', pid, '/T', '/F'], { stdio: 'ignore' })
-        const done = () => { if (--pending === 0) resolve(true) }
-        tk.on('error', done)
-        tk.on('close', done)
-      }
+      resolve([...pids])
     })
   })
+}
+
+async function killPortWindows(port) {
+  let pids = await netstatListenerPids(port)
+  if (!pids.length) {
+    // El 2026-11-07 netstat no dio NINGÚN PID para el 5000 aunque un backend
+    // viejo lo tenía tomado (el log: "sigue ocupado", sin línea de huérfano).
+    // Segunda vía antes de rendirse.
+    pids = await listenerPidsPowerShell(port)
+    if (pids.length) log(`Puerto ${port}: netstat no dio PID; PowerShell sí (${pids.join(', ')})`)
+  }
+  if (!pids.length) {
+    log(`Puerto ${port} ocupado pero NO se ha podido identificar el proceso`)
+    return false
+  }
+  return taskkillAll(port, pids)
 }
 
 /**
@@ -166,9 +251,22 @@ function killPortWindows(port) {
 async function freeOwnedPorts() {
   if (!app.isPackaged || process.platform !== 'win32') return
   for (const port of [PORTS.mariadb, PORTS.backend, PORTS.frontend]) {
-    if (await portInUse(port)) {
-      await killPortWindows(port)
-      try { await waitForPortFree(port) } catch (e) { log(e.message) }
+    if (!(await portInUse(port))) continue
+    await killPortWindows(port)
+    try {
+      await waitForPortFree(port)
+    } catch {
+      // ANTES: solo se escribía en el log y se seguía arrancando, así que la app
+      // acababa hablando con el programa ajeno que tenía el puerto. Ahora se
+      // para con un aviso que dice QUÉ pasa y QUÉ hacer.
+      log(`el puerto ${port} sigue ocupado → se aborta el arranque`)
+      throw new Error(
+        `El puerto ${port} está ocupado por otro programa y no se ha podido liberar.\n\n`
+        + `ConstruGest necesita los puertos ${PORTS.mariadb} (base de datos), `
+        + `${PORTS.backend} (API) y ${PORTS.frontend} (interfaz).\n\n`
+        + 'Cierra el programa que lo esté usando (otra copia de ConstruGest, un backend '
+        + 'de desarrollo, un servicio que arranque con Windows…) y vuelve a abrir la app.',
+      )
     }
   }
 }
@@ -210,8 +308,16 @@ function spawnNode(entry, extraEnv) {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const tag = path.basename(entry)
+  child.tag = tag
   child.stdout.on('data', (d) => { process.stdout.write(`  ${tag} | ${d}`); writeLog(`  ${tag} | ${d}`) })
   child.stderr.on('data', (d) => { process.stderr.write(`  ${tag} | ${d}`); writeLog(`  ${tag} | ${d}`) })
+  // Marcar la muerte del hijo: sin esto nadie se enteraba de que el backend se
+  // había caído (y el shutdown podía hacer taskkill de un PID ya reutilizado).
+  child.on('exit', (code, signal) => {
+    child.exited = true
+    child.exitInfo = code != null ? String(code) : String(signal)
+    log(`${tag} ha terminado (${child.exitInfo})`)
+  })
   children.push(child)
   return child
 }
@@ -389,7 +495,8 @@ async function startServices() {
   startOllama()
 
   log('Arrancando backend…')
-  spawnNode(paths.backendEntry, {
+  const backend = spawnNode(paths.backendEntry, {
+    INSTANCE_ID,
     PORT: String(PORTS.backend),
     FRONTEND_URL: `http://localhost:${PORTS.frontend}`,
     DB_HOST: '127.0.0.1',
@@ -404,15 +511,21 @@ async function startServices() {
     AI_PROVIDER_ORDER: 'local',
     JWT_SECRET: process.env.JWT_SECRET || 'construgest-desktop-secret',
   })
-  await waitForHttp(`http://127.0.0.1:${PORTS.backend}/api/health`)
+  // "backend listo" solo si contesta NUESTRO backend (id de instancia) y sigue vivo.
+  await waitForHttp(`http://127.0.0.1:${PORTS.backend}/api/health`, {
+    child: backend,
+    expectInstance: INSTANCE_ID,
+  })
   log('backend listo')
 
   log('Arrancando frontend…')
-  spawnNode(paths.frontendEntry, {
+  const frontend = spawnNode(paths.frontendEntry, {
     PORT: String(PORTS.frontend),
     HOSTNAME: '127.0.0.1',
   })
-  await waitForHttp(`http://127.0.0.1:${PORTS.frontend}`)
+  // El frontend no tiene health check propio: aquí basta con que responda algo
+  // (la raíz redirige a /login), pero sí se vigila que el proceso no haya muerto.
+  await waitForHttp(`http://127.0.0.1:${PORTS.frontend}`, { child: frontend })
   log('frontend listo')
 
   // El modelo IA se asegura en segundo plano (no bloquea la ventana).
@@ -659,19 +772,43 @@ ipcMain.handle('pin:clear', () => {
   return { ok: true }
 })
 
+// Una sola instancia: dos ConstruGest a la vez se pisan los puertos (la segunda
+// mataría los servicios de la primera al limpiar huérfanos). La segunda solo
+// trae al frente la ventana que ya está abierta.
+const hasInstanceLock = app.requestSingleInstanceLock()
+if (!hasInstanceLock) {
+  log('ya hay otra instancia de ConstruGest abierta → se cierra esta')
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+  })
+}
+
 app.whenReady().then(async () => {
+  if (!hasInstanceLock) return
   try {
     await startServices()
     createWindow()
   } catch (err) {
     log('ERROR al arrancar:', err.message)
-    dialog.showErrorBox('ConstruGest', `No se pudieron arrancar los servicios:\n${err.message}`)
+    dialog.showErrorBox('ConstruGest', `No se pudieron arrancar los servicios:\n\n${err.message}`)
     app.quit()
   }
 })
 
+let shuttingDown = false
 function shutdown() {
+  if (shuttingDown) return
+  shuttingDown = true
   for (const c of children) {
+    // Un hijo que ya murió no se mata: su PID puede estar reutilizado por otro
+    // proceso del sistema y el taskkill /T se llevaría a un inocente.
+    if (c.exited) continue
     try {
       // En Windows, matar el árbol (/T) con /F arrastra los subprocesos y es más
       // fiable que SIGTERM: evita dejar MariaDB/backend/frontend huérfanos.
