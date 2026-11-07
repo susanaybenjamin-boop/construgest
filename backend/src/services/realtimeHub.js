@@ -64,6 +64,14 @@ export function publish(topic, event, payload) {
 export function initRealtime(server) {
   const wss = new WebSocketServer({ server, path: '/ws' })
 
+  // `ws` REEMITE los errores del http.Server en el wss (websocket-server.js:121).
+  // Sin este manejador, un fallo del listen (p. ej. EADDRINUSE) salía por aquí
+  // como 'error' sin manejar y tumbaba el proceso con un volcado de Node. El
+  // EADDRINUSE lo trata app.js (mensaje claro + salida); aquí solo se registra.
+  wss.on('error', (err) => {
+    if (err?.code !== 'EADDRINUSE') console.error('[realtime] error del WebSocket:', err?.message || err)
+  })
+
   wss.on('connection', (ws, req) => {
     // Auth por JWT en el query string (?token=...). Sin token válido → cerrar.
     let user
