@@ -2,7 +2,8 @@ import { Router } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 // FASE 2 (DATA-1): auth migrado a MariaDB local vía el shim compatible con Supabase.
-// Para volver a la nube temporalmente, cambiar este import por ../db/supabase.js
+// (Ya NO hay vuelta a la nube: Benjamin eliminó el proyecto Supabase el 2026-11-07 y
+//  `db/supabase.js` no existe. El shim `db/local.js` solo imita su API sobre MariaDB.)
 import supabase from "../db/local.js";
 
 const router = Router();
