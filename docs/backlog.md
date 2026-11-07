@@ -80,11 +80,19 @@
 > el log, porque Benjamin acababa de cerrar la app. Es BACK-2 funcionando en vivo: antes eso
 > habría salido como "Credenciales incorrectas".
 >
+> **HECHO**: Benjamin instaló la 0.4.9 **desde el propio aviso de actualización de la app**
+> (el log muestra la descarga de 453 MB y el instalador) y **confirmó que entra**. Verificado
+> en su equipo: `resources/app` y `resources/backend` en 0.4.9, los arreglos presentes en los
+> ficheros instalados, arranque limpio (`API running on port 5000`, "backend listo", **cero
+> EADDRINUSE**) y la comprobación **forzada** de versión consultando a GitHub de verdad
+> (`checkedRemote: true`). **REL-CLEAN al día**: borrado el `.msi` local de 0.4.7 (−452,9 MB);
+> en `desktop/dist` quedan **0.4.8 (anterior) y 0.4.9 (actual)**. Los `.msi` publicados en
+> GitHub no se han tocado.
+>
 > **PENDIENTE**:
-> - **Que Benjamin instale la 0.4.9 y confirme** que entra. Hasta entonces **no** hacer
->   REL-CLEAN: en `desktop/dist` siguen 0.4.7, 0.4.8 y 0.4.9 (al confirmar, borrar la 0.4.7).
 > - Sin probar dentro del `.msi` ya instalado: `freeOwnedPorts` (solo corre con
->   `app.isPackaged`), es decir el aborto con diálogo cuando un puerto no se libera.
+>   `app.isPackaged`), es decir el aborto con diálogo cuando un puerto no se libera. Se vería
+>   solo si vuelve a aparecer un okupa en el 5000/3000/3308.
 > - **Revocar en Supabase la service-role key** que estaba en claro en el `.env` de la
 >   instalación de marzo (línea de SEC-1, como se hizo con la de Google). La carpeta
 >   `%LOCALAPPDATA%\ConstruGest\` **ya la borró Benjamin** el 2026-11-07, y su acceso
