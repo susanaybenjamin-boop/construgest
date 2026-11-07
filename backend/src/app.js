@@ -111,7 +111,9 @@ app.get('/api/health', (req, res) => {
 // Versión actual + comprobación de actualizaciones (GitHub Releases). Público.
 app.get('/api/version', async (req, res) => {
   try {
-    res.json(await getVersionStatus())
+    // ?force=1 → se salta la caché de 1 h (botón "Comprobar" de Acerca de).
+    const force = req.query.force === '1' || req.query.force === 'true'
+    res.json(await getVersionStatus({ force }))
   } catch {
     res.json({ current: getCurrentVersion(), latest: null, updateAvailable: false, checkedRemote: false })
   }

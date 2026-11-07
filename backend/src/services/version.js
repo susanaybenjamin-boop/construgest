@@ -44,9 +44,15 @@ export function compareVersions(a, b) {
   return 0
 }
 
-/** Consulta la última release en GitHub (cacheada). Devuelve null si no se pudo. */
-async function fetchLatestRelease() {
-  if (cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data
+/**
+ * Consulta la última release en GitHub (cacheada 1 h). Devuelve null si no se pudo.
+ *
+ * `force` salta la caché: lo usa el botón "Comprobar" de Acerca de. Sin esto, el
+ * botón releía la copia guardada y durante una hora seguía diciendo que no había
+ * actualización aunque acabara de publicarse (le pasó a Benjamin con la 0.4.9).
+ */
+async function fetchLatestRelease({ force = false } = {}) {
+  if (!force && cache && Date.now() - cache.at < CACHE_TTL_MS) return cache.data
 
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -90,8 +96,8 @@ async function fetchLatestRelease() {
  * Estado de versión para el endpoint: versión actual, última publicada y si hay
  * actualización disponible.
  */
-export async function getVersionStatus() {
-  const latest = await fetchLatestRelease()
+export async function getVersionStatus({ force = false } = {}) {
+  const latest = await fetchLatestRelease({ force })
   const current = currentVersion
   const updateAvailable = !!(latest?.version && compareVersions(latest.version, current) > 0)
   return {
