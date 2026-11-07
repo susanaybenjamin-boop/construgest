@@ -16,6 +16,7 @@ interface AuthState {
   register: (email: string, password: string, fullName: string) => Promise<void>
   logout: () => void
   checkAuth: () => Promise<void>
+  clearError: () => void
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -71,6 +72,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
+  clearError: () => set({ error: null }),
+
   logout: () => {
     clearToken()
     closeRealtime()
@@ -92,10 +95,36 @@ export const useAuthStore = create<AuthState>((set) => ({
         organizationId: data.organization_id,
         isSuperAdmin: data.is_super_admin || false,
         token,
+        error: null,
       })
-    } catch {
-      clearToken()
-      set({ user: null, token: null })
+    } catch (err: any) {
+      // Solo se destruye la sesión si el servidor dice que el token no vale (401).
+      // Antes, CUALQUIER error (backend reiniciándose, 500, red) borraba el token
+      // y echaba al usuario a /login justo después de haber entrado bien.
+      if (err?.response?.status === 401) {
+        clearToken()
+        set({ user: null, token: null })
+        return
+      }
+      // Fallo transitorio: se conserva la sesión y se reintenta una vez.
+      try {
+        await new Promise((r) => setTimeout(r, 2000))
+        const { data } = await api.get('/auth/me')
+        set({
+          user: data.user,
+          organizationId: data.organization_id,
+          isSuperAdmin: data.is_super_admin || false,
+          token,
+          error: null,
+        })
+      } catch (err2: any) {
+        if (err2?.response?.status === 401) {
+          clearToken()
+          set({ user: null, token: null })
+        } else {
+          set({ error: 'No se puede conectar con el servidor' })
+        }
+      }
     }
   },
 }))
