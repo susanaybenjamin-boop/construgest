@@ -48,9 +48,28 @@ export default function PinGate({
         return
       }
       // PIN correcto → el padre hace el login con las credenciales liberadas.
-      await onUnlock?.(r.email!, r.password!)
+      try {
+        await onUnlock?.(r.email!, r.password!)
+      } catch (err: any) {
+        // El PIN era bueno, así que el fallo es del LOGIN. Antes todo acababa en
+        // un "prueba con tu contraseña" genérico y el usuario no sabía por qué.
+        const status = err?.response?.status
+        if (status === 401) {
+          // Las credenciales guardadas ya no sirven (contraseña cambiada, otra
+          // base de datos…). El PIN no volverá a funcionar: se borra el vault.
+          await pinApi.clear().catch(() => {})
+          setError('La contraseña guardada con tu PIN ya no es válida. Entra con tu contraseña y crea el PIN de nuevo.')
+          setTimeout(() => onUsePassword?.(), 2500)
+        } else if (status) {
+          setError(err?.response?.data?.error || `No se pudo iniciar sesión (error ${status}).`)
+        } else {
+          setError('No se pudo conectar con el servidor de ConstruGest. Espera unos segundos y vuelve a intentarlo.')
+        }
+        setPin('')
+        setBusy(false)
+      }
     } catch {
-      setError('No se pudo iniciar sesión. Prueba con tu contraseña.')
+      setError('No se pudo comprobar el PIN. Prueba con tu contraseña.')
       setBusy(false)
     }
   }

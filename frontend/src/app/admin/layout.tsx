@@ -35,7 +35,10 @@ const navItems = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, organizationId, checkAuth, logout, isSuperAdmin } = useAuthStore()
+  const {
+    user, organizationId, checkAuth, logout, isSuperAdmin,
+    error: authError, clearError: clearAuthError,
+  } = useAuthStore()
   const { company, loadSettings } = useSettingsStore()
   const { subscribeRealtime, unsubscribeRealtime } = useRealtimeNotificationStore()
   const { loadUnreadCount: loadMailboxUnread, unreadCount: mailboxUnread } = useMailboxStore()
@@ -83,6 +86,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
     }
   }, [user?.id, organizationId])
+
+  // Sin usuario y con error: el servidor no responde. Antes esto borraba la
+  // sesión y echaba al login; ahora la sesión se conserva, así que hay que
+  // DECIR qué pasa en vez de dejar un spinner girando para siempre.
+  if (!user && authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4">
+        <div className="max-w-md w-full rounded-2xl bg-slate-800 p-8 text-center shadow-xl">
+          <h2 className="text-lg font-semibold text-white">No se puede conectar con ConstruGest</h2>
+          <p className="mt-2 text-sm text-slate-300">
+            El servidor local no responde. Suele pasar si el programa aún está terminando de
+            arrancar o si otro programa está usando sus puertos. Tu sesión sigue guardada.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <button
+              onClick={() => { clearAuthError(); checkAuth() }}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+            >
+              Reintentar
+            </button>
+            <button
+              onClick={logout}
+              className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-700"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) {
     return (

@@ -82,7 +82,18 @@ router.post("/login", async (req, res, next) => {
       .eq("email", email)
       .single();
 
-    if (error || !user) {
+    // Un fallo de la BD NO es una credencial mala: antes ambos casos daban el
+    // mismo 401 "Credenciales incorrectas" y la causa real no quedaba en ningún
+    // sitio (MariaDB caída, tabla que falta, columna renombrada… todo parecía
+    // "te has equivocado de contraseña"). PGRST116 = no hay filas.
+    if (error && error.code !== "PGRST116") {
+      console.error("Login: fallo al consultar cons_users:", error.code, error.message);
+      return res.status(503).json({
+        error: "No se puede acceder a la base de datos. Vuelve a intentarlo en unos segundos.",
+      });
+    }
+
+    if (!user) {
       return res.status(401).json({ error: "Credenciales incorrectas" });
     }
 
@@ -97,12 +108,22 @@ router.post("/login", async (req, res, next) => {
     }
 
     // Get user's organization
-    const { data: membership } = await supabase
+    const { data: membership, error: membershipError } = await supabase
       .from("cons_organization_members")
       .select("organization_id, role")
       .eq("user_id", user.id)
       .limit(1)
       .single();
+
+    // Sin membresía (PGRST116) es válido; cualquier otro error es la BD fallando
+    // y NO se puede seguir: el token saldría sin organization_id y todo lo
+    // siguiente daría 403 o errores raros ya dentro de la app.
+    if (membershipError && membershipError.code !== "PGRST116") {
+      console.error("Login: fallo al consultar la organización:", membershipError.code, membershipError.message);
+      return res.status(503).json({
+        error: "No se puede acceder a la base de datos. Vuelve a intentarlo en unos segundos.",
+      });
+    }
 
     const token = jwt.sign(
       {
@@ -277,7 +298,12 @@ router.get("/me", async (req, res, next) => {
     const isSuperAdmin = decoded.organization_id === process.env.MASTER_ORG_ID
     res.json({ user, organization_id: decoded.organization_id, is_super_admin: isSuperAdmin });
   } catch (err) {
-    return res.status(401).json({ error: "Token inválido" });
+    // Solo es 401 si el problema es el TOKEN. Un fallo de BD aquí devolvía
+    // "Token inválido" y el frontend cerraba la sesión y echaba al usuario.
+    if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError" || err.name === "NotBeforeError") {
+      return res.status(401).json({ error: "Token inválido" });
+    }
+    return next(err);
   }
 });
 

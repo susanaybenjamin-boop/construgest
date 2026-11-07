@@ -22,8 +22,14 @@ export async function authMiddleware(req, res, next) {
   // revocar por sí solo (y la expiración deslizante lo renueva indefinidamente),
   // así que desactivar un usuario debe cortarle el acceso en la siguiente llamada.
   try {
-    const { data: user } = await supabase
+    const { data: user, error } = await supabase
       .from('cons_users').select('is_active').eq('id', decoded.id).single()
+    // El shim devuelve el fallo en `error`, NO lanza: ignorarlo convertía
+    // "la BD no responde" en un 401 'Sesión no válida' que echaba al usuario
+    // de la app en cada petición. PGRST116 = el usuario ya no existe (sí es 401).
+    if (error && error.code !== 'PGRST116') {
+      return next(Object.assign(new Error('No se puede acceder a la base de datos'), { status: 503 }))
+    }
     if (!user || user.is_active === false) {
       return res.status(401).json({ error: 'Sesión no válida' })
     }

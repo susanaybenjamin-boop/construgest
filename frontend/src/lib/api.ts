@@ -30,9 +30,17 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    if (error.response?.status === 401) {
+    const url: string = error.config?.url || ''
+    // Un 401 de las rutas de /auth/ NO es "sesión caducada": es la respuesta
+    // normal a una credencial incorrecta. Recargar /login aquí BORRABA el
+    // mensaje de error antes de que se viera, y con PIN la recarga devolvía a la
+    // pantalla del PIN → parecía que la app no hacía nada (bug del 2026-11-07).
+    // Esos 401 los muestra quien hizo la llamada (authStore / PinGate).
+    const isAuthCall = url.startsWith('/auth/')
+
+    if (error.response?.status === 401 && !isAuthCall) {
       clearToken()
-      if (typeof window !== 'undefined') {
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
     }

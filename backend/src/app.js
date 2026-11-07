@@ -98,8 +98,15 @@ const aiLimiter = rateLimit({
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'construgest-api' })
 })
+// `instance` lo pasa el lanzador de escritorio (INSTANCE_ID) para poder distinguir
+// NUESTRO backend de otro proceso cualquiera que tenga tomado el puerto.
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({
+    status: 'ok',
+    pid: process.pid,
+    instance: process.env.INSTANCE_ID || null,
+    timestamp: new Date().toISOString(),
+  })
 })
 // Versión actual + comprobación de actualizaciones (GitHub Releases). Público.
 app.get('/api/version', async (req, res) => {
@@ -143,6 +150,25 @@ app.use((err, req, res, next) => {
 
 // http.Server explícito para poder montar el WebSocket (Realtime local) encima.
 const server = createServer(app)
+
+// Si el listen falla (puerto ocupado), hay que decirlo CLARO y salir. Antes no
+// había manejador: el error salía por el 'error' del WebSocketServer (ws reemite
+// los del http.Server) y el proceso moría con un volcado de Node ilegible,
+// mientras el lanzador daba "backend listo" porque el OTRO proceso del puerto
+// contestaba al health check. Resultado: login imposible y sin mensaje.
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `FATAL: el puerto ${PORT} ya está ocupado por otro proceso, así que esta API no `
+      + 'puede arrancar. Cierra lo que esté usando ese puerto (otra copia de ConstruGest, '
+      + 'un backend de desarrollo, un servicio que arranque con Windows…).',
+    )
+  } else {
+    console.error(`FATAL: el servidor no pudo arrancar (${err.code || 'error'}): ${err.message}`)
+  }
+  process.exit(1)
+})
+
 initRealtime(server)
 server.listen(PORT, () => {
   console.log(`ConstruGest API running on port ${PORT}`)
