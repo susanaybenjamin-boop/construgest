@@ -101,14 +101,25 @@
 > backend excluía `.env`, `.env.example` y `.env.sample`. Actualizados `CLAUDE.md` §0.1 y el
 > comentario de `routes/auth.js` que aún decían cómo "volver a la nube".
 >
-> **PENDIENTE (seguridad, no urgente)**: el repo es **público** y las releases **v0.2.0 a
-> v0.3.4** (14-jul) siguen con su `.msi` adjunto. Su `build-msi.ps1` excluía los `.env` pero
-> **no** `google-vision-key.json` ni `construgest-web-*.json`, así que por la misma razón por
-> la que se borraron los adjuntos de v0.4.0 y v0.4.1 es muy probable que lleven dentro las
-> credenciales de Google (**ya revocadas**, de ahí que no sea urgente). **No verificado**: no
-> se ha abierto ninguno de esos `.msi`. Decidir si se borran esos 6 adjuntos (sin tocar las
-> releases ni sus notas). Siguen además en `backend/` los dos ficheros de credenciales de
-> Google, ya inútiles (el OCR es local): conviene borrarlos del disco.
+> **SEC-2 (cerrado el mismo día): instaladores públicos con las credenciales de Google.**
+> El repo es **público** y varias releases conservaban su `.msi`. **Verificado abriendo el
+> `.msi` de la v0.3.4** (descargado de GitHub; leída su tabla de ficheros, 4.899 entradas):
+> lleva dentro `google-vision-key.json` y `construgest-web-23e7ee55f786.json` (la MISMA
+> cuenta de servicio `construgest-ocr@construgest-web.iam.gserviceaccount.com`, clave
+> `23e7ee55…`), y **ningún `.env`** → la clave de Supabase nunca viajó en un instalador.
+> Mirando el `build-msi.ps1` de cada versión, la exclusión de esos JSON entró en la **v0.4.6**
+> (commit `ae10472`, SEC-1), así que estaban afectadas **v0.2.0–v0.3.4 y también la v0.4.5**
+> (se le pasó a la limpieza anterior, que solo quitó v0.4.0 y v0.4.1). **Borrados los 7
+> adjuntos** (releases, notas y etiquetas intactas); quedan con `.msi` **0.4.6, 0.4.7, 0.4.8
+> y 0.4.9**. Benjamin **eliminó la cuenta de servicio** en Google Cloud, así que esas
+> credenciales ya no valen para nada. Comprobado además que **nunca se commitearon** (están
+> en `.gitignore`; el único `private_key` del historial es el patrón del propio gate).
+>
+> **PENDIENTE (menor)**: siguen en `backend/` los dos ficheros de credenciales de Google, ya
+> inútiles (sin dependencias `@google-cloud/*`; el OCR es local con tesseract, la única
+> mención a "vision" es un comentario de `dxf-service.js:426`). Conviene borrarlos del disco.
+> Benjamin está además eliminando sus proyectos de Google Cloud (`construgest-web` entre
+> ellos): Construgest **no depende de ninguno**.
 >
 > ### Anterior (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
 > **Síntomas de Benjamin**: "Backup de todos los proyectos" da error, y restaurar solo deja
