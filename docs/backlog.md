@@ -115,11 +115,14 @@
 > credenciales ya no valen para nada. Comprobado además que **nunca se commitearon** (están
 > en `.gitignore`; el único `private_key` del historial es el patrón del propio gate).
 >
-> **PENDIENTE (menor)**: siguen en `backend/` los dos ficheros de credenciales de Google, ya
-> inútiles (sin dependencias `@google-cloud/*`; el OCR es local con tesseract, la única
-> mención a "vision" es un comentario de `dxf-service.js:426`). Conviene borrarlos del disco.
-> Benjamin está además eliminando sus proyectos de Google Cloud (`construgest-web` entre
-> ellos): Construgest **no depende de ninguno**.
+> **Borrados del disco** los dos ficheros de credenciales de `backend/`
+> (`google-vision-key.json` y `construgest-web-23e7ee55f786.json`), ya inútiles: no hay
+> dependencias `@google-cloud/*`, el OCR es local con tesseract y la única mención a "vision"
+> es un comentario de `dxf-service.js:426`. Barrido posterior del repo: **no queda ningún**
+> fichero de credenciales (`*credential*.json`, `*-key.json`, `*.pem`, `*.p12`, `*.pfx`,
+> `id_rsa`, `*.keystore`). Siguen en el `.gitignore` y en las exclusiones del build por si
+> alguna vez reaparecen. Benjamin está además eliminando sus proyectos de Google Cloud
+> (`construgest-web` entre ellos): Construgest **no depende de ninguno**.
 >
 > ### Anterior (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
 > **Síntomas de Benjamin**: "Backup de todos los proyectos" da error, y restaurar solo deja
