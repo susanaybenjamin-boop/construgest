@@ -24,11 +24,14 @@ lecciones duras de BENJAGEST). Síguelas salvo que él pida lo contrario.
 - **Desarrollo/pruebas:** MariaDB en **Docker Desktop** + **DBeaver**. Puerto distinto
   al 3307 de Benjagest. **El `.msi` autocontenido es SOLO la fase final.**
 
-### 0.1. La BD de la nube está COMPARTIDA
-El proyecto Supabase "APP360" aloja tablas de VARIAS apps. **Solo migramos
-`cons_*` + `mcp_*`** (ver [`docs/schema/README.md`](docs/schema/README.md)). Todo lo
-`*_180` y las tablas sueltas son de otras apps → **no se tocan**. (El módulo
-"ferralla"/`ferrapp_*` se ELIMINÓ el 2026-07-14: no encajaba en el producto.)
+### 0.1. Ya NO hay nube (histórico)
+El **2026-11-07 Benjamin eliminó el proyecto Supabase "APP360"**: no queda nada en la nube
+y **no hay vuelta atrás**. Nunca proponer Supabase como respaldo ni "volver a la nube".
+Lo que sigue es solo el contexto de la migración: aquel proyecto alojaba tablas de VARIAS
+apps y se migró **solo `cons_*` + `mcp_*`** (ver [`docs/schema/README.md`](docs/schema/README.md),
+que conserva el inventario, las constraints y las 25 RPC de Postgres como referencia); lo
+`*_180` y las tablas sueltas eran de otras apps. (El módulo "ferralla"/`ferrapp_*` se
+ELIMINÓ el 2026-07-14: no encajaba en el producto.) De los datos de la nube **no queda copia**.
 
 ---
 

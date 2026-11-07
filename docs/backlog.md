@@ -93,10 +93,22 @@
 > - Sin probar dentro del `.msi` ya instalado: `freeOwnedPorts` (solo corre con
 >   `app.isPackaged`), es decir el aborto con diálogo cuando un puerto no se libera. Se vería
 >   solo si vuelve a aparecer un okupa en el 5000/3000/3308.
-> - **Revocar en Supabase la service-role key** que estaba en claro en el `.env` de la
->   instalación de marzo (línea de SEC-1, como se hizo con la de Google). La carpeta
->   `%LOCALAPPDATA%\ConstruGest\` **ya la borró Benjamin** el 2026-11-07, y su acceso
->   directo del Inicio de Windows también está fuera.
+> **CERRADO el mismo día (seguridad)**: la carpeta `%LOCALAPPDATA%\ConstruGest\` y su acceso
+> directo del Inicio los borró Benjamin, y después **eliminó entero el proyecto Supabase
+> APP360** — ya no queda nada en la nube, así que la service-role key que estaba en claro en
+> aquel `.env` murió con el proyecto y no hay nada que revocar. Verificado además que **esa
+> clave nunca viajó en un `.msi`**: ya en el `build-msi.ps1` de la v0.3.4 el copiado del
+> backend excluía `.env`, `.env.example` y `.env.sample`. Actualizados `CLAUDE.md` §0.1 y el
+> comentario de `routes/auth.js` que aún decían cómo "volver a la nube".
+>
+> **PENDIENTE (seguridad, no urgente)**: el repo es **público** y las releases **v0.2.0 a
+> v0.3.4** (14-jul) siguen con su `.msi` adjunto. Su `build-msi.ps1` excluía los `.env` pero
+> **no** `google-vision-key.json` ni `construgest-web-*.json`, así que por la misma razón por
+> la que se borraron los adjuntos de v0.4.0 y v0.4.1 es muy probable que lleven dentro las
+> credenciales de Google (**ya revocadas**, de ahí que no sea urgente). **No verificado**: no
+> se ha abierto ninguno de esos `.msi`. Decidir si se borran esos 6 adjuntos (sin tocar las
+> releases ni sus notas). Siguen además en `backend/` los dos ficheros de credenciales de
+> Google, ya inútiles (el OCR es local): conviene borrarlos del disco.
 >
 > ### Anterior (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
 > **Síntomas de Benjamin**: "Backup de todos los proyectos" da error, y restaurar solo deja
