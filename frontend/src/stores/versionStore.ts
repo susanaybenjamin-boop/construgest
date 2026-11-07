@@ -33,7 +33,9 @@ export const useVersionStore = create<VersionState>((set, get) => ({
     if (!force && (get().info || get().loading)) return
     set({ loading: true })
     try {
-      const { data } = await api.get<VersionInfo>('/version')
+      // force=1 también en el servidor: si no, el backend devolvía su copia
+      // guardada (1 h) y "Comprobar" no se enteraba de una release recién hecha.
+      const { data } = await api.get<VersionInfo>('/version', force ? { params: { force: 1 } } : undefined)
       set({ info: data })
     } catch {
       /* sin conexión al backend: se ignora */
