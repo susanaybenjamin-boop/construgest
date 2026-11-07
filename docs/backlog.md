@@ -49,12 +49,25 @@
 > (frontend dev) el mensaje de error sin recarga, el camino feliz, el backend caído con
 > "Reintentar" y los dos caminos del PIN. `tsc --noEmit` limpio.
 >
-> **PENDIENTE**: esto está en `feat/benjamin`, **NO en la 0.4.8 instalada**. Hace falta
-> merge a `develop` + bump a **v0.4.9** + `.msi` + release para que le llegue. Y queda sin
-> probar dentro del `.msi` empaquetado (`app.isPackaged`): `freeOwnedPorts` solo corre ahí.
-> *A saber*: sigue existiendo `%LOCALAPPDATA%\ConstruGest\` (instalación de marzo) con un
-> `.env` que lleva la **service-role key de Supabase en claro** → decidir si se borra la
-> carpeta y se revoca la clave (línea de SEC-1).
+> Bump **v0.4.9** en los 3 `package.json` + lock del backend. Merge `--no-ff` a `develop`
+> (`d08aee2`), ambas ramas pusheadas, `.msi` construido (gate de secretos OK: 1497 ficheros,
+> sin credenciales) y **RELEASE v0.4.9 PUBLICADA** (GitHub, Latest, `ConstruGest-0.4.9.msi`
+> 452,9 MB, target = merge de develop `d08aee2`). Verificado **antes de publicar** arrancando
+> el backend y el frontend **EMPAQUETADOS** (runtime de Electron, contra una copia de la BD en
+> :3319): `/api/version` da 0.4.9, login con contraseña mala → "Credenciales incorrectas" en
+> pantalla y SIN recarga, login correcto → entra al panel, y un segundo backend sobre el 5000
+> ocupado → "FATAL: el puerto 5000 ya está ocupado…" y exit 1 sin volcado. Tras publicar, la
+> API de GitHub ya da `v0.4.9` como *latest* y `/api/version` lo ve.
+>
+> **PENDIENTE**:
+> - **Que Benjamin instale la 0.4.9 y confirme** que entra. Hasta entonces **no** hacer
+>   REL-CLEAN: en `desktop/dist` siguen 0.4.7, 0.4.8 y 0.4.9 (al confirmar, borrar la 0.4.7).
+> - Sin probar dentro del `.msi` ya instalado: `freeOwnedPorts` (solo corre con
+>   `app.isPackaged`), es decir el aborto con diálogo cuando un puerto no se libera.
+> - **Revocar en Supabase la service-role key** que estaba en claro en el `.env` de la
+>   instalación de marzo (línea de SEC-1, como se hizo con la de Google). La carpeta
+>   `%LOCALAPPDATA%\ConstruGest\` **ya la borró Benjamin** el 2026-11-07, y su acceso
+>   directo del Inicio de Windows también está fuera.
 >
 > ### Anterior (2026-10-17): BAK-1 + BAK-2 — copias de seguridad rotas desde la migración
 > **Síntomas de Benjamin**: "Backup de todos los proyectos" da error, y restaurar solo deja
