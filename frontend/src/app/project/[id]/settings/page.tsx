@@ -9,6 +9,7 @@ import {
   Save, Loader2, FileText, FolderOpen, Folder, ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
+import ClientPicker from '@/components/clients/ClientPicker'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
@@ -22,6 +23,7 @@ export default function SettingsPage() {
     name: activeProject?.name || '',
     client_name: activeProject?.client_name || '',
     client_contact: activeProject?.client_contact || '',
+    client_id: activeProject?.client_id || null as string | null,
     location: activeProject?.location || '',
     address: activeProject?.address || '',
     city: activeProject?.city || '',
@@ -153,13 +155,27 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-gray-900">Datos del Cliente</h2>
             </div>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del cliente</label>
-                <input type="text" value={projectForm.client_name} onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })} className={inputClass} placeholder="Juan Perez / Empresa S.L." />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contacto (telefono/email)</label>
-                <input type="text" value={projectForm.client_contact} onChange={(e) => setProjectForm({ ...projectForm, client_contact: e.target.value })} className={inputClass} placeholder="600 123 456 / cliente@email.com" />
+              {/* PRES-1: ficha reutilizable. Es la que sale en la portada del
+                  presupuesto; los dos campos de abajo son los de siempre y se
+                  mantienen para las obras antiguas. */}
+              <ClientPicker
+                value={projectForm.client_id}
+                onChange={(client_id) => setProjectForm({ ...projectForm, client_id })}
+                fallbackName={projectForm.client_name}
+              />
+
+              <div className="pt-4 border-t border-gray-100 space-y-4">
+                <p className="text-xs text-gray-400">
+                  Campos sueltos de la obra (no salen en la portada del presupuesto).
+                </p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del cliente</label>
+                  <input type="text" value={projectForm.client_name} onChange={(e) => setProjectForm({ ...projectForm, client_name: e.target.value })} className={inputClass} placeholder="Juan Perez / Empresa S.L." />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contacto (telefono/email)</label>
+                  <input type="text" value={projectForm.client_contact} onChange={(e) => setProjectForm({ ...projectForm, client_contact: e.target.value })} className={inputClass} placeholder="600 123 456 / cliente@email.com" />
+                </div>
               </div>
             </div>
           </div>

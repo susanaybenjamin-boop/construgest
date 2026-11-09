@@ -24,6 +24,9 @@ export interface ProjectInfo {
   location: string | null;
   client_name: string | null;
   client_contact: string | null;
+  /** PRES-1: ficha de cliente reutilizable. Manda sobre client_name cuando existe. */
+  client_id?: string | null;
+  client?: Client | null;
   address: string | null;
   city: string | null;
   province: string | null;
@@ -537,6 +540,28 @@ export interface PlanCalibration {
 }
 
 // ─── Suppliers ──────────────────────────────────────────────────────
+// PRES-1: ficha de cliente reutilizable entre obras (antes el cliente era solo
+// texto suelto en el proyecto y no tenia NIF ni direccion fiscal).
+export interface Client {
+  id: string;
+  organization_id: string;
+  name: string;
+  legal_name: string | null;
+  tax_id: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  postal_code: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Supplier {
   id: string;
   organization_id: string;

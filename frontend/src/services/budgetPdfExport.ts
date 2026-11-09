@@ -343,6 +343,20 @@ export interface BudgetPdfOptions {
    */
   showCosts?: boolean
   generalConditions?: string
+  /**
+   * PRES-1: ficha del cliente de la obra. Va en la portada (nombre fiscal, NIF
+   * y direccion), como en cualquier presupuesto formal. Si no hay ficha
+   * asignada, la portada sale igual que antes: sin bloque de cliente.
+   */
+  client?: {
+    name?: string | null
+    legal_name?: string | null
+    tax_id?: string | null
+    address?: string | null
+    postal_code?: string | null
+    city?: string | null
+    province?: string | null
+  } | null
   margins?: { top: number; bottom: number; left: number; right: number } // mm
   pdfStyles?: PdfStyleOptions
   /** Nombre a mostrar en pie de página (si se omite, usa budget.budget.name) */
@@ -362,9 +376,25 @@ function buildBudgetDocDefinition(
     showPrices = true,
     showCosts = false,
     generalConditions,
+    client,
     pdfStyles,
     documentName,
   } = options
+
+  // PRES-1 — Cliente de la portada: el nombre fiscal si lo hay, y debajo el
+  // NIF y la direccion, como en el modelo de presupuesto completo:
+  //   "Cliente: COMUNIDAD DE PROPIETARIOS EDIFICIO PARQUE FORUM"
+  //   "CIF H19544071 · C/ Omeya 14, 18006 Granada"
+  const clientName = (client?.legal_name || client?.name || '').trim()
+  // Si ciudad y provincia coinciden (Granada, Granada) se escribe una sola vez.
+  const clientProvince =
+    (client?.province || '').trim().toLowerCase() === (client?.city || '').trim().toLowerCase()
+      ? '' : client?.province
+  const clientFiscalLine = [
+    client?.tax_id ? `NIF/CIF ${client.tax_id}` : '',
+    [client?.address, client?.postal_code, client?.city, clientProvince]
+      .filter(Boolean).join(', '),
+  ].filter(Boolean).join(' · ')
 
   // ─── Style overrides (shadows module-level defaults) ─────────────────
   // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -487,6 +517,15 @@ function buildBudgetDocDefinition(
             { text: 'Proyecto:', bold: true, color: COLORS.muted, fontSize: 10 },
             { text: projectName || budget.budget.name, bold: true, fontSize: 12, color: COLORS.text },
           ],
+          // PRES-1: el cliente, justo debajo del proyecto.
+          ...(clientName ? [[
+            { text: 'Cliente:', bold: true, color: COLORS.muted, fontSize: 10 },
+            { text: clientName, bold: true, fontSize: 11, color: COLORS.text },
+          ]] : []),
+          ...(clientFiscalLine ? [[
+            { text: '', fontSize: 10 },
+            { text: clientFiscalLine, fontSize: 9, color: COLORS.muted },
+          ]] : []),
           [
             { text: 'Presupuesto:', bold: true, color: COLORS.muted, fontSize: 10 },
             { text: budget.budget.name, fontSize: 11, color: COLORS.text },

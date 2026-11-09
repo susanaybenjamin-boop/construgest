@@ -1492,6 +1492,7 @@ export default function BudgetPage() {
           onClose={() => setShowPdfPreview(false)}
           budget={activeBudget}
           projectName={activeProject?.name || projectId}
+          client={activeProject?.client}
         />
       )}
 

@@ -3,20 +3,22 @@
 import { useState, useEffect } from 'react'
 import { useSettingsStore } from '@/stores/settingsStore'
 import PdfPreviewModal from '@/components/shared/PdfPreviewModal'
-import type { FullBudget } from '@/types'
+import type { Client, FullBudget } from '@/types'
 
 interface Props {
   isOpen: boolean
   onClose: () => void
   budget: FullBudget
   projectName: string
+  /** PRES-1: ficha del cliente de la obra; sale en la portada del PDF. */
+  client?: Client | null
 }
 
 function formatCurrency(val: number): string {
   return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(val)
 }
 
-export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, projectName }: Props) {
+export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, projectName, client }: Props) {
   const { print: printSettings, company, pdf_styles } = useSettingsStore()
 
   // Document-specific options
@@ -50,6 +52,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           showPrices,
           showCosts,
           generalConditions: generalConditions || undefined,
+          client,
           margins: {
             top: printSettings.default_margin_top,
             bottom: printSettings.default_margin_bottom,
@@ -72,7 +75,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     }, 400)
 
     return () => clearTimeout(timer)
-  }, [isOpen, orientation, showPrices, showCosts, generalConditions, budget, projectName, company, printSettings, pdfName, pdf_styles])
+  }, [isOpen, orientation, showPrices, showCosts, generalConditions, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
 
   // Cleanup blob URL on unmount
   useEffect(() => {

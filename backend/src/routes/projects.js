@@ -106,7 +106,7 @@ router.get('/', async (req, res, next) => {
 // POST /api/projects - Create project
 router.post('/', async (req, res, next) => {
   try {
-    const { name, description, location, client_name, client_contact, address, city, province, postal_code, country, start_date, end_date, folder_path } = req.body
+    const { name, description, location, client_name, client_contact, client_id, address, city, province, postal_code, country, start_date, end_date, folder_path } = req.body
 
     if (!name) {
       return res.status(400).json({ error: 'El nombre es obligatorio' })
@@ -122,6 +122,9 @@ router.post('/', async (req, res, next) => {
         location,
         client_name,
         client_contact,
+        // PRES-1: ficha de cliente reutilizable (client_name se mantiene por
+        // compatibilidad con lo que ya hay escrito).
+        client_id: client_id || null,
         address,
         city,
         province,
@@ -253,8 +256,22 @@ router.get('/:id', projectAccessMiddleware, async (req, res, next) => {
       .single()
 
     if (error) throw error
+
+    // PRES-1: la ficha del cliente va dentro del proyecto, que es quien la
+    // necesita (ajustes del proyecto y portada del presupuesto en PDF).
+    let client = null
+    if (data?.client_id) {
+      const { data: c } = await supabase
+        .from('cons_clients')
+        .select('*')
+        .eq('id', data.client_id)
+        .single()
+      client = c || null
+    }
+
     res.json({
       ...data,
+      client,
       access: {
         role: req.userRole,
         shared_kinds: req.mailboxSharedKinds || null,
@@ -272,11 +289,15 @@ router.put('/:id', projectAccessMiddleware({ requireWrite: true }), async (req, 
     // objeto entero y el shim convertía los `undefined` en NULL: al cambiar solo
     // el estado desde la lista (se manda { status }) hacía SET name=NULL sobre una
     // columna NOT NULL y fallaba ("Error al cambiar el estado").
-    const editable = ['name', 'description', 'location', 'client_name', 'client_contact', 'address', 'city', 'province', 'postal_code', 'country', 'start_date', 'end_date', 'status', 'folder_path']
+    const editable = ['name', 'description', 'location', 'client_name', 'client_contact', 'client_id', 'address', 'city', 'province', 'postal_code', 'country', 'start_date', 'end_date', 'status', 'folder_path']
     const updates = { updated_at: new Date().toISOString() }
     for (const f of editable) {
       if (req.body[f] === undefined) continue
-      updates[f] = (f === 'start_date' || f === 'end_date') ? (req.body[f] || null) : req.body[f]
+      // Las fechas y la ficha de cliente vacías van a NULL, no a cadena vacía
+      // (client_id tiene FK: '' daría error de integridad).
+      updates[f] = (f === 'start_date' || f === 'end_date' || f === 'client_id')
+        ? (req.body[f] || null)
+        : req.body[f]
     }
 
     const { data, error } = await supabase

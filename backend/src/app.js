@@ -18,6 +18,7 @@ import planRoutes from './routes/plans.js'
 import aiRoutes from './routes/ai.js'
 import libraryRoutes from './routes/library.js'
 import suppliersRoutes from './routes/suppliers.js'
+import clientsRoutes from './routes/clients.js'
 import settingsRoutes from './routes/settings.js'
 import workLogRoutes from './routes/workLogs.js'
 import supplierMaterialRoutes from './routes/supplierMaterials.js'
@@ -131,6 +132,7 @@ app.use('/api/plans', planRoutes)
 app.use('/api/ai', aiLimiter, aiRoutes)
 app.use('/api/library', libraryRoutes)
 app.use('/api/suppliers', suppliersRoutes)
+app.use('/api/clients', clientsRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/work-logs', workLogRoutes)
 app.use('/api/supplier-materials', supplierMaterialRoutes)
