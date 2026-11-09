@@ -4,6 +4,7 @@ import express from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import { initRealtime } from './services/realtimeHub.js'
+import { runMigrations } from './db/migrate.js'
 import { getVersionStatus, getCurrentVersion } from './services/version.js'
 
 // Route imports
@@ -170,6 +171,20 @@ server.on('error', (err) => {
   }
   process.exit(1)
 })
+
+// MIG-1: el esquema se pone al día ANTES de servir. El 01_schema.sql solo se
+// aplica al crear la BD, así que sin esto una instalación ya existente nunca
+// recibía las columnas nuevas. Si falla, se dice claro y se sale: servir con el
+// esquema a medias solo produce errores de SQL incomprensibles más adelante.
+try {
+  const { applied } = await runMigrations()
+  if (applied.length) {
+    console.log(`[migraciones] aplicadas ${applied.length}: ${applied.join(', ')}`)
+  }
+} catch (err) {
+  console.error(`FATAL: no se pudo poner al día el esquema de la base de datos.\n${err.message}`)
+  process.exit(1)
+}
 
 initRealtime(server)
 server.listen(PORT, () => {
