@@ -66,7 +66,10 @@ const SECTIONS = {
     'company_email', 'company_web', 'company_iban',
     'company_professional_number', 'company_logo_url',
   ],
-  defaults: ['tax_rate', 'overhead_pct', 'profit_pct', 'currency', 'default_folder_path'],
+  // PRES-4: `budget_conditions_default` es la plantilla de condiciones de la
+  // oferta que se precarga en cada presupuesto nuevo.
+  defaults: ['tax_rate', 'overhead_pct', 'profit_pct', 'currency', 'default_folder_path',
+    'budget_conditions_default'],
   appearance: ['theme', 'language'],
   print: [
     'default_format', 'default_orientation',

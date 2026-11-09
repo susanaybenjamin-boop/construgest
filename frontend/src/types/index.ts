@@ -157,6 +157,8 @@ export interface Budget {
   overhead_pct: number;
   profit_pct: number;
   notes: string | null;
+  /** PRES-4: condiciones de la oferta (validez, forma de pago, plazo, garantía). */
+  conditions?: string | null;
   submitted_at: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;

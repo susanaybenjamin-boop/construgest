@@ -237,11 +237,30 @@ router.get('/:id/full', budgetAccessMiddleware('budget'), async (req, res, next)
 // POST /api/budgets - Create budget
 router.post('/', budgetAccessMiddleware('project', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { project_id, name, tax_rate, overhead_pct, profit_pct, notes } = req.body
+    // PRES-4: `conditions` son las condiciones de la oferta (validez, forma de
+    // pago, plazo, garantía). Si el presupuesto nace sin ellas, se precargan con
+    // la PLANTILLA de Ajustes. Se resuelve aquí y no en el navegador porque la
+    // pantalla de presupuesto no carga el store de ajustes: desde ahí llegaba
+    // vacío y el presupuesto nuevo salía sin condiciones.
+    const { project_id, name, tax_rate, overhead_pct, profit_pct, notes, conditions } = req.body
+
+    let condicionesIniciales = conditions
+    if (condicionesIniciales == null || condicionesIniciales === '') {
+      const { data: plantilla } = await supabase
+        .from('cons_app_settings')
+        .select('value')
+        .eq('organization_id', req.project.organization_id)
+        .eq('key', 'budget_conditions_default')
+        .single()
+      condicionesIniciales = plantilla?.value || null
+    }
 
     const { data, error } = await supabase
       .from('cons_budgets')
-      .insert({ project_id, name, tax_rate, overhead_pct, profit_pct, notes })
+      .insert({
+        project_id, name, tax_rate, overhead_pct, profit_pct, notes,
+        conditions: condicionesIniciales,
+      })
       .select()
       .single()
 
@@ -256,7 +275,7 @@ router.post('/', budgetAccessMiddleware('project', { requireWrite: true }), asyn
 // PUT /api/budgets/:id - Update budget (name, tax_rate, etc.)
 router.put('/:id', budgetAccessMiddleware('budget', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { name, tax_rate, overhead_pct, profit_pct, notes, version } = req.body
+    const { name, tax_rate, overhead_pct, profit_pct, notes, version, conditions } = req.body
     const updates = {}
     if (name !== undefined) updates.name = name
     if (tax_rate !== undefined) updates.tax_rate = tax_rate
@@ -264,6 +283,7 @@ router.put('/:id', budgetAccessMiddleware('budget', { requireWrite: true }), asy
     if (profit_pct !== undefined) updates.profit_pct = profit_pct
     if (notes !== undefined) updates.notes = notes
     if (version !== undefined) updates.version = version
+    if (conditions !== undefined) updates.conditions = conditions
 
     const { data, error } = await supabase
       .from('cons_budgets')

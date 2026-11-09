@@ -182,6 +182,8 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
 
   createBudget: async (projectId, name) => {
     const budgets = get().budgets
+    // PRES-4: las condiciones del presupuesto nuevo las precarga el BACKEND con
+    // la plantilla de Ajustes (esta pantalla no carga el store de ajustes).
     const { data } = await api.post<Budget>('/budgets', {
       project_id: projectId,
       name: name || `Presupuesto v${budgets.length + 1}`,

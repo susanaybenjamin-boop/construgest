@@ -62,6 +62,8 @@ interface SettingsState {
     profit_pct: number
     currency: string
     default_folder_path: string
+    /** PRES-4: plantilla de condiciones de la oferta para los presupuestos nuevos. */
+    budget_conditions_default: string
   }
   // Appearance
   appearance: {
@@ -114,6 +116,7 @@ export const useSettingsStore = create<SettingsState & SettingsActions>((set, ge
     profit_pct: 6,
     currency: 'EUR',
     default_folder_path: '',
+    budget_conditions_default: '',
   },
   appearance: {
     theme: 'light',

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useBudgetStore } from '@/stores/budgetStore'
+import { useNotificationStore } from '@/stores/notificationStore'
 import PdfPreviewModal from '@/components/shared/PdfPreviewModal'
 import type { Client, FullBudget } from '@/types'
 
@@ -19,12 +21,20 @@ function formatCurrency(val: number): string {
 }
 
 export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, projectName, client }: Props) {
-  const { print: printSettings, company, pdf_styles } = useSettingsStore()
+  const { print: printSettings, company, pdf_styles, defaults } = useSettingsStore()
+  const { updateBudget } = useBudgetStore()
+  const { addToast } = useNotificationStore()
 
   // Document-specific options
   const [showPrices, setShowPrices] = useState(true)
   const [showCosts, setShowCosts] = useState(false)
-  const [generalConditions, setGeneralConditions] = useState('')
+  // PRES-4: las condiciones salen de lo guardado en el presupuesto; si todavía
+  // no tiene, de la plantilla de Ajustes. Antes esto era un textarea suelto que
+  // se perdía al cerrar el modal.
+  const [generalConditions, setGeneralConditions] = useState(
+    budget.budget.conditions ?? defaults.budget_conditions_default ?? ''
+  )
+  const [savingConditions, setSavingConditions] = useState(false)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
     (printSettings.default_orientation as 'portrait' | 'landscape') || 'portrait'
   )
@@ -33,7 +43,25 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
   // Reset PDF name when budget changes
   useEffect(() => {
     setPdfName(budget.budget.name)
+    setGeneralConditions(budget.budget.conditions ?? defaults.budget_conditions_default ?? '')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budget.budget.id])
+
+  // Guardar en el presupuesto al salir del campo (solo si ha cambiado).
+  const guardarCondiciones = async () => {
+    const actual = budget.budget.conditions ?? ''
+    if (generalConditions === actual) return
+    setSavingConditions(true)
+    try {
+      await updateBudget(budget.budget.id, { conditions: generalConditions })
+      addToast('success', 'Condiciones guardadas en el presupuesto')
+    } catch (e) {
+      const r = e as { response?: { data?: { error?: string } }; message?: string }
+      addToast('error', `No se pudieron guardar: ${r?.response?.data?.error || r?.message || 'error'}`)
+    } finally {
+      setSavingConditions(false)
+    }
+  }
 
   // Blob management
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
@@ -159,15 +187,21 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
       {/* General conditions */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">
-          Condiciones generales
+          Condiciones de la oferta
         </label>
         <textarea
           value={generalConditions}
           onChange={(e) => setGeneralConditions(e.target.value)}
-          placeholder="Texto de condiciones generales que aparecera al final del documento..."
+          onBlur={guardarCondiciones}
+          placeholder="Validez de la oferta, forma de pago, plazo de ejecucion, garantia, exclusiones..."
           rows={5}
           className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none transition"
         />
+        <p className="text-xs text-gray-400 mt-1">
+          {savingConditions
+            ? 'Guardando...'
+            : 'Se guardan en este presupuesto. La plantilla por defecto esta en Configuracion.'}
+        </p>
       </div>
     </>
   )

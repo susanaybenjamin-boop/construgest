@@ -1009,7 +1009,7 @@ function buildBudgetDocDefinition(
   if (generalConditions && generalConditions.trim()) {
     summaryPage.push({
       id: 'budget-conditions',
-      text: 'CONDICIONES GENERALES',
+      text: 'CONDICIONES DE LA OFERTA',
       fontSize: 16,
       bold: true,
       color: COLORS.primary,
