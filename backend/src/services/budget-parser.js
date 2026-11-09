@@ -489,6 +489,10 @@ function isPageNoise(line) {
   if (/^\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}$/.test(t)) return true
   if (/^P[áa]gina\s*\d+$/i.test(t)) return true
   if (/^(p[áa]g\.?\s*\d|hoja\s+\d)/i.test(t)) return true
+  // Pie de página CON texto delante (lo normal en PDFs de Word/LLM):
+  //   "BENJAMIN RECIO LOPEZ  Presupuesto 2026-023 — 9 de noviembre  Página 3 de 23"
+  // Si no se quita, se cuela como descripción de la última partida del capítulo.
+  if (/\b(p[áa]gina|p[áa]g\.?|page|hoja)\s*\d{1,4}\s*(de|of|\/)\s*\d{1,4}\s*$/i.test(t)) return true
   if (/^\d{1,3}$/.test(t)) return true
 
   // Software-specific headers/footers
@@ -563,6 +567,65 @@ function checkInlineSummary(line) {
 
   const textBefore = cleaned.substring(0, last3[0].index).replace(/\s+/g, ' ').trim()
   return { qty, price, amount, textBefore }
+}
+
+/**
+ * Partida de UNA SOLA LÍNEA (formato "informe": lo que sale de Word, de Excel o
+ * de un PDF redactado con un LLM). Código, título, unidad, cantidad, precio e
+ * importe van todos juntos, y la descripción larga en las líneas siguientes:
+ *   "01.01 PROTECCIÓN DE ZONAS COMUNES    ud 1,00 680,00 € 680,00 €"
+ *   "Protección de suelos, peldaños, carpinterías…"
+ * Antes esto daba 0 partidas: detectPartidaStart() exige la unidad justo DETRÁS
+ * del código, y su patrón inline descarta la línea precisamente por llevar
+ * summary; y checkInlineSummary() solo se consulta si ya hay una partida
+ * abierta, así que la línea se perdía entera.
+ * Retorna { code, unit, title, qty, price, amount } o null.
+ */
+function detectOneLinePartida(line) {
+  const inl = checkInlineSummary(line)
+  if (!inl || !inl.textBefore) return null
+
+  // textBefore = "01.01 PROTECCIÓN DE ZONAS COMUNES ud"
+  const m = inl.textBefore.match(/^([A-Z0-9][A-Za-z0-9.,\-/]{1,15})\s+(.+)$/)
+  if (!m || !looksLikePartidaCode(m[1])) return null
+
+  let rest = m[2].trim()
+  let unit = null
+
+  // La unidad suele ir al FINAL del texto, justo antes de la cantidad: "… ud"
+  const unitTail = rest.match(new RegExp(`^(.*?)[\\s|]+(${UNIT_WORDS})$`, 'i'))
+  if (unitTail && /[a-záéíóúñü]/i.test(unitTail[1])) {
+    rest = unitTail[1].trim()
+    unit = normalizeUnit(unitTail[2])
+  } else {
+    // …o justo DETRÁS del código: "01.01 ud PROTECCIÓN DE…"
+    const unitHead = rest.match(new RegExp(`^(${UNIT_WORDS})\\s+(.+)$`, 'i'))
+    if (unitHead) {
+      unit = normalizeUnit(unitHead[1])
+      rest = unitHead[2].trim()
+    }
+  }
+
+  const title = rest.replace(/[\s.:;|\-]+$/, '').trim()
+  if (title.length < 3 || !/[a-záéíóúñü]/i.test(title)) return null
+
+  return {
+    code: normalizeCode(m[1]),
+    unit: unit || 'UD',
+    title,
+    qty: inl.qty,
+    price: inl.price,
+    amount: inl.amount,
+  }
+}
+
+/**
+ * Cabecera de anexo / apéndice / reportaje fotográfico. NO es presupuesto: sus
+ * tablas de mediciones por zona y sus pies de foto no deben colarse como
+ * descripción ni como mediciones de la última partida.
+ */
+function isAnnexHeading(line) {
+  return /^(anexo|anejo|ap[ée]ndice|reportaje\s+fotogr|documentaci[óo]n\s+gr[áa]fica|fotograf[íi]as)\b/i.test(line.trim())
 }
 
 /**
@@ -1015,12 +1078,13 @@ export function parseBudgetAlgorithmic(text) {
  * (no en línea aparte). Se usa solo cuando el parser de separadores no extrae nada.
  */
 export function parseBudgetInlineSummary(text) {
-  const logs = ['📐 Parser inline v1.0 — totales en línea (formato Excel, sin separadores)']
+  const logs = ['📐 Parser inline v1.1 — totales en línea (Excel/Word) + partida de una línea']
 
   const lines = text.split('\n').map(l => l.trim()).filter(l => l)
   const chapters = []
   let currentChapter = null
   let currentPartida = null
+  let inAnnex = false
 
   function closePartida() {
     if (currentPartida && currentPartida.summary) {
@@ -1036,18 +1100,41 @@ export function parseBudgetInlineSummary(text) {
   }
 
   for (const line of lines) {
+    // Anexo / reportaje fotográfico: cierra la partida en curso y se ignora todo
+    // hasta el siguiente CAPÍTULO (si lo hubiera).
+    if (isAnnexHeading(line)) {
+      closePartida()
+      inAnnex = true
+      continue
+    }
+
     // Capítulo
     const ch = detectChapter(line)
     if (ch) {
       closePartida()
+      inAnnex = false
       if (currentChapter) chapters.push(currentChapter)
       currentChapter = { code: ch.code, name: ch.name, items: [] }
       continue
     }
 
+    if (inAnnex) continue
+
     // "total capitulo …" y demás totales cierran la partida abierta y se ignoran
     if (isTotalLine(line)) {
       closePartida()
+      continue
+    }
+
+    // Partida de UNA LÍNEA: "01.01 TÍTULO    ud 1,00 680,00 € 680,00 €".
+    // Se deja abierta para que las líneas siguientes sean su descripción.
+    const one = detectOneLinePartida(line)
+    if (one) {
+      closePartida()
+      currentPartida = {
+        code: one.code, unit: one.unit, title: one.title, bodyLines: [],
+        summary: { qty: one.qty, price: one.price, amount: one.amount },
+      }
       continue
     }
 
