@@ -38,6 +38,41 @@ export async function loadPdfMake() {
 /**
  * Fetch an image URL and convert to base64 data URI for pdfmake
  */
+/**
+ * PRES-3 — Carga una foto y la REESCALA antes de meterla en el PDF.
+ * Una foto de movil son 3-5 MB; veinte fotos a pelo darian un PDF imposible de
+ * enviar por correo. Se limita el lado mayor y se guarda como JPEG.
+ * Devuelve null si la foto no se puede cargar (se salta, no rompe el PDF).
+ */
+async function fetchPhotoAsBase64(
+  url: string,
+  maxSide = 1100,
+  quality = 0.72,
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const bitmap = await createImageBitmap(blob)
+
+    const escala = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+    const w = Math.max(1, Math.round(bitmap.width * escala))
+    const h = Math.max(1, Math.round(bitmap.height * escala))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0, w, h)
+    bitmap.close?.()
+
+    return { dataUrl: canvas.toDataURL('image/jpeg', quality), width: w, height: h }
+  } catch {
+    return null
+  }
+}
+
 async function fetchImageAsBase64(url: string): Promise<string | null> {
   if (!url) return null
   try {
@@ -350,6 +385,13 @@ export interface BudgetPdfOptions {
    */
   /** PRES-2: anexo con la tabla de mediciones por zona al final del documento. */
   includeMeasurementsAnnex?: boolean
+  /**
+   * PRES-3: fotos del anexo fotografico, YA cargadas y reescaladas
+   * (generateBudgetPdfBlob las prepara a partir de `photoSources`).
+   */
+  photos?: { zone: string; caption: string; dataUrl: string; width: number; height: number }[]
+  /** PRES-3: fotos a cargar (url + zona + pie). */
+  photoSources?: { url: string; zone?: string | null; caption?: string | null }[]
   client?: {
     name?: string | null
     legal_name?: string | null
@@ -379,6 +421,7 @@ function buildBudgetDocDefinition(
     showCosts = false,
     generalConditions,
     includeMeasurementsAnnex = true,
+    photos = [],
     client,
     pdfStyles,
     documentName,
@@ -1160,6 +1203,73 @@ function buildBudgetDocDefinition(
     }
   }
 
+  // ─── ANEXO II. REPORTAJE FOTOGRAFICO ───────────────────────────────
+  // PRES-3 — Fotos agrupadas por zona, dos por fila, con pie numerado
+  // ("Foto 1", "Foto 2"...) como en el modelo de presupuesto completo.
+  if (photos.length > 0) {
+    const anchoCaja = isLandscape ? 340 : 240   // puntos; dos columnas
+    const altoCaja = Math.round(anchoCaja * 0.75)
+
+    annexPages.push({
+      id: 'budget-annex-photos',
+      text: 'ANEXO II. REPORTAJE FOTOGRAFICO',
+      fontSize: 16,
+      bold: true,
+      color: COLORS.primary,
+      margin: [0, 0, 0, 16],
+      pageBreak: 'before' as const,
+    })
+
+    // Agrupar por zona manteniendo el orden en que vienen.
+    const porZona: { zona: string; fotos: typeof photos }[] = []
+    for (const foto of photos) {
+      const zona = foto.zone || 'Sin zona asignada'
+      let grupo = porZona.find((g) => g.zona === zona)
+      if (!grupo) { grupo = { zona, fotos: [] }; porZona.push(grupo) }
+      grupo.fotos.push(foto)
+    }
+
+    let numero = 0
+    for (const grupo of porZona) {
+      annexPages.push({
+        text: grupo.zona,
+        fontSize: 11,
+        bold: true,
+        color: COLORS.text,
+        margin: [0, 10, 0, 6],
+      })
+
+      for (let i = 0; i < grupo.fotos.length; i += 2) {
+        const pareja = grupo.fotos.slice(i, i + 2)
+        annexPages.push({
+          columns: pareja.map((foto) => {
+            numero++
+            // Encajar la foto en la caja sin deformarla.
+            const escala = Math.min(anchoCaja / foto.width, altoCaja / foto.height)
+            return {
+              width: anchoCaja,
+              stack: [
+                {
+                  image: foto.dataUrl,
+                  width: Math.round(foto.width * escala),
+                  height: Math.round(foto.height * escala),
+                },
+                {
+                  text: foto.caption ? `Foto ${numero}. ${foto.caption}` : `Foto ${numero}`,
+                  fontSize: 8,
+                  color: COLORS.muted,
+                  margin: [0, 3, 0, 0],
+                },
+              ],
+            }
+          }),
+          columnGap: 16,
+          margin: [0, 0, 0, 12],
+        })
+      }
+    }
+  }
+
   // ─── Build Document Definition ─────────────────────────────────────
   return {
     pageSize: 'A4' as const,
@@ -1230,7 +1340,23 @@ export async function generateBudgetPdfBlob(
   const fontFamily = options?.pdfStyles?.pdf_font_family ?? 'Roboto'
   const fonts = getFonts(fontFamily)
   const logoBase64 = await fetchImageAsBase64(company.company_logo_url)
-  const docDef = buildBudgetDocDefinition(budget, projectName, company, options, logoBase64)
+
+  // PRES-3: las fotos del anexo se cargan y reescalan aqui (buildDocDefinition
+  // es sincrona). Las que fallen se saltan: mejor un anexo con menos fotos que
+  // un PDF que no se genera.
+  let photos = options?.photos
+  if (!photos && options?.photoSources?.length) {
+    const cargadas = await Promise.all(options.photoSources.map(async (ps) => {
+      const img = await fetchPhotoAsBase64(ps.url)
+      if (!img) return null
+      return { zone: (ps.zone || '').trim(), caption: (ps.caption || '').trim(), ...img }
+    }))
+    photos = cargadas.filter(Boolean) as NonNullable<typeof photos>
+  }
+
+  const docDef = buildBudgetDocDefinition(
+    budget, projectName, company, { ...options, photos }, logoBase64,
+  )
   return new Promise<Blob>((resolve) => {
     pdf.createPdf(docDef, null, fonts, pdf.vfs).getBlob((blob: Blob) => resolve(blob))
   })

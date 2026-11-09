@@ -27,7 +27,7 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   Plus, Loader2, Calculator, ChevronDown, ChevronRight,
   Trash2, FileDown, FileUp, Send, Check, RotateCcw, GripVertical, BookmarkPlus, Eye, EyeOff, X,
-  ArrowRightLeft, FileText, List, Library, Search, Undo2
+  ArrowRightLeft, FileText, List, Library, Search, Undo2, Images
 } from 'lucide-react'
 import type { PricePickMessage } from '@/types'
 import { formatCurrency } from '@/lib/utils'
@@ -37,6 +37,7 @@ import ImportBudgetDialog from '@/components/budget/ImportBudgetDialog'
 import ImportFromLibraryDialog from '@/components/budget/ImportFromLibraryDialog'
 import PickFromLibraryDialog from '@/components/budget/PickFromLibraryDialog'
 import BudgetPdfPreviewModal from '@/components/budget/BudgetPdfPreviewModal'
+import BudgetPhotosPanel from '@/components/budget/BudgetPhotosPanel'
 import ChapterMappingDialog from '@/components/budget/ChapterMappingDialog'
 import BudgetComparisonModal from '@/components/budget/BudgetComparisonModal'
 import BudgetTrashModal from '@/components/budget/BudgetTrashModal'
@@ -175,6 +176,7 @@ export default function BudgetPage() {
   const [batchSaving, setBatchSaving] = useState(false)
   const [showChapterMapping, setShowChapterMapping] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [showPhotos, setShowPhotos] = useState(false)
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null)
   const [deletingInProgress, setDeletingInProgress] = useState(false)
   const [editingChapterCode, setEditingChapterCode] = useState<string | null>(null)
@@ -856,6 +858,13 @@ export default function BudgetPage() {
                   <FileUp className="w-4 h-4" /> Importar desde...
                 </button>
                 <button
+                  onClick={() => setShowPhotos(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition shadow-sm"
+                  title="Anexo fotográfico del presupuesto"
+                >
+                  <Images className="w-4 h-4" /> Fotos
+                </button>
+                <button
                   onClick={() => setShowPdfPreview(true)}
                   className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition shadow-sm"
                   title="Vista previa del PDF"
@@ -1485,8 +1494,19 @@ export default function BudgetPage() {
         />
       )}
 
-      {/* PDF Preview Modal */}
+      {/* PDF Preview Modal + anexo fotografico */}
       {activeBudget && (
+        <>
+        <BudgetPhotosPanel
+          isOpen={showPhotos}
+          onClose={() => setShowPhotos(false)}
+          budgetId={activeBudget.budget.id}
+          projectId={projectId}
+          zones={[...new Set(
+            activeBudget.chapters.flatMap((c) => c.items.flatMap((i) =>
+              (i.measurements || []).map((m) => (m.zone || '').trim()).filter(Boolean))),
+          )]}
+        />
         <BudgetPdfPreviewModal
           isOpen={showPdfPreview}
           onClose={() => setShowPdfPreview(false)}
@@ -1494,6 +1514,7 @@ export default function BudgetPage() {
           projectName={activeProject?.name || projectId}
           client={activeProject?.client}
         />
+        </>
       )}
 
       {/* Budget Comparison Modal */}

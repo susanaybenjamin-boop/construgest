@@ -566,6 +566,24 @@ export interface Client {
   updated_at: string;
 }
 
+// PRES-3: foto del anexo fotografico del presupuesto. No duplica el fichero:
+// apunta al que ya esta subido al proyecto y le anade zona, pie y orden.
+export interface BudgetPhoto {
+  id: string;
+  budget_id: string;
+  file_id: string;
+  zone: string | null;
+  caption: string | null;
+  sort_order: number;
+  created_at: string;
+  file?: {
+    id: string;
+    original_name: string;
+    storage_path: string;
+    file_type: string;
+  } | null;
+}
+
 export interface Supplier {
   id: string;
   organization_id: string;

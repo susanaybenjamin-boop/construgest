@@ -1578,4 +1578,120 @@ router.get('/library-as-budget', async (req, res, next) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════════════════════
+//  PRES-3 — ANEXO FOTOGRÁFICO
+//  Las fotos ya están subidas al proyecto; aquí solo se dice cuáles salen en
+//  este presupuesto, en qué zona y con qué pie.
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/budgets/:id/photos — fotos del anexo, con los datos del fichero
+router.get('/:id/photos', budgetAccessMiddleware('budget'), async (req, res, next) => {
+  try {
+    const { data: photos, error } = await supabase
+      .from('cons_budget_photos')
+      .select('*')
+      .eq('budget_id', req.params.id)
+      .order('sort_order', { ascending: true })
+    if (error) throw error
+    if (!photos || photos.length === 0) return res.json([])
+
+    const { data: files, error: fErr } = await supabase
+      .from('cons_project_files')
+      .select('id, original_name, storage_path, file_type')
+      .in('id', photos.map((p) => p.file_id))
+    if (fErr) throw fErr
+
+    const byId = new Map((files || []).map((f) => [f.id, f]))
+    res.json(photos.map((p) => ({ ...p, file: byId.get(p.file_id) || null })))
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/budgets/:id/photos — añadir fotos (varias de una vez)
+router.post('/:id/photos', budgetAccessMiddleware('budget', { requireWrite: true }), async (req, res, next) => {
+  try {
+    const fileIds = Array.isArray(req.body?.file_ids) ? req.body.file_ids : []
+    if (fileIds.length === 0) {
+      return res.status(400).json({ error: 'No se ha indicado ninguna foto' })
+    }
+
+    // Las fotos tienen que ser del MISMO proyecto que el presupuesto.
+    const { data: validos, error: vErr } = await supabase
+      .from('cons_project_files')
+      .select('id')
+      .eq('project_id', req.project.id)
+      .in('id', fileIds)
+    if (vErr) throw vErr
+    const permitidos = new Set((validos || []).map((f) => f.id))
+    const aInsertar = fileIds.filter((id) => permitidos.has(id))
+    if (aInsertar.length === 0) {
+      return res.status(400).json({ error: 'Esas fotos no son de este proyecto' })
+    }
+
+    // Las que ya estaban se ignoran (la clave única no deja duplicados).
+    const { data: yaEstan } = await supabase
+      .from('cons_budget_photos')
+      .select('file_id')
+      .eq('budget_id', req.params.id)
+    const existentes = new Set((yaEstan || []).map((p) => p.file_id))
+    const nuevos = aInsertar.filter((id) => !existentes.has(id))
+    if (nuevos.length === 0) return res.json([])
+
+    const { data: ultimas } = await supabase
+      .from('cons_budget_photos')
+      .select('sort_order')
+      .eq('budget_id', req.params.id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+    let orden = (ultimas?.[0]?.sort_order ?? 0)
+
+    const { data, error } = await supabase
+      .from('cons_budget_photos')
+      .insert(nuevos.map((file_id) => ({
+        budget_id: req.params.id, file_id, sort_order: ++orden,
+      })))
+      .select()
+    if (error) throw error
+
+    res.status(201).json(data)
+    notifyBudgetChange(req.params.id, 'budget-photo-add')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// PUT /api/budgets/photos/:photoId — zona, pie y orden
+router.put('/photos/:photoId', budgetAccessMiddleware('budgetPhoto', { requireWrite: true }), async (req, res, next) => {
+  try {
+    const { zone, caption, sort_order } = req.body
+    const { data, error } = await supabase
+      .from('cons_budget_photos')
+      .update({ zone, caption, sort_order })
+      .eq('id', req.params.photoId)
+      .select()
+      .single()
+    if (error) throw error
+    res.json(data)
+    notifyBudgetChange(req.resolvedBudgetId, 'budget-photo-update')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// DELETE /api/budgets/photos/:photoId — quitarla del anexo (el fichero sigue en el proyecto)
+router.delete('/photos/:photoId', budgetAccessMiddleware('budgetPhoto', { requireWrite: true }), async (req, res, next) => {
+  try {
+    const { error } = await supabase
+      .from('cons_budget_photos')
+      .delete()
+      .eq('id', req.params.photoId)
+    if (error) throw error
+    res.json({ success: true })
+    notifyBudgetChange(req.resolvedBudgetId, 'budget-photo-delete')
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import api from '@/lib/api'
+import { photoUrl } from '@/components/budget/BudgetPhotosPanel'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useBudgetStore } from '@/stores/budgetStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import PdfPreviewModal from '@/components/shared/PdfPreviewModal'
-import type { Client, FullBudget } from '@/types'
+import type { BudgetPhoto, Client, FullBudget } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -40,6 +42,18 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
   const hayMediciones = budget.chapters.some((c) =>
     c.items.some((i) => (i.measurements?.length || 0) > 0))
   const [includeMeasurementsAnnex, setIncludeMeasurementsAnnex] = useState(true)
+
+  // PRES-3: fotos del anexo. Se piden al abrir; si no hay, ni se ofrece la opcion.
+  const [photos, setPhotos] = useState<BudgetPhoto[]>([])
+  const [includePhotoAnnex, setIncludePhotoAnnex] = useState(true)
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelado = false
+    api.get<BudgetPhoto[]>(`/budgets/${budget.budget.id}/photos`)
+      .then(({ data }) => { if (!cancelado) setPhotos(data || []) })
+      .catch(() => { if (!cancelado) setPhotos([]) })
+    return () => { cancelado = true }
+  }, [isOpen, budget.budget.id])
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
     (printSettings.default_orientation as 'portrait' | 'landscape') || 'portrait'
   )
@@ -86,6 +100,11 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           showCosts,
           generalConditions: generalConditions || undefined,
           includeMeasurementsAnnex,
+          photoSources: includePhotoAnnex
+            ? photos
+              .filter((p) => p.file?.storage_path)
+              .map((p) => ({ url: photoUrl(p.file?.storage_path), zone: p.zone, caption: p.caption }))
+            : [],
           client,
           margins: {
             top: printSettings.default_margin_top,
@@ -109,7 +128,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     }, 400)
 
     return () => clearTimeout(timer)
-  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
+  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, includePhotoAnnex, photos, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -208,6 +227,30 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           </label>
           <p className="text-xs text-gray-400 mt-1 ml-12">
             Tabla por zona al final, con los totales de cada partida
+          </p>
+        </div>
+      )}
+
+      {/* PRES-3 — Anexo fotografico */}
+      {photos.length > 0 && (
+        <div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={includePhotoAnnex}
+                onChange={(e) => setIncludePhotoAnnex(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-checked:bg-blue-600 rounded-full transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+            </div>
+            <span className="text-sm font-medium text-gray-700">
+              Anexo fotografico ({photos.length})
+            </span>
+          </label>
+          <p className="text-xs text-gray-400 mt-1 ml-12">
+            Las fotos se reescalan para que el PDF no se dispare de tamano
           </p>
         </div>
       )}

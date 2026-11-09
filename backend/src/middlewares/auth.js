@@ -200,8 +200,17 @@ async function lookupBreakdown(breakdownId) {
   return lookupItem(data.budget_item_id)
 }
 
+// PRES-3: foto del anexo fotográfico -> presupuesto -> proyecto.
+async function lookupBudgetPhoto(photoId) {
+  const { data } = await supabase
+    .from('cons_budget_photos').select('budget_id').eq('id', photoId).single()
+  if (!data) return null
+  return lookupBudget(data.budget_id)
+}
+
 const RESOLVERS = {
   budget: lookupBudget,
+  budgetPhoto: lookupBudgetPhoto,
   chapter: lookupChapter,
   item: lookupItem,
   measurement: lookupMeasurement,
@@ -215,6 +224,7 @@ const PARAM_KEYS = {
   item: ['itemId', 'item_id'],
   measurement: ['measurementId', 'measurement_id'],
   breakdown: ['id', 'breakdownId', 'breakdown_id'],
+  budgetPhoto: ['photoId', 'photo_id'],
   project: ['projectId', 'project_id'],
 }
 
