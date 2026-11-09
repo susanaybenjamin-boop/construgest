@@ -94,6 +94,58 @@
 >   2 capítulos y 15 partidas** (14.547,37 €) en **57 s** — o sea, el camino que estaba muerto ahora
 >   resuelve el presupuesto entero. `tsc --noEmit` limpio.
 >
+>
+> ### MIG-1 + PRES-1 + PRES-4 (2026-11-09): el presupuesto se acerca al modelo "completo"
+>
+> **MIG-1 — migrador de esquema (lo que desbloquea todo lo demás).** Antes de tocar el
+> modelo se vio que **no había forma de que una columna nueva llegara a la app ya
+> instalada**: `database/init/01_schema.sql` solo se aplica si la BD **no existe**
+> (`desktop/main.js:404`), y en Docker solo al crear el volumen. Una columna nueva habría
+> dado errores de SQL en tu instalación. Ahora el backend aplica al arrancar los `.sql`
+> pendientes de [`backend/migrations/mariadb/`](../backend/migrations/mariadb) y los anota en
+> `cons_schema_migrations`; si una falla, **lo dice claro y no arranca** (nada de servir con
+> el esquema a medias). Idempotentes (`ADD COLUMN IF NOT EXISTS`, comprobado contra MariaDB
+> 11.4). Las migraciones viejas de `backend/migrations/*.sql` son de Supabase (Postgres) y
+> NO se ejecutan. Viajan dentro del `.msi` (el robocopy del build copia `/E`).
+> *Verificado*: se aplican al arrancar, al reiniciar no se repiten, y relanzando una a mano
+> el traspaso de datos no duplica nada.
+>
+> **PRES-1 — ficha de cliente reutilizable + cliente en la portada.** El PDF no imprimía
+> NINGÚN dato del cliente y el cliente era texto suelto en el proyecto, sin NIF ni dirección,
+> reescrito en cada obra. Ahora: tabla `cons_clients` por organización (nombre, razón social,
+> NIF, dirección fiscal, contacto, baja lógica), `cons_projects.client_id`, API `/api/clients`,
+> **pantalla Clientes** en el panel y **selector de ficha** en Ajustes del proyecto que avisa
+> en ámbar si falta el NIF o la dirección. La migración **convierte los `client_name` que ya
+> existían en fichas** y enlaza los proyectos (la dirección del proyecto NO se copia: es la de
+> la OBRA). En la portada sale `Cliente: <razón social>` y debajo
+> `NIF/CIF … · dirección, CP, ciudad` (ciudad y provincia iguales → una sola vez).
+> *(Decisión de Benjamin: ficha reutilizable, no campos sueltos en el proyecto.)*
+>
+> **PRES-4 — condiciones de la oferta, guardadas.** Antes se escribían en el modal del PDF y
+> **se perdían al cerrar**. Ahora: `cons_budgets.conditions`, **plantilla por defecto** en
+> Ajustes → Valores por Defecto (validez, forma de pago, plazo, garantía, exclusiones), el
+> presupuesto NUEVO nace con ella dentro, y el modal **guarda al salir del campo**. Retocar un
+> presupuesto no toca la plantilla. La sección del PDF pasa a llamarse
+> "CONDICIONES DE LA OFERTA".
+>
+> **Un fallo que solo salió probándolo**: la plantilla se precargaba desde el navegador, pero
+> **la pantalla de presupuesto no carga el store de ajustes**, así que llegaba vacía y el
+> presupuesto nuevo nacía sin condiciones. Se resuelve ahora en el **backend**, que siempre
+> tiene el dato.
+>
+> **Verificado en ejecución** (Docker + frontend dev + login real), de punta a punta: la
+> pantalla de Clientes; el selector en Ajustes del proyecto; **la portada del PDF con
+> "C.P. EDIFICIO PARQUE FORUM / NIF/CIF H19544071 · C/ Omeya 14, 18006, Granada"**; la
+> plantilla escrita en Ajustes y guardada en `cons_app_settings`; un presupuesto NUEVO creado
+> desde la pantalla que nace con ella; el texto editado en el modal apareciendo cambiado en la
+> BD al salir del campo; y la página final "CONDICIONES DE LA OFERTA" en el PDF.
+> Por `curl`: alta/edición/listado de clientes y rechazo con nombre vacío (400).
+> `npm test` **39/39** y `tsc --noEmit` limpio.
+>
+> **Quedan del bloque PRES**: PRES-2 (anexo de mediciones, y la tabla por zona), PRES-3
+> (reportaje fotográfico por zonas) y PRES-5 (GG+BI / descompuestos: decisión de negocio,
+> PEM o PEC). **Nada pusheado todavía** — se pushea cuando esté todo.
+>
 > ### Anterior (2026-11-07): LOGIN roto — un backend VIEJO ocupaba el puerto 5000
 > **Síntoma de Benjamin**: "no me deja entrar; meto el PIN y vuelve a la pantalla del PIN,
 > pruebo con email y contraseña y vuelve al inicio de sesión, como si no se ejecutara el
@@ -762,7 +814,7 @@ además cosas que ese PDF no lleva: coste y margen, versiones, estados, bibliote
 comparador y certificaciones.
 
 Lo que **NO** tenemos, en orden de "más valor por menos trabajo":
-- **PRES-1 · Datos del cliente en el presupuesto.** El PDF ajeno pone en portada *Cliente,
+- ~~**PRES-1 · Datos del cliente en el presupuesto.**~~ **HECHO 2026-11-09** (ficha reutilizable). El PDF ajeno pone en portada *Cliente,
   CIF y dirección*. Hoy `cons_projects` solo guarda `client_name` y `client_contact` (texto
   libre) y al PDF solo se le pasa `projectName`. → Campos de cliente (nombre fiscal, NIF,
   dirección) + bloque en portada. **Pequeño.**
@@ -777,7 +829,7 @@ Lo que **NO** tenemos, en orden de "más valor por menos trabajo":
   vínculo a capítulo, partida ni zona, y el PDF **no inserta ninguna imagen** salvo el logo.
   → Vincular foto ↔ zona/partida + sección de anexo con rejilla y pie de foto. **Mediano**
   (cuidado con el peso del PDF y con el tamaño de las imágenes).
-- **PRES-4 · Condiciones de la oferta.** Validez, forma de pago, plazo de ejecución, garantía y
+- ~~**PRES-4 · Condiciones de la oferta.**~~ **HECHO 2026-11-09** (plantilla + por presupuesto). Validez, forma de pago, plazo de ejecución, garantía y
   exclusiones. Hoy el textarea "Condiciones generales" del modal del PDF **no se guarda en
   ninguna parte**: se escribe, sale en ese PDF y se pierde al cerrar. → Persistirlo en el
   presupuesto (`cons_budgets.notes` está libre y sin uso) y/o una plantilla en Ajustes.
