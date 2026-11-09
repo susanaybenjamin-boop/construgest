@@ -35,6 +35,11 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     budget.budget.conditions ?? defaults.budget_conditions_default ?? ''
   )
   const [savingConditions, setSavingConditions] = useState(false)
+
+  // PRES-2: el anexo solo tiene sentido si hay mediciones; si no, ni se ofrece.
+  const hayMediciones = budget.chapters.some((c) =>
+    c.items.some((i) => (i.measurements?.length || 0) > 0))
+  const [includeMeasurementsAnnex, setIncludeMeasurementsAnnex] = useState(true)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
     (printSettings.default_orientation as 'portrait' | 'landscape') || 'portrait'
   )
@@ -80,6 +85,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           showPrices,
           showCosts,
           generalConditions: generalConditions || undefined,
+          includeMeasurementsAnnex,
           client,
           margins: {
             top: printSettings.default_margin_top,
@@ -103,7 +109,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     }, 400)
 
     return () => clearTimeout(timer)
-  }, [isOpen, orientation, showPrices, showCosts, generalConditions, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
+  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -183,6 +189,28 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           Incluye coste estimado y margen bruto (uso interno, no compartir con cliente)
         </p>
       </div>
+
+      {/* PRES-2 — Anexo de mediciones */}
+      {hayMediciones && (
+        <div>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={includeMeasurementsAnnex}
+                onChange={(e) => setIncludeMeasurementsAnnex(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-9 h-5 bg-gray-200 peer-checked:bg-blue-600 rounded-full transition-colors" />
+              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+            </div>
+            <span className="text-sm font-medium text-gray-700">Anexo de mediciones</span>
+          </label>
+          <p className="text-xs text-gray-400 mt-1 ml-12">
+            Tabla por zona al final, con los totales de cada partida
+          </p>
+        </div>
+      )}
 
       {/* General conditions */}
       <div>

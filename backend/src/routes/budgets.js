@@ -702,11 +702,12 @@ async function recomputePartidaQuantityFromMeasurements(itemId) {
 // POST /api/budgets/items/:itemId/measurements
 router.post('/items/:itemId/measurements', budgetAccessMiddleware('item', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { description, units, length, width, height, partial, sort_order } = req.body
+    // PRES-2: `zone` es la zona de la obra donde se mide (texto libre).
+    const { description, units, length, width, height, partial, sort_order, zone } = req.body
 
     const { data, error } = await supabase
       .from('cons_measurements')
-      .insert({ budget_item_id: req.params.itemId, description, units, length, width, height, partial, sort_order })
+      .insert({ budget_item_id: req.params.itemId, description, units, length, width, height, partial, sort_order, zone: zone || null })
       .select()
       .single()
 
@@ -736,6 +737,7 @@ router.post('/items/:itemId/measurements/bulk', budgetAccessMiddleware('item', {
       height: m.height ?? 0,
       partial: m.partial ?? 0,
       sort_order: m.sort_order ?? idx + 1,
+      zone: m.zone || null,
     }))
 
     const { data, error } = await supabase
@@ -755,11 +757,13 @@ router.post('/items/:itemId/measurements/bulk', budgetAccessMiddleware('item', {
 // PUT /api/budgets/measurements/:measurementId
 router.put('/measurements/:measurementId', budgetAccessMiddleware('measurement', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { description, units, length, width, height, partial, sort_order } = req.body
+    const { description, units, length, width, height, partial, sort_order, zone } = req.body
 
     const { data, error } = await supabase
       .from('cons_measurements')
-      .update({ description, units, length, width, height, partial, sort_order })
+      // El shim ignora las claves `undefined`, así que esto es una actualización
+      // parcial: mandar solo `units` no borra la descripción ni la zona.
+      .update({ description, units, length, width, height, partial, sort_order, zone })
       .eq('id', req.params.measurementId)
       .select()
       .single()

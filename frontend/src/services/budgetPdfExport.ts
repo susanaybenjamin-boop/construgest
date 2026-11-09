@@ -348,6 +348,8 @@ export interface BudgetPdfOptions {
    * y direccion), como en cualquier presupuesto formal. Si no hay ficha
    * asignada, la portada sale igual que antes: sin bloque de cliente.
    */
+  /** PRES-2: anexo con la tabla de mediciones por zona al final del documento. */
+  includeMeasurementsAnnex?: boolean
   client?: {
     name?: string | null
     legal_name?: string | null
@@ -376,6 +378,7 @@ function buildBudgetDocDefinition(
     showPrices = true,
     showCosts = false,
     generalConditions,
+    includeMeasurementsAnnex = true,
     client,
     pdfStyles,
     documentName,
@@ -1024,6 +1027,139 @@ function buildBudgetDocDefinition(
     })
   }
 
+  // ─── ANEXO I. MEDICIONES POR ZONA ──────────────────────────────────
+  // PRES-2 — La tabla cruzada zona x partida del modelo de presupuesto
+  // completo: de un vistazo se ve de donde salen los metros de cada partida.
+  // Las mediciones YA se guardaban (uds/largo/ancho/alto/parcial) pero no
+  // salian nunca en el PDF.
+  //
+  // Un capitulo con muchas partidas no cabe a lo ancho, asi que la tabla se
+  // parte en bloques de 5 columnas. Las mediciones sin zona van a una fila
+  // "Sin zona asignada" para que los totales sigan cuadrando.
+  const annexPages: any[] = []
+  if (includeMeasurementsAnnex) {
+    const SIN_ZONA = 'Sin zona asignada'
+    const MAX_COLS = 5
+
+    const chaptersConMediciones = chapters
+      .map(({ chapter, items }) => ({
+        chapter,
+        items: items.filter((it) => (it.measurements?.length || 0) > 0 && it.is_active !== false),
+      }))
+      .filter((c) => c.items.length > 0)
+
+    if (chaptersConMediciones.length > 0) {
+      annexPages.push({
+        id: 'budget-annex-measurements',
+        text: 'ANEXO I. MEDICIONES POR ZONA',
+        fontSize: 16,
+        bold: true,
+        color: COLORS.primary,
+        margin: [0, 0, 0, 16],
+        pageBreak: 'before' as const,
+      })
+
+      for (const { chapter, items } of chaptersConMediciones) {
+        annexPages.push({
+          text: `Capitulo ${chapter.code}. ${chapter.name}`,
+          fontSize: 11,
+          bold: true,
+          color: COLORS.text,
+          margin: [0, 10, 0, 6],
+        })
+
+        // Zonas del capitulo. Se ordenan por el sort_order mas bajo con el que
+        // aparecen en CUALQUIER partida: asi las plantas salen en el orden en
+        // que se midieron y no segun que partida se mire primero (una zona que
+        // solo tiene una partida acababa descolgada al final).
+        const ordenZona = new Map<string, number>()
+        for (const it of items) {
+          for (const m of it.measurements || []) {
+            const z = (m.zone || '').trim() || SIN_ZONA
+            const orden = Number(m.sort_order) || 0
+            const previo = ordenZona.get(z)
+            if (previo === undefined || orden < previo) ordenZona.set(z, orden)
+          }
+        }
+        const zonas = [...ordenZona.keys()].sort((a, b) => {
+          if (a === SIN_ZONA) return 1          // "sin zona" siempre al final
+          if (b === SIN_ZONA) return -1
+          return (ordenZona.get(a) ?? 0) - (ordenZona.get(b) ?? 0)
+        })
+
+        // Suma de parciales por (zona, partida).
+        const valor = (it: typeof items[number], zona: string) =>
+          (it.measurements || [])
+            .filter((m) => ((m.zone || '').trim() || SIN_ZONA) === zona)
+            .reduce((sum, m) => sum + (Number(m.partial) || 0), 0)
+
+        for (let desde = 0; desde < items.length; desde += MAX_COLS) {
+          const bloque = items.slice(desde, desde + MAX_COLS)
+
+          const cabecera = [
+            { text: 'Zona', fontSize: 8, bold: true, color: COLORS.white },
+            ...bloque.map((it) => ({
+              text: `${it.code} ${it.name}`.slice(0, 40) + ` (${it.unit})`,
+              fontSize: 7,
+              bold: true,
+              color: COLORS.white,
+              alignment: 'right' as const,
+            })),
+          ]
+
+          const filas = zonas
+            .map((z) => {
+              const celdas = bloque.map((it) => valor(it, z))
+              if (celdas.every((v) => v === 0)) return null   // zona que no toca estas partidas
+              return [
+                { text: z, fontSize: 8, color: COLORS.text },
+                ...celdas.map((v) => ({
+                  text: v === 0 ? '—' : fmt(v),
+                  fontSize: 8,
+                  color: v === 0 ? COLORS.muted : COLORS.text,
+                  alignment: 'right' as const,
+                })),
+              ]
+            })
+            .filter(Boolean) as any[][]
+
+          const totales = [
+            { text: 'TOTAL', fontSize: 8, bold: true, color: COLORS.text },
+            ...bloque.map((it) => ({
+              text: fmt((it.measurements || []).reduce((sum, m) => sum + (Number(m.partial) || 0), 0)),
+              fontSize: 8,
+              bold: true,
+              color: COLORS.text,
+              alignment: 'right' as const,
+            })),
+          ]
+
+          annexPages.push({
+            table: {
+              headerRows: 1,
+              widths: ['*', ...bloque.map(() => 58)],
+              body: [cabecera, ...filas, totales],
+            },
+            layout: {
+              hLineWidth: (i: number, node: any) =>
+                (i === 0 || i === 1 || i === node.table.body.length - 1 || i === node.table.body.length) ? 0.8 : 0.3,
+              vLineWidth: () => 0,
+              hLineColor: () => COLORS.border,
+              fillColor: (rowIndex: number, node: any) => {
+                if (rowIndex === 0) return COLORS.primary
+                if (rowIndex === node.table.body.length - 1) return COLORS.light
+                return null
+              },
+              paddingTop: () => 3,
+              paddingBottom: () => 3,
+            },
+            margin: [0, 0, 0, 10],
+          })
+        }
+      }
+    }
+  }
+
   // ─── Build Document Definition ─────────────────────────────────────
   return {
     pageSize: 'A4' as const,
@@ -1034,6 +1170,7 @@ function buildBudgetDocDefinition(
       ...indexPage,
       ...chapterPages,
       ...summaryPage,
+      ...annexPages,
     ],
     // pageBreakBefore: ensure the budget summary and conditions section start on a fresh
     // page, but ONLY if the node would otherwise land mid-page. We check `startPosition.top`

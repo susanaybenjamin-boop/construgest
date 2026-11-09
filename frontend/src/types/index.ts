@@ -185,6 +185,8 @@ export interface Measurement {
   id: string;
   budget_item_id: string;
   description: string | null;
+  /** PRES-2: zona de la obra donde se mide (planta 5ª, portal…). Texto libre. */
+  zone?: string | null;
   units: number;
   length: number;
   width: number;
