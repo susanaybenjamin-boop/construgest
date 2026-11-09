@@ -530,12 +530,16 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
     const { parseBudgetFromText, parseBudgetWithVision } = await import('../services/budget-parser.js')
 
     let result
+    // Traza acumulada: si el texto no da nada y DESPUÉS el OCR tampoco, los logs
+    // del primer intento no se pierden — son el motivo que ve el usuario.
+    const allLogs = []
 
     // 1) Método texto (rápido): pdfjs (frontend) + parser algorítmico + LLM local.
     //    Es lo normal para PDFs digitales; el OCR (lento en CPU) solo si esto no da nada.
     if (text) {
       const r = await parseBudgetFromText(text, true, req.user.organization_id, req.user.id)
       if (r.logs?.length) console.log(`[parse-budget-pdf] ${r.logs[r.logs.length - 1]}`)
+      if (r.logs?.length) allLogs.push(...r.logs)
       if (r.chapters?.length > 0) result = r
     }
 
@@ -543,6 +547,7 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
     if (!result && pdfBase64) {
       try {
         const ocrResult = await parseBudgetWithVision(pdfBase64, req.user.organization_id, req.user.id)
+        if (ocrResult?.logs?.length) allLogs.push(...ocrResult.logs)
         if (ocrResult?.chapters?.length > 0) {
           result = ocrResult
           console.log(`[parse-budget-pdf] OCR local: ${result.chapters.length} capitulos, ${result.chapters.reduce((s, c) => s + c.items.length, 0)} partidas`)
@@ -551,12 +556,16 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
         }
       } catch (err) {
         console.log(`[parse-budget-pdf] OCR local fallo: ${err.message}`)
+        allLogs.push(`⚠️ El OCR local falló: ${err.message}`)
       }
     }
 
     if (!result) {
       result = { chapters: [], logs: ['No se pudo extraer informacion del PDF'] }
     }
+
+    // Devolver SIEMPRE la traza completa (texto + OCR), no solo la del último intento.
+    if (allLogs.length) result.logs = allLogs
 
     res.json(result)
   } catch (err) {
