@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import api from '@/lib/api'
 import { useBudgetStore } from '@/stores/budgetStore'
 import { useNotificationStore } from '@/stores/notificationStore'
@@ -37,7 +37,35 @@ interface ParsedChapter {
 
 interface ParsedResult {
   chapters: ParsedChapter[]
+  /** Traza del parser (qué estrategia entró, qué se descartó y por qué). */
+  logs?: string[]
 }
+
+/** Mensaje de error REAL del servidor, para no esconderlo tras un texto genérico. */
+const serverErrorMessage = (e: unknown): string => {
+  const r = e as { response?: { status?: number; data?: { error?: string } }; message?: string }
+  if (r?.response?.data?.error) return r.response.data.error
+  if (r?.response?.status) return `el servidor respondió ${r.response.status}`
+  return r?.message || 'error desconocido'
+}
+
+/**
+ * Fichero → base64 por trozos. El bucle byte a byte con String.fromCharCode
+ * congelaba la pestaña con PDFs grandes (un PDF de 2,6 MB son 2,6 millones de
+ * vueltas y una cadena que crece en cada una).
+ */
+const toBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer)
+  const CHUNK = 32768
+  const parts: string[] = []
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    parts.push(String.fromCharCode(...bytes.subarray(i, i + CHUNK)))
+  }
+  return btoa(parts.join(''))
+}
+
+/** Tope de tamaño: el backend acepta 50 MB de JSON y el base64 crece un 33%. */
+const MAX_FILE_MB = 35
 
 interface ImportBudgetDialogProps {
   isOpen: boolean
@@ -72,7 +100,18 @@ export default function ImportBudgetDialog({
   const [expandedMeasurements, setExpandedMeasurements] = useState<Set<string>>(new Set())
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0, phase: '' })
   const [dragOver, setDragOver] = useState(false)
+  // Por qué falló el análisis: mensaje para Benjamin + traza del parser.
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [parseLogs, setParseLogs] = useState<string[]>([])
+  const [noTextLayer, setNoTextLayer] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const resultPanelRef = useRef<HTMLDivElement>(null)
+
+  // El diálogo tiene scroll: sin esto el motivo del fallo aparece POR DEBAJO de
+  // lo que se ve y parece que al pulsar "Analizar" no ha pasado nada.
+  useEffect(() => {
+    if (parseError) resultPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [parseError])
 
   const resetDialog = useCallback(() => {
     setStep('upload')
@@ -90,6 +129,9 @@ export default function ImportBudgetDialog({
     setExpandedMeasurements(new Set())
     setImportProgress({ current: 0, total: 0, phase: '' })
     setDragOver(false)
+    setParseError(null)
+    setParseLogs([])
+    setNoTextLayer(false)
   }, [])
 
   const handleClose = () => {
@@ -112,38 +154,46 @@ export default function ImportBudgetDialog({
       return
     }
 
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      addToast('error',
+        `El archivo pesa ${(file.size / 1024 / 1024).toFixed(1)} MB y el máximo es ${MAX_FILE_MB} MB.`)
+      return
+    }
+
     setFileName(file.name)
+    setParseError(null)
+    setParseLogs([])
+    setNoTextLayer(false)
     const arrayBuffer = await file.arrayBuffer()
 
     if (ext === '.bc3' || ext === '.pzh') {
       // Archivos binarios: enviar como base64 al backend
       const detectedType = ext === '.bc3' ? 'bc3' : 'pzh'
       setFileType(detectedType as 'bc3' | 'pzh')
-      const bytes = new Uint8Array(arrayBuffer)
-      let binary = ''
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-      const base64 = btoa(binary)
-      setBinaryFileData(base64)
+      setBinaryFileData(toBase64(arrayBuffer))
       setPdfText('') // no text for binary files
       addToast('success', `Archivo ${ext.toUpperCase()} cargado correctamente`)
     } else {
       // PDF: extraer texto
       setFileType('pdf')
       setBinaryFileData(null)
-      // Guardar PDF original como base64 para OCR con Gemini Vision
-      const bytes = new Uint8Array(arrayBuffer)
-      let binary = ''
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-      setPdfBase64(btoa(binary))
+      // Limpiar el texto del fichero ANTERIOR: si el nuevo PDF no trae capa de
+      // texto, se quedaba el del anterior y se analizaba el documento equivocado.
+      setPdfText('')
+      // Guardar el PDF original en base64: es lo que se manda al OCR local del
+      // backend si el PDF no trae capa de texto (escaneado).
+      setPdfBase64(toBase64(arrayBuffer))
       try {
         const text = await extractTextFromPdf(arrayBuffer)
         if (text.trim()) {
           setPdfText(text)
         } else {
-          addToast('warning', 'No se pudo extraer texto del PDF. Puede pegar el texto manualmente.')
+          setNoTextLayer(true)
+          addToast('warning', 'El PDF no trae texto: parece escaneado. Puede intentar el OCR o pegar el texto a mano.')
         }
-      } catch {
-        addToast('warning', 'Error al leer el PDF. Puede pegar el texto manualmente.')
+      } catch (err) {
+        setNoTextLayer(true)
+        addToast('warning', `No se pudo leer el PDF (${serverErrorMessage(err)}). Puede intentar el OCR o pegar el texto a mano.`)
       }
     }
   }
@@ -221,8 +271,10 @@ export default function ImportBudgetDialog({
       }
 
       return pageTexts.join('\n\n')
-    } catch {
-      return ''
+    } catch (err) {
+      // Antes esto devolvía '' y la causa se perdía (PDF cifrado, worker de
+      // pdfjs inaccesible sin internet, fichero corrupto…). Ahora sube.
+      throw new Error(serverErrorMessage(err))
     }
   }
 
@@ -243,12 +295,15 @@ export default function ImportBudgetDialog({
   }
 
   const handleAnalyze = async () => {
-    if (!pdfText.trim() && !binaryFileData) {
+    // Con un PDF escaneado no hay texto, pero sí el PDF: ese es el camino del OCR.
+    if (!pdfText.trim() && !binaryFileData && !pdfBase64) {
       addToast('error', 'Debe proporcionar un archivo o texto para analizar')
       return
     }
 
     setParsing(true)
+    setParseError(null)
+    setParseLogs([])
     try {
       let data: ParsedResult
 
@@ -285,12 +340,23 @@ export default function ImportBudgetDialog({
           }
         }))
         setExpandedMeasurements(withMeasurements)
+        setParseLogs(data.logs || [])
         setStep('preview')
       } else {
-        addToast('error', 'No se pudieron extraer capítulos del texto')
+        // El backend SIEMPRE devuelve `logs` con el motivo. Antes se tiraban y
+        // Benjamin solo veía "no se pudieron extraer capítulos".
+        setParseLogs(data.logs || [])
+        setParseError(
+          pdfText.trim()
+            ? 'Ninguno de los parsers reconoció el formato de este presupuesto.'
+            : 'El OCR no pudo sacar un presupuesto de este PDF.'
+        )
+        addToast('error', 'No se reconoció el formato — abajo tienes el motivo')
       }
-    } catch {
-      addToast('error', 'Error al analizar el texto con IA')
+    } catch (err) {
+      const msg = serverErrorMessage(err)
+      setParseError(`El servidor no pudo analizarlo: ${msg}`)
+      addToast('error', `No se pudo analizar: ${msg}`)
     } finally {
       setParsing(false)
     }
@@ -352,6 +418,9 @@ export default function ImportBudgetDialog({
       s + c.items.reduce((si, i) => si + (i.measurements?.length || 0), 0), 0)
     : 0
 
+  // Sin texto pero con PDF: analizar significa mandarlo al OCR del servidor.
+  const isOcrRun = fileType === 'pdf' && !pdfText.trim() && !!pdfBase64
+
   const handleImport = async () => {
     if (!parsedResult) return
 
@@ -369,11 +438,8 @@ export default function ImportBudgetDialog({
     const total = chaptersToImport.length + totalItems + (totalMeas > 0 ? totalItems : 0)
     setImportProgress({ current: 0, total, phase: 'Creando capítulos...' })
 
-    // Extrae el mensaje de error REAL del servidor (para no ocultarlo).
-    const errMsg = (e: unknown): string => {
-      const r = (e as { response?: { data?: { error?: string } }; message?: string })
-      return r?.response?.data?.error || r?.message || 'error desconocido'
-    }
+    // Mensaje de error REAL del servidor (para no ocultarlo).
+    const errMsg = serverErrorMessage
 
     const failures: string[] = []
     let okChapters = 0
@@ -569,6 +635,58 @@ export default function ImportBudgetDialog({
                   </p>
                 </div>
               )}
+              {/* PDF escaneado: el texto no existe, pero el OCR del backend sí */}
+              {fileType === 'pdf' && noTextLayer && !pdfText.trim() && pdfBase64 && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800 font-medium">
+                    Este PDF no trae capa de texto (está escaneado o es una imagen).
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1">
+                    Puede pegar el texto a mano arriba, o pulsar <strong>Analizar con OCR</strong> para
+                    que el servidor lo lea con reconocimiento de texto. El OCR es lento (va por CPU,
+                    las 20 primeras páginas) y solo está disponible si el servidor lleva tesseract
+                    instalado; si no, lo dirá aquí mismo.
+                  </p>
+                </div>
+              )}
+
+              {/* Por qué no se pudo: mensaje + traza del parser (antes se perdía).
+                  OJO con los colores: en tema oscuro, globals.css repinta
+                  text-gray-500/600/700 en claro, y sobre un fondo bg-*-50 (que NO
+                  se repinta) el texto queda invisible. Por eso aquí se usa la
+                  misma familia de color del panel, como en el resto del diálogo. */}
+              {(parseError || parseLogs.length > 0) && (
+                <div
+                  ref={resultPanelRef}
+                  className={`p-4 rounded-lg border ${parseError ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-200'}`}
+                >
+                  {parseError && (
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-red-800">{parseError}</p>
+                        <p className="text-xs text-red-700 mt-1">
+                          Puede pegar o corregir el texto arriba y volver a analizar. Si el formato es
+                          nuevo, pásame este detalle y lo añado al parser.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {parseLogs.length > 0 && (
+                    <div className={parseError ? 'mt-3' : ''}>
+                      <p className={`text-xs font-medium uppercase tracking-wider mb-1 ${parseError ? 'text-red-700' : 'text-blue-700'}`}>
+                        Qué hizo el analizador
+                      </p>
+                      <ul className={`text-xs font-mono space-y-0.5 max-h-40 overflow-y-auto ${parseError ? 'text-red-900' : 'text-blue-900'}`}>
+                        {parseLogs.map((l, i) => (
+                          <li key={i} className="break-words">{l}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {(fileType === 'bc3' || fileType === 'pzh') && binaryFileData && (
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-sm text-green-700 font-medium">
@@ -800,7 +918,7 @@ export default function ImportBudgetDialog({
                 </button>
                 <button
                   onClick={handleAnalyze}
-                  disabled={(!pdfText.trim() && !binaryFileData) || parsing}
+                  disabled={(!pdfText.trim() && !binaryFileData && !pdfBase64) || parsing}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm disabled:opacity-50"
                 >
                   {parsing ? (
@@ -808,7 +926,9 @@ export default function ImportBudgetDialog({
                   ) : (
                     <Sparkles className="w-4 h-4" />
                   )}
-                  {parsing ? 'Analizando...' : 'Analizar presupuesto'}
+                  {parsing
+                    ? (isOcrRun ? 'Leyendo el PDF con OCR...' : 'Analizando...')
+                    : (isOcrRun ? 'Analizar con OCR' : 'Analizar presupuesto')}
                 </button>
               </>
             )}

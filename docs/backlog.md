@@ -1,8 +1,100 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-11-07
+> ## 📍 ESTADO ACTUAL — 2026-11-09
 >
-> ### Último (2026-11-07): LOGIN roto — un backend VIEJO ocupaba el puerto 5000
+> ### Último (2026-11-09): PARSE-1 — un PDF de presupuesto ajeno daba error al importar
+> **Síntoma de Benjamin**: "ayer intenté subir este pdf para un proyecto nuevo y me dio error;
+> yo pienso que será porque tiene imágenes". El PDF: `Presupuesto_2026-023_Parque_Forum.pdf`
+> (23 páginas, 2,6 MB; lo redactó su hermano con ChatGPT para un cliente).
+>
+> **No eran las imágenes.** Causa real, REPRODUCIDA fuera de la app (texto extraído con el
+> mismo código del diálogo + `parseBudgetFromText`), no supuesta: el PDF **sí tiene capa de
+> texto** y pdfjs la extrae entera (8.315 caracteres, 205 líneas). Lo que no se contemplaba es
+> su formato: **partida en UNA SOLA LÍNEA**, con la unidad DETRÁS del título —
+> `01.01 PROTECCIÓN DE ZONAS COMUNES    ud 1,00 680,00 € 680,00 €` — y la descripción larga en
+> las líneas siguientes. Ninguno de los parsers lo cogía:
+> 1. **Algorítmico por separadores**: el PDF no tiene líneas `______` → 0 partidas.
+> 2. **Inline**: `detectPartidaStart()` exige la unidad justo DETRÁS del código, y su patrón
+>    de respaldo descarta la línea **precisamente por llevar summary**
+>    (`&& !checkInlineSummary(line)`); y `checkInlineSummary()` solo se consulta **si ya hay
+>    una partida abierta**. Resultado: la línea se perdía entera.
+> 3. `validateAndClean()` tira los capítulos sin partidas → `chapters: []` → el diálogo suelta
+>    **"No se pudieron extraer capítulos del texto"**. Ese es el "error" que vio.
+> *(La IA local no tapa el agujero: Ollama solo entra después, con los primeros 15.000
+> caracteres, y si no está levantado el fallo se queda en los `logs` — que la UI no muestra.)*
+>
+> **PARSE-1** ([`budget-parser.js`](../backend/src/services/budget-parser.js)), 3 cambios:
+> - `detectOneLinePartida()`: partida de una línea (código + título + unidad + cantidad ·
+>   precio · importe). La unidad se busca al final del texto y, si no, detrás del código. La
+>   partida queda ABIERTA para que las líneas siguientes sean su descripción.
+> - `isAnnexHeading()`: `ANEXO` / `ANEJO` / `APÉNDICE` / `REPORTAJE FOTOGRÁFICO` cierran la
+>   partida en curso y se ignora todo hasta el siguiente CAPÍTULO. Sin esto, la tabla de
+>   mediciones por zona y los pies de foto se colaban como descripción (o como mediciones)
+>   de la última partida del capítulo.
+> - `isPageNoise()`: pie de página **con texto delante** ("EMPRESA  Presupuesto 2026-023 — 9
+>   de noviembre  Página 3 de 23"). Antes solo se quitaba "Página 3" a secas, así que el pie
+>   se pegaba al final de la descripción de la última partida de cada capítulo.
+>
+> **Verificado en ejecución** (parser real contra el PDF real, sin IA):
+> - **15/15 partidas** en sus 2 capítulos, con código, unidad, cantidad y precio exactos.
+> - PEM calculado **14.547,37 €** vs **14.547,38 €** del PDF (1 céntimo: el PDF redondea
+>   112,25 × 10,50 = 1.178,625 → 1.178,63). Subtotales por capítulo cuadrados.
+> - **Sin regresión**: mismo parser ANTES/DESPUÉS sobre el fixture de Ogijares
+>   (`backend/test-pdf-output.txt`, formato PRESTO con separadores) → idéntico: 26 capítulos,
+>   149 partidas, 293 mediciones, 95.426,76 €. `node --check` y `npm test` (20/20) OK.
+>
+> **PENDIENTE de decidir (Benjamin)** — ver "PARSE-2 / PRES-x" más abajo. Lo que sigue roto o
+> corto en el import de PDFs ajenos, y hasta dónde puede llegar el modelo de presupuesto.
+>
+>
+> ### PARSE-2 (2026-11-09, mismo día): que un PDF ajeno NO acabe en "error" a secas
+> Con PARSE-1 entra el PDF de Parque Fórum, pero siempre habrá un formato nuevo. Esto es lo que
+> pasaba cuando fallaba — y dos cosas que se vieron **solo al usarlo en el navegador**:
+> - **El motivo se tiraba.** El backend devuelve `logs` con la traza (qué parser entró, cuántas
+>   partidas, por qué se descartaron) y la UI no los pintaba; el `catch` de `handleAnalyze`
+>   descartaba el mensaje real del servidor y ponía siempre "Error al analizar el texto con IA".
+> - **PDF escaneado = camino muerto.** Sin capa de texto el botón "Analizar" quedaba
+>   **deshabilitado**, así que el OCR local del backend **no se podía alcanzar** desde la UI.
+> - `extractTextFromPdf` hacía `catch { return '' }`: PDF cifrado, corrupto o worker de pdfjs
+>   inaccesible daban todos el mismo aviso mudo.
+>
+> **Hecho** ([`ImportBudgetDialog.tsx`](../frontend/src/components/budget/ImportBudgetDialog.tsx),
+> [`routes/ai.js`](../backend/src/routes/ai.js)):
+> - Panel con **el motivo + la traza del parser** bajo el cuadro de texto, y el mensaje REAL del
+>   servidor en el `catch`. `extractTextFromPdf` ya no se traga la causa: la propaga.
+> - **"Analizar con OCR"**: sin texto pero con PDF, el botón se habilita, cambia de nombre y manda
+>   solo el `pdfBase64` → OCR local. Aviso amarillo explicando que es lento y que depende de que el
+>   servidor lleve tesseract (en el `.msi` todavía NO va: sigue en Pendientes conocidos).
+> - La ruta acumula la traza de **texto + OCR**: antes, si el texto fallaba y luego el OCR no estaba
+>   disponible, el motivo del primer intento se perdía.
+> - Base64 **por trozos de 32 KB** (el bucle byte a byte congelaba la pestaña) y tope de **35 MB**
+>   por fichero (el backend acepta 50 MB de JSON y el base64 crece un 33%).
+> - **Red de seguridad**: [`backend/tests/budgetParser.test.js`](../backend/tests/budgetParser.test.js),
+>   un caso por formato (una línea, separadores PRESTO con mediciones, anexos, descartes) + el
+>   fixture real de Ogijares como guardián. `npm test`: **31/31**.
+>
+> **Dos fallos que solo aparecieron usando la pantalla** (y por los que existe la REGLA Nº1):
+> 1. **Texto del fichero anterior.** Al cargar un PDF sin capa de texto se quedaba el texto del PDF
+>    ANTERIOR en el cuadro: se analizaba el documento equivocado sin avisar. Ahora se limpia.
+> 2. **El panel salía fuera de la vista.** El diálogo tiene scroll y el motivo quedaba por debajo:
+>    parecía que pulsar "Analizar" no hacía nada (me pasó a mí probándolo). Ahora el panel se trae
+>    solo a la vista. Y los colores: en tema oscuro `globals.css` repinta `text-gray-600/700` en
+>    claro, y sobre un fondo `bg-*-50` el texto quedaba **invisible** (la traza salía como una
+>    columna de emojis sueltos). Se usa la familia de color del panel, como el resto del diálogo.
+>
+> **Verificado en ejecución** (Docker: MariaDB + backend recompilado; frontend dev en :3000; login
+> real `admin@construgest.local`), los tres caminos en pantalla:
+> - PDF de Parque Fórum → **"Se encontraron 2 capítulos, 15 partidas"** con sus importes (680,00 /
+>   2.063,60 / 1.178,63 / 2.569,25…) y subtotal de capítulo 9.195,87 €.
+> - Texto que no es un presupuesto → panel rojo con el motivo y la traza completa, incluido
+>   "🤖 Intentando extracción con IA…" y "⚠️ IA no pudo extraer partidas válidas".
+> - PDF **sin capa de texto** (uno mínimo creado a mano) → aviso amarillo, botón "Analizar con OCR",
+>   y respuesta del OCR real: "OCR: 0 caracteres extraídos / ⚠️ El OCR no extrajo texto legible".
+> - Y por `curl` contra el backend: el **OCR local del PDF real de 23 páginas** devuelve los **mismos
+>   2 capítulos y 15 partidas** (14.547,37 €) en **57 s** — o sea, el camino que estaba muerto ahora
+>   resuelve el presupuesto entero. `tsc --noEmit` limpio.
+>
+> ### Anterior (2026-11-07): LOGIN roto — un backend VIEJO ocupaba el puerto 5000
 > **Síntoma de Benjamin**: "no me deja entrar; meto el PIN y vuelve a la pantalla del PIN,
 > pruebo con email y contraseña y vuelve al inicio de sesión, como si no se ejecutara el
 > proceso". Hasta ese día sí entraba.
@@ -636,6 +728,66 @@
 > fichero (no repetir el God Object de Benjagest).
 
 ---
+
+## 🧾 Bloque PARSE / PRES — importar PDFs ajenos y presupuesto "completo"
+
+*(Análisis del 2026-11-09, a partir del PDF de Parque Fórum. **Decide Benjamin el QUÉ**; esto
+es solo el mapa de lo que falta y el coste de cada trozo. PARSE-1 ya está hecho.)*
+
+### ~~PARSE-2~~ — **HECHO el 2026-11-09** (detalle y verificación, en la cabecera)
+Aunque el parser mejore, siempre habrá formatos nuevos. Esto es lo que pasaba **antes** de PARSE-2
+(se deja escrito porque es el síntoma a reconocer si algo así vuelve):
+- **El motivo se tira a la basura.** El backend devuelve `logs` con el detalle (qué parser
+  entró, cuántas partidas, por qué se descartaron) y la UI **no los muestra**; y el `catch` de
+  `handleAnalyze` ([`ImportBudgetDialog.tsx:292`](../frontend/src/components/budget/ImportBudgetDialog.tsx))
+  descarta el error real del servidor y pone siempre "Error al analizar el texto con IA".
+  → Mostrar los `logs` y el mensaje real. *(Barato y es lo que evita el "me dio error" a secas.)*
+- **PDF escaneado = camino muerto.** Si no hay capa de texto, el botón "Analizar" se queda
+  **deshabilitado** (`:803` exige `pdfText`), así que el **fallback de OCR local del backend
+  nunca se puede alcanzar** desde la UI. → Permitir analizar con solo el PDF (`pdfBase64`).
+  *(Ojo: el OCR solo funciona en Docker; tesseract/poppler no van dentro del `.msi` — ya está
+  en Pendientes conocidos. Dentro del `.msi` habría que empaquetarlos o decirlo claro.)*
+- Sin límite de tamaño ni timeout, y el base64 se construye **byte a byte en el hilo de la UI**
+  (`:134-137`): un PDF grande congela la pantalla un rato.
+- **Red de seguridad que falta**: `npm test` no prueba el parser (solo existe el script manual
+  `backend/test-parser-v6.mjs`). → Un test con un fixture por formato (PRESTO con separadores,
+  CYPE, una línea/Word, Excel). Así un formato que ya funcionaba no se rompe al añadir el siguiente.
+
+### PRES-x — hasta dónde actualizar el presupuesto
+**Ya lo tenemos igual que el PDF ajeno**: portada con logo y datos de empresa, índice de
+capítulos con importe y **%**, tabla por capítulo (Código/Concepto/Ud/Cantidad/Precio/Importe),
+**SUBTOTAL** por capítulo, resumen, **PEM + IVA + TOTAL**, **total en letra**, firma
+empresa/cliente con "En <ciudad>, a <fecha>" y pie con paginación. El modelo de datos tiene
+además cosas que ese PDF no lleva: coste y margen, versiones, estados, biblioteca de partidas,
+comparador y certificaciones.
+
+Lo que **NO** tenemos, en orden de "más valor por menos trabajo":
+- **PRES-1 · Datos del cliente en el presupuesto.** El PDF ajeno pone en portada *Cliente,
+  CIF y dirección*. Hoy `cons_projects` solo guarda `client_name` y `client_contact` (texto
+  libre) y al PDF solo se le pasa `projectName`. → Campos de cliente (nombre fiscal, NIF,
+  dirección) + bloque en portada. **Pequeño.**
+- **PRES-2 · Anexo de mediciones.** El PDF ajeno trae *ANEXO I: mediciones por zona* (tabla
+  zonas × conceptos con totales por columna). Nosotros ya guardamos y editamos mediciones por
+  partida (`cons_measurements`: uds/largo/ancho/alto/parcial) pero **no salen en el PDF** y no
+  existe el concepto de **zona**. Dos tamaños: (a) imprimir las mediciones que ya hay como
+  anexo por partida — **pequeño**; (b) añadir *zona* a la medición y sacar la tabla cruzada por
+  zona como la del PDF — **mediano** (BD + UI + PDF).
+- **PRES-3 · Anexo fotográfico por zonas.** *ANEXO II*: 17 páginas de fotos numeradas agrupadas
+  por zona. Hoy las fotos son ficheros del proyecto (`cons_project_files.category='photo'`) sin
+  vínculo a capítulo, partida ni zona, y el PDF **no inserta ninguna imagen** salvo el logo.
+  → Vincular foto ↔ zona/partida + sección de anexo con rejilla y pie de foto. **Mediano**
+  (cuidado con el peso del PDF y con el tamaño de las imágenes).
+- **PRES-4 · Condiciones de la oferta.** Validez, forma de pago, plazo de ejecución, garantía y
+  exclusiones. Hoy el textarea "Condiciones generales" del modal del PDF **no se guarda en
+  ninguna parte**: se escribe, sale en ese PDF y se pierde al cerrar. → Persistirlo en el
+  presupuesto (`cons_budgets.notes` está libre y sin uso) y/o una plantilla en Ajustes.
+  **Pequeño y se nota en cada presupuesto.**
+- **PRES-5 · GG + BI y cuadro de descompuestos.** `overhead_pct` (13) y `profit_pct` (6) están
+  en la BD y en Ajustes pero **no se usan en ningún cálculo ni en el PDF**: el presupuesto va
+  PEM → IVA → TOTAL, sin PEC. Y `cons_price_breakdown` (mano de obra / material / maquinaria /
+  subcontrata) tiene UI pero tampoco se imprime. → Decidir si el presupuesto es **PEM** (como
+  el PDF ajeno, que es "de ejecución material") o **PEC** (PEM + GG + BI), y si se imprime
+  cuadro de precios descompuestos. **Decisión de negocio antes que trabajo.**
 
 ## 🔧 Config del proyecto (decidido 2026-07-13)
 
