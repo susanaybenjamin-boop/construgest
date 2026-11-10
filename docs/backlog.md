@@ -2,7 +2,49 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-11-10
 >
-> ### Último (2026-11-10): PRES-2 + PRES-3 + PRES-5: el bloque PRES, cerrado
+>
+> ### Último (2026-11-10, tarde): COND-1/2/3 (cláusulas) y PDF-3 (la página casi vacía)
+>
+> **PDF-3 — La página casi vacía antes del total, en horizontal.** Síntoma de Benjamin:
+> *"cuando lo cambio a horizontal, según la cantidad de partidas me deja el total en una
+> página sola arriba del todo, con lo cual se queda toda la página vacía"*. Causa: el RESUMEN
+> **forzaba página nueva siempre** y en horizontal (área útil ~475 pt) no cabía entero, así
+> que el cuadro de totales se descolgaba. Las filas de GG/BI/PEC de PRES-5 lo empeoraron.
+> Ahora el resumen **arranca donde toque** (las condiciones sí siguen en página nueva) y el
+> **cierre** (totales + total en letra + firma) viaja en un bloque `unbreakable`: o cabe
+> entero o pasa entero.
+> *Verificado midiendo la ocupación real de cada página*, horizontal, 2 capítulos × 10 partidas:
+> **ANTES** p6: **33 %** · **AHORA** p6: 56 %, p7: 61 %. Con 6 y 14 partidas no empeora.
+> ⚠️ **Aviso para el futuro**: pdfmake **no soporta bloques `unbreakable` de más de una
+> página** (`PageElementWriter.js:115`) y **se queda solo con la primera, perdiendo el resto en
+> silencio**. Por eso solo se usa en el cierre, que es corto, y nunca en la tabla de capítulos.
+>
+> **COND-1/2/3 — Cláusulas de condiciones y referencias vivas.** Benjamin: el capítulo de
+> condiciones ya existía y con formato rico, pero se reescribe entero en cada obra, y cuando
+> una condición nombra una partida ("EN EL APARTADO 2.1 HORMIGÓN DE LIMPIEZA…") el número se
+> queda mintiendo en cuanto se renumera. Decisiones suyas: biblioteca editable, referencia
+> viva y huecos que se preguntan al insertar.
+> - **COND-1**: `cons_condition_clauses` + API + pantalla **Cláusulas** en el panel. La
+>   migración **semilla sus cláusulas reales generalizadas** (16 por organización).
+> - **COND-2**: botón **Cláusula** en la barra del editor; los huecos `{{etiqueta|valor}}` se
+>   piden al insertar, con vista previa.
+> - **COND-3**: botón **Partida**; la referencia se guarda como `data-partida-ref` y la
+>   etiqueta se recalcula al mostrar y al imprimir, con **la misma función** en editor y PDF.
+>   Si la partida se borra: `[partida eliminada]` y aviso en rojo.
+>
+> **Un fallo anterior que salió al abrir el capítulo**: TipTap 3 aborta con *"SSR has been
+> detected"* porque Next renderiza el editor también en el servidor; faltaba
+> `immediatelyRender: false`. Sin eso, **abrir el capítulo de condiciones revienta la
+> pantalla**. No lo introdujo este trabajo.
+>
+> **Verificado en ejecución**: insertar "Exceso de material" con la cantidad cambiada a 25
+> mete el texto ya resuelto; referenciar `01.06 PINTURA DE TECHOS` y renombrarla a
+> `01.99 PINTURA DE TECHOS Y ESCALERAS` actualiza sola la condición **en pantalla y en el
+> PDF**; borrarla deja `[partida eliminada]` con su aviso. `npm test` **39/39**, `tsc` limpio.
+>
+> **Pendiente**: esto NO está en la 0.5.0 (se publicó antes). Va en la siguiente versión.
+>
+> ### Anterior (2026-11-10): PRES-2 + PRES-3 + PRES-5: el bloque PRES, cerrado
 >
 > **PRES-2 — Anexo de mediciones por zona.** Las mediciones ya se guardaban y
 > alimentaban la cantidad de la partida, pero no salían en el PDF y no decían DÓNDE
