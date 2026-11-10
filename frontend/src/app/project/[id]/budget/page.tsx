@@ -722,10 +722,20 @@ export default function BudgetPage() {
     (sum, ch) => ch.chapter.is_active === false ? sum : sum + calcChapterTotal(ch.items),
     0,
   ) || 0
+  // PRES-5: gastos generales y beneficio industrial. A 0 (lo de siempre) el
+  // presupuesto es PEM -> IVA -> TOTAL; si se ponen, pasa a ser por contrata:
+  // PEM -> GG -> BI -> PEC -> IVA -> TOTAL.
+  const overheadPct = Number(activeBudget?.budget.overhead_pct) || 0
+  const profitPct = Number(activeBudget?.budget.profit_pct) || 0
+  const overhead = totalPEM * (overheadPct / 100)
+  const profit = totalPEM * (profitPct / 100)
+  const totalPEC = totalPEM + overhead + profit
+  const usaPec = overheadPct > 0 || profitPct > 0
+
   const ivaEnabled = (activeBudget?.budget.tax_rate || 0) > 0
   const ivaRate = activeBudget?.budget.tax_rate || 0
-  const iva = totalPEM * (ivaRate / 100)
-  const totalFinal = totalPEM + iva
+  const iva = totalPEC * (ivaRate / 100)
+  const totalFinal = totalPEC + iva
 
   // Filter chapter templates by search
   const filteredTemplates = CHAPTER_TEMPLATES.filter(t =>
@@ -1330,6 +1340,48 @@ export default function BudgetPage() {
                 <span className="font-bold">{formatCurrency(totalPEM)}</span>
               </div>
 
+              {/* PRES-5 — Gastos generales y beneficio industrial */}
+              <div className="flex items-center justify-between border-t pt-2 gap-3">
+                <span className="text-gray-600">Gastos generales</span>
+                <div className="flex items-center gap-2">
+                  <DecimalInput
+                    min="0"
+                    max="100"
+                    value={overheadPct}
+                    onChange={(v) => updateBudget(activeBudget.budget.id, { overhead_pct: v })}
+                    className="w-16 px-2 py-0.5 text-sm text-right border border-gray-300 rounded outline-none focus:border-blue-500"
+                  />
+                  <span className="text-gray-500">%</span>
+                  <span className="text-gray-600 w-24 text-right">
+                    {overheadPct > 0 ? formatCurrency(overhead) : '—'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-600">Beneficio industrial</span>
+                <div className="flex items-center gap-2">
+                  <DecimalInput
+                    min="0"
+                    max="100"
+                    value={profitPct}
+                    onChange={(v) => updateBudget(activeBudget.budget.id, { profit_pct: v })}
+                    className="w-16 px-2 py-0.5 text-sm text-right border border-gray-300 rounded outline-none focus:border-blue-500"
+                  />
+                  <span className="text-gray-500">%</span>
+                  <span className="text-gray-600 w-24 text-right">
+                    {profitPct > 0 ? formatCurrency(profit) : '—'}
+                  </span>
+                </div>
+              </div>
+              {usaPec && (
+                <div className="flex justify-between border-t pt-2">
+                  <span className="font-medium text-gray-700">
+                    Presupuesto de Ejecución por Contrata (PEC)
+                  </span>
+                  <span className="font-bold">{formatCurrency(totalPEC)}</span>
+                </div>
+              )}
+
               {/* IVA toggle */}
               <div className="flex items-center justify-between border-t pt-2">
                 <div className="flex items-center gap-3">
@@ -1371,7 +1423,8 @@ export default function BudgetPage() {
 
               {!ivaEnabled && (
                 <p className="text-xs text-gray-400 italic">
-                  Presupuesto sin IVA. Los importes mostrados corresponden al Presupuesto de Ejecución Material.
+                  Presupuesto sin IVA. Los importes mostrados corresponden al Presupuesto de Ejecución
+                  {usaPec ? ' por Contrata.' : ' Material.'}
                 </p>
               )}
 

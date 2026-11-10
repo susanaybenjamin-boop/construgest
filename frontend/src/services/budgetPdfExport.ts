@@ -392,6 +392,18 @@ export interface BudgetPdfOptions {
   photos?: { zone: string; caption: string; dataUrl: string; width: number; height: number }[]
   /** PRES-3: fotos a cargar (url + zona + pie). */
   photoSources?: { url: string; zone?: string | null; caption?: string | null }[]
+  /**
+   * PRES-5: lineas de descompuestos del presupuesto. Son COSTE, asi que el
+   * anexo solo se imprime con la version interna activada (`showCosts`).
+   */
+  breakdown?: {
+    budget_item_id: string
+    resource_type: string
+    description: string
+    unit: string
+    quantity: number
+    unit_cost: number
+  }[]
   client?: {
     name?: string | null
     legal_name?: string | null
@@ -422,6 +434,7 @@ function buildBudgetDocDefinition(
     generalConditions,
     includeMeasurementsAnnex = true,
     photos = [],
+    breakdown = [],
     client,
     pdfStyles,
     documentName,
@@ -459,9 +472,22 @@ function buildBudgetDocDefinition(
 
   const { chapters } = budget
   const pem = chapters.reduce((sum, ch) => sum + chTotal(ch), 0)
+
+  // PRES-5 — Gastos generales y beneficio industrial. Estaban en la base de
+  // datos y en Ajustes desde el principio pero NO se usaban en ningun calculo:
+  // el presupuesto iba PEM -> IVA -> TOTAL. Ahora, si se ponen a mas de 0, el
+  // documento hace PEM -> GG -> BI -> PEC -> IVA -> TOTAL (presupuesto de
+  // ejecucion por contrata). A 0 (lo de siempre) nada cambia.
+  const overheadRate = Number(budget.budget.overhead_pct) || 0
+  const profitRate = Number(budget.budget.profit_pct) || 0
+  const overhead = pem * (overheadRate / 100)
+  const profit = pem * (profitRate / 100)
+  const pec = pem + overhead + profit          // base imponible
+  const usaPec = overheadRate > 0 || profitRate > 0
+
   const ivaRate = budget.budget.tax_rate || 0
-  const iva = pem * (ivaRate / 100)
-  const grandTotal = pem + iva
+  const iva = pec * (ivaRate / 100)
+  const grandTotal = pec + iva
 
   const companyName = company.company_name || 'Empresa Constructora'
   const companyCif = company.company_cif || ''
@@ -548,7 +574,8 @@ function buildBudgetDocDefinition(
       margin: [0, 0, 0, 4],
     },
     {
-      text: 'DE EJECUCIÓN MATERIAL',
+      // PRES-5: con GG/BI el presupuesto es por contrata, y la portada lo dice.
+      text: usaPec ? 'DE EJECUCIÓN POR CONTRATA' : 'DE EJECUCIÓN MATERIAL',
       fontSize: isLandscape ? Math.round((pdfStyles?.pdf_subtitle_size ?? 18) * 0.78) : (pdfStyles?.pdf_subtitle_size ?? 18),
       color: COLORS.primaryLight,
       alignment: 'right',
@@ -940,6 +967,26 @@ function buildBudgetDocDefinition(
       ],
     ]
 
+    // PRES-5: GG + BI -> PEC, solo si estan puestos.
+    if (usaPec) {
+      if (overheadRate > 0) {
+        calcRows.push([
+          { text: `Gastos generales (${overheadRate}%)`, fontSize: 10, color: COLORS.muted, margin: [8, 6, 8, 6] },
+          { text: fmtCurrency(overhead), fontSize: 10, color: COLORS.muted, alignment: 'right', margin: [8, 6, 8, 6] },
+        ])
+      }
+      if (profitRate > 0) {
+        calcRows.push([
+          { text: `Beneficio industrial (${profitRate}%)`, fontSize: 10, color: COLORS.muted, margin: [8, 6, 8, 6] },
+          { text: fmtCurrency(profit), fontSize: 10, color: COLORS.muted, alignment: 'right', margin: [8, 6, 8, 6] },
+        ])
+      }
+      calcRows.push([
+        { text: 'Presupuesto de Ejecucion por Contrata (PEC)', fontSize: 10, bold: true, color: COLORS.text, margin: [8, 8, 8, 8] },
+        { text: fmtCurrency(pec), fontSize: 10, bold: true, color: COLORS.text, alignment: 'right', margin: [8, 8, 8, 8] },
+      ])
+    }
+
     if (ivaRate > 0) {
       calcRows.push([
         { text: `IVA (${ivaRate}%)`, fontSize: 10, color: COLORS.muted, margin: [8, 6, 8, 6] },
@@ -988,7 +1035,10 @@ function buildBudgetDocDefinition(
 
     if (ivaRate === 0) {
       summaryPage.push({
-        text: 'Los importes corresponden al Presupuesto de Ejecucion Material, sin IVA.',
+        // PRES-5: con GG/BI el documento ya no es "de ejecucion material".
+        text: usaPec
+          ? 'Los importes corresponden al Presupuesto de Ejecucion por Contrata, sin IVA.'
+          : 'Los importes corresponden al Presupuesto de Ejecucion Material, sin IVA.',
         fontSize: 9,
         color: COLORS.muted,
         italics: true,
@@ -1266,6 +1316,121 @@ function buildBudgetDocDefinition(
           columnGap: 16,
           margin: [0, 0, 0, 12],
         })
+      }
+    }
+  }
+
+  // ─── ANEXO III. CUADRO DE PRECIOS DESCOMPUESTOS ────────────────────
+  // PRES-5 — Solo en la VERSION INTERNA: son costes (mano de obra, material,
+  // maquinaria...), no el precio de venta. No se le manda al cliente.
+  if (showCosts && breakdown.length > 0) {
+    const ETIQUETA: Record<string, string> = {
+      labor: 'Mano de obra',
+      material: 'Material',
+      equipment: 'Maquinaria',
+      subcontract: 'Subcontrata',
+      other: 'Otros',
+    }
+
+    const porItem = new Map<string, typeof breakdown>()
+    for (const l of breakdown) {
+      const lista = porItem.get(l.budget_item_id) || []
+      lista.push(l)
+      porItem.set(l.budget_item_id, lista)
+    }
+
+    const conDescompuesto = chapters
+      .map(({ chapter, items }) => ({
+        chapter,
+        items: items.filter((it) => (porItem.get(it.id)?.length || 0) > 0),
+      }))
+      .filter((c) => c.items.length > 0)
+
+    if (conDescompuesto.length > 0) {
+      annexPages.push({
+        id: 'budget-annex-breakdown',
+        text: 'ANEXO III. CUADRO DE PRECIOS DESCOMPUESTOS',
+        fontSize: 16,
+        bold: true,
+        color: COLORS.primary,
+        margin: [0, 0, 0, 6],
+        pageBreak: 'before' as const,
+      })
+      annexPages.push({
+        text: 'Version interna: son costes, no el precio de venta. No compartir con el cliente.',
+        fontSize: 9,
+        italics: true,
+        color: '#d97706',
+        margin: [0, 0, 0, 14],
+      })
+
+      for (const { chapter, items } of conDescompuesto) {
+        annexPages.push({
+          text: `Capitulo ${chapter.code}. ${chapter.name}`,
+          fontSize: 11,
+          bold: true,
+          color: COLORS.text,
+          margin: [0, 10, 0, 6],
+        })
+
+        for (const it of items) {
+          const lineas = porItem.get(it.id) || []
+          const costeUd = lineas.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0), 0)
+
+          annexPages.push({
+            table: {
+              headerRows: 2,
+              widths: [70, '*', 28, 44, 50, 56],
+              body: [
+                [
+                  { text: `${it.code}  ${it.name}`, colSpan: 4, fontSize: 9, bold: true, color: COLORS.white },
+                  {}, {}, {},
+                  { text: `${fmt(it.quantity)} ${it.unit}`, fontSize: 8, color: COLORS.white, alignment: 'right' },
+                  { text: fmtCurrency(it.unit_price), fontSize: 8, bold: true, color: COLORS.white, alignment: 'right' },
+                ],
+                [
+                  { text: 'Tipo', fontSize: 7, bold: true, color: COLORS.muted },
+                  { text: 'Concepto', fontSize: 7, bold: true, color: COLORS.muted },
+                  { text: 'Ud.', fontSize: 7, bold: true, color: COLORS.muted },
+                  { text: 'Cant.', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+                  { text: 'Coste', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+                  { text: 'Importe', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+                ],
+                ...lineas.map((l) => {
+                  const importe = (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0)
+                  return [
+                    { text: ETIQUETA[l.resource_type] || l.resource_type, fontSize: 8, color: COLORS.muted },
+                    { text: l.description || '', fontSize: 8, color: COLORS.text },
+                    { text: l.unit || '', fontSize: 8, color: COLORS.muted },
+                    { text: fmt(Number(l.quantity) || 0), fontSize: 8, color: COLORS.text, alignment: 'right' },
+                    { text: fmtCurrency(Number(l.unit_cost) || 0), fontSize: 8, color: COLORS.text, alignment: 'right' },
+                    { text: fmtCurrency(importe), fontSize: 8, color: COLORS.text, alignment: 'right' },
+                  ]
+                }),
+                [
+                  { text: 'Coste por unidad', colSpan: 5, fontSize: 8, bold: true, color: COLORS.text },
+                  {}, {}, {}, {},
+                  { text: fmtCurrency(costeUd), fontSize: 8, bold: true, color: COLORS.text, alignment: 'right' },
+                ],
+              ],
+            },
+            layout: {
+              hLineWidth: (i: number, node: any) =>
+                (i === 0 || i === 2 || i === node.table.body.length - 1 || i === node.table.body.length) ? 0.8 : 0.3,
+              vLineWidth: () => 0,
+              hLineColor: () => COLORS.border,
+              fillColor: (rowIndex: number, node: any) => {
+                if (rowIndex === 0) return COLORS.primary
+                if (rowIndex === node.table.body.length - 1) return COLORS.light
+                return null
+              },
+              paddingTop: () => 2,
+              paddingBottom: () => 2,
+            },
+            margin: [0, 0, 0, 10],
+            dontBreakRows: true,
+          })
+        }
       }
     }
   }

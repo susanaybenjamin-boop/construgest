@@ -1694,4 +1694,33 @@ router.delete('/photos/:photoId', budgetAccessMiddleware('budgetPhoto', { requir
   }
 })
 
+// GET /api/budgets/:id/breakdown — PRES-5: todas las lineas de descompuestos
+// del presupuesto de una vez, para el anexo del PDF (sin pedirlas partida a
+// partida). Son datos de COSTE, asi que el PDF solo las imprime en la version
+// interna.
+router.get('/:id/breakdown', budgetAccessMiddleware('budget'), async (req, res, next) => {
+  try {
+    const { data: chapters, error: cErr } = await supabase
+      .from('cons_chapters').select('id').eq('budget_id', req.params.id)
+    if (cErr) throw cErr
+    if (!chapters || chapters.length === 0) return res.json([])
+
+    const { data: items, error: iErr } = await supabase
+      .from('cons_budget_items').select('id').in('chapter_id', chapters.map((c) => c.id))
+    if (iErr) throw iErr
+    if (!items || items.length === 0) return res.json([])
+
+    const { data: lines, error: bErr } = await supabase
+      .from('cons_price_breakdown')
+      .select('*')
+      .in('budget_item_id', items.map((i) => i.id))
+      .order('sort_order', { ascending: true })
+    if (bErr) throw bErr
+
+    res.json(lines || [])
+  } catch (err) {
+    next(err)
+  }
+})
+
 export default router

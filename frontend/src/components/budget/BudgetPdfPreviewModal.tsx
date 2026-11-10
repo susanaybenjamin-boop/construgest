@@ -43,6 +43,20 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     c.items.some((i) => (i.measurements?.length || 0) > 0))
   const [includeMeasurementsAnnex, setIncludeMeasurementsAnnex] = useState(true)
 
+  // PRES-5: lineas de descompuestos (solo se imprimen en version interna).
+  const [breakdown, setBreakdown] = useState<{
+    budget_item_id: string; resource_type: string; description: string
+    unit: string; quantity: number; unit_cost: number
+  }[]>([])
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelado = false
+    api.get(`/budgets/${budget.budget.id}/breakdown`)
+      .then(({ data }) => { if (!cancelado) setBreakdown(data || []) })
+      .catch(() => { if (!cancelado) setBreakdown([]) })
+    return () => { cancelado = true }
+  }, [isOpen, budget.budget.id])
+
   // PRES-3: fotos del anexo. Se piden al abrir; si no hay, ni se ofrece la opcion.
   const [photos, setPhotos] = useState<BudgetPhoto[]>([])
   const [includePhotoAnnex, setIncludePhotoAnnex] = useState(true)
@@ -100,6 +114,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           showCosts,
           generalConditions: generalConditions || undefined,
           includeMeasurementsAnnex,
+          breakdown,
           photoSources: includePhotoAnnex
             ? photos
               .filter((p) => p.file?.storage_path)
@@ -128,7 +143,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     }, 400)
 
     return () => clearTimeout(timer)
-  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, includePhotoAnnex, photos, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
+  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, includePhotoAnnex, photos, breakdown, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -152,9 +167,15 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
 
   const totalPEM = budget.chapters.reduce((sum, ch) =>
     sum + ch.items.reduce((s, item) => s + item.quantity * item.unit_price, 0), 0)
+  // PRES-5: el mismo calculo que el documento (PEM -> GG -> BI -> PEC -> IVA).
+  // Si no, el resumen del lateral decia un total y el PDF otro.
+  const overheadPct = Number(budget.budget.overhead_pct) || 0
+  const profitPct = Number(budget.budget.profit_pct) || 0
+  const totalPEC = totalPEM * (1 + overheadPct / 100 + profitPct / 100)
+  const usaPec = overheadPct > 0 || profitPct > 0
   const ivaRate = budget.budget.tax_rate || 0
-  const iva = totalPEM * (ivaRate / 100)
-  const totalFinal = totalPEM + iva
+  const iva = totalPEC * (ivaRate / 100)
+  const totalFinal = totalPEC + iva
 
   const filename = `${(pdfName || budget.budget.name).replace(/\s+/g, '_')}.pdf`
 
@@ -165,6 +186,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
         <div className="space-y-0.5 text-xs text-gray-500">
           <p>{budget.chapters.length} capitulos</p>
           <p>PEM: {formatCurrency(totalPEM)}</p>
+          {usaPec && <p>PEC: {formatCurrency(totalPEC)}</p>}
           <p className="font-medium text-blue-700">Total: {formatCurrency(totalFinal)}</p>
         </div>
       </div>
@@ -206,6 +228,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
         </label>
         <p className="text-xs text-amber-700/80 mt-1 ml-12">
           Incluye coste estimado y margen bruto (uso interno, no compartir con cliente)
+          {breakdown.length > 0 && ', y el cuadro de precios descompuestos'}
         </p>
       </div>
 
