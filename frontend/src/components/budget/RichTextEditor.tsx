@@ -9,6 +9,7 @@ import Highlight from '@tiptap/extension-highlight'
 import { useRef, useCallback, useEffect } from 'react'
 import type { Editor } from '@tiptap/react'
 import { PartidaRef } from './partidaRefExtension'
+import { BlockDragHandle } from './blockDragHandle'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   Heading1, Heading2, Heading3, Pilcrow,
@@ -99,12 +100,14 @@ export default function RichTextEditor({ content, onChange, placeholder, extraTo
       Highlight.configure({ multicolor: true }),
       // COND-3: referencia viva a una partida del presupuesto.
       PartidaRef,
+      // COND-4: tirador para reordenar los párrafos arrastrándolos.
+      BlockDragHandle,
     ],
     content: content || '',
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm max-w-none px-4 py-3 min-h-[200px] outline-none focus:outline-none ' +
+          'prose prose-sm max-w-none pl-8 pr-4 py-3 min-h-[200px] outline-none focus:outline-none ' +
           'prose-headings:text-gray-900 prose-p:text-gray-700 prose-p:leading-relaxed ' +
           'prose-ul:my-1 prose-ol:my-1 prose-li:my-0',
       },
