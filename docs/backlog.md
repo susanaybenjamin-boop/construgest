@@ -42,7 +42,54 @@
 > `01.99 PINTURA DE TECHOS Y ESCALERAS` actualiza sola la condición **en pantalla y en el
 > PDF**; borrarla deja `[partida eliminada]` con su aviso. `npm test` **39/39**, `tsc` limpio.
 >
-> **Pendiente**: esto NO está en la 0.5.0 (se publicó antes). Va en la siguiente versión.
+> **Publicado en la v0.5.1** (ver abajo).
+>
+>
+>
+> **COND-4 (2026-11-10, noche): varias cláusulas de una vez y párrafos que se arrastran.**
+> Dos peticiones de Benjamin sobre el capítulo de condiciones:
+> - **Selección múltiple**: se marcan varias cláusulas y entran juntas. Cada una pide **sus**
+>   huecos por separado (dos cláusulas pueden tener un hueco llamado igual, "unidad", y
+>   significar cosas distintas), con vista previa. Se insertan en el mismo orden en que se ven:
+>   generales → exclusiones → económicas, que es el del documento.
+> - **Reordenar arrastrando** "como las demás partidas", sin salir del capítulo. *(Decisión de
+>   Benjamin: tirador en cada párrafo, en vez de convertir cada cláusula en una partida, para
+>   no perder el formato rico.)* Al pasar el ratón sale un tirador a la izquierda del párrafo.
+>   **Sin dependencias nuevas**: con el ProseMirror que ya trae TipTap.
+>
+> **Dos trampas que costaron y conviene no repetir**:
+> 1. `posAtCoords` devuelve en `inside` la posición **ANTES** del nodo, no una dentro de él.
+>    Tratándola como "dentro" sale `depth 0`, se descarta el bloque y el tirador **no aparece
+>    nunca**.
+> 2. El tirador **no puede colgarse del contenedor del editor**: cuando arranca el plugin,
+>    React todavía no lo ha montado (`immediatelyRender: false`). Va al `body` con
+>    `position: fixed` y los listeners en `view.dom`, que siempre existe.
+>
+> **Verificado en ejecución**: tres cláusulas marcadas a la vez con la validez en 45 días y el
+> plazo en 48 horas entran con sus datos; el tirador aparece al pasar por encima; y arrastrando
+> "LAS PARTIDAS VALORADAS A CERO" del quinto al primer puesto queda reordenado, sin perder ni
+> duplicar, y **así se guarda en la base de datos**.
+> ⚠️ El arrastre se probó lanzando **eventos de arrastre reales** sobre el editor, porque el
+> arrastre sintético del navegador de pruebas no dispara el drag-and-drop nativo. La lógica está
+> verificada de punta a punta, pero **falta probarlo con el ratón**.
+>
+> **Pendiente**: COND-4 no está en la 0.5.1 (se publicó antes). Va en la siguiente.
+>
+> **RELEASE v0.5.1 PUBLICADA (2026-11-10).** Bump en los tres `package.json` + lock, merge
+> `--no-ff` a `develop` (`b58e944`), las dos ramas **pusheadas** y release en GitHub con
+> `ConstruGest-0.5.1.msi` (453 MB), **Latest** según la API.
+>
+> **Comprobado antes de publicar**: gate de secretos (1.555 ficheros, sin credenciales) y,
+> leyendo la tabla `File` del instalador (4.964 ficheros), que viaja dentro **la migración
+> nueva `005_clausulas_condiciones`** junto a las cuatro anteriores, y **cero credenciales**.
+>
+> **REL-CLEAN**: borrado el `.msi` local de 0.4.9; quedan **0.5.0 (anterior) y 0.5.1 (actual)**.
+> Los publicados en GitHub, intactos.
+>
+> **Al instalar, mirar**: que el log diga `[migraciones] aplicadas 1: 005_clausulas_condiciones.sql`
+> **una sola vez**; que en Panel → **Cláusulas** aparezcan las 16 cláusulas; y que al abrir el
+> capítulo de condiciones de un presupuesto salgan los botones **Cláusula** y **Partida**
+> (antes de esta versión, abrir ese capítulo dejaba la pantalla en blanco).
 >
 > ### Anterior (2026-11-10): PRES-2 + PRES-3 + PRES-5: el bloque PRES, cerrado
 >
