@@ -38,6 +38,41 @@ export async function loadPdfMake() {
 /**
  * Fetch an image URL and convert to base64 data URI for pdfmake
  */
+/**
+ * PRES-3 — Carga una foto y la REESCALA antes de meterla en el PDF.
+ * Una foto de movil son 3-5 MB; veinte fotos a pelo darian un PDF imposible de
+ * enviar por correo. Se limita el lado mayor y se guarda como JPEG.
+ * Devuelve null si la foto no se puede cargar (se salta, no rompe el PDF).
+ */
+async function fetchPhotoAsBase64(
+  url: string,
+  maxSide = 1100,
+  quality = 0.72,
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return null
+    const blob = await res.blob()
+    const bitmap = await createImageBitmap(blob)
+
+    const escala = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
+    const w = Math.max(1, Math.round(bitmap.width * escala))
+    const h = Math.max(1, Math.round(bitmap.height * escala))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    ctx.drawImage(bitmap, 0, 0, w, h)
+    bitmap.close?.()
+
+    return { dataUrl: canvas.toDataURL('image/jpeg', quality), width: w, height: h }
+  } catch {
+    return null
+  }
+}
+
 async function fetchImageAsBase64(url: string): Promise<string | null> {
   if (!url) return null
   try {
@@ -343,6 +378,41 @@ export interface BudgetPdfOptions {
    */
   showCosts?: boolean
   generalConditions?: string
+  /**
+   * PRES-1: ficha del cliente de la obra. Va en la portada (nombre fiscal, NIF
+   * y direccion), como en cualquier presupuesto formal. Si no hay ficha
+   * asignada, la portada sale igual que antes: sin bloque de cliente.
+   */
+  /** PRES-2: anexo con la tabla de mediciones por zona al final del documento. */
+  includeMeasurementsAnnex?: boolean
+  /**
+   * PRES-3: fotos del anexo fotografico, YA cargadas y reescaladas
+   * (generateBudgetPdfBlob las prepara a partir de `photoSources`).
+   */
+  photos?: { zone: string; caption: string; dataUrl: string; width: number; height: number }[]
+  /** PRES-3: fotos a cargar (url + zona + pie). */
+  photoSources?: { url: string; zone?: string | null; caption?: string | null }[]
+  /**
+   * PRES-5: lineas de descompuestos del presupuesto. Son COSTE, asi que el
+   * anexo solo se imprime con la version interna activada (`showCosts`).
+   */
+  breakdown?: {
+    budget_item_id: string
+    resource_type: string
+    description: string
+    unit: string
+    quantity: number
+    unit_cost: number
+  }[]
+  client?: {
+    name?: string | null
+    legal_name?: string | null
+    tax_id?: string | null
+    address?: string | null
+    postal_code?: string | null
+    city?: string | null
+    province?: string | null
+  } | null
   margins?: { top: number; bottom: number; left: number; right: number } // mm
   pdfStyles?: PdfStyleOptions
   /** Nombre a mostrar en pie de página (si se omite, usa budget.budget.name) */
@@ -362,9 +432,28 @@ function buildBudgetDocDefinition(
     showPrices = true,
     showCosts = false,
     generalConditions,
+    includeMeasurementsAnnex = true,
+    photos = [],
+    breakdown = [],
+    client,
     pdfStyles,
     documentName,
   } = options
+
+  // PRES-1 — Cliente de la portada: el nombre fiscal si lo hay, y debajo el
+  // NIF y la direccion, como en el modelo de presupuesto completo:
+  //   "Cliente: COMUNIDAD DE PROPIETARIOS EDIFICIO PARQUE FORUM"
+  //   "CIF H19544071 · C/ Omeya 14, 18006 Granada"
+  const clientName = (client?.legal_name || client?.name || '').trim()
+  // Si ciudad y provincia coinciden (Granada, Granada) se escribe una sola vez.
+  const clientProvince =
+    (client?.province || '').trim().toLowerCase() === (client?.city || '').trim().toLowerCase()
+      ? '' : client?.province
+  const clientFiscalLine = [
+    client?.tax_id ? `NIF/CIF ${client.tax_id}` : '',
+    [client?.address, client?.postal_code, client?.city, clientProvince]
+      .filter(Boolean).join(', '),
+  ].filter(Boolean).join(' · ')
 
   // ─── Style overrides (shadows module-level defaults) ─────────────────
   // eslint-disable-next-line @typescript-eslint/no-shadow
@@ -383,9 +472,22 @@ function buildBudgetDocDefinition(
 
   const { chapters } = budget
   const pem = chapters.reduce((sum, ch) => sum + chTotal(ch), 0)
+
+  // PRES-5 — Gastos generales y beneficio industrial. Estaban en la base de
+  // datos y en Ajustes desde el principio pero NO se usaban en ningun calculo:
+  // el presupuesto iba PEM -> IVA -> TOTAL. Ahora, si se ponen a mas de 0, el
+  // documento hace PEM -> GG -> BI -> PEC -> IVA -> TOTAL (presupuesto de
+  // ejecucion por contrata). A 0 (lo de siempre) nada cambia.
+  const overheadRate = Number(budget.budget.overhead_pct) || 0
+  const profitRate = Number(budget.budget.profit_pct) || 0
+  const overhead = pem * (overheadRate / 100)
+  const profit = pem * (profitRate / 100)
+  const pec = pem + overhead + profit          // base imponible
+  const usaPec = overheadRate > 0 || profitRate > 0
+
   const ivaRate = budget.budget.tax_rate || 0
-  const iva = pem * (ivaRate / 100)
-  const grandTotal = pem + iva
+  const iva = pec * (ivaRate / 100)
+  const grandTotal = pec + iva
 
   const companyName = company.company_name || 'Empresa Constructora'
   const companyCif = company.company_cif || ''
@@ -472,7 +574,8 @@ function buildBudgetDocDefinition(
       margin: [0, 0, 0, 4],
     },
     {
-      text: 'DE EJECUCIÓN MATERIAL',
+      // PRES-5: con GG/BI el presupuesto es por contrata, y la portada lo dice.
+      text: usaPec ? 'DE EJECUCIÓN POR CONTRATA' : 'DE EJECUCIÓN MATERIAL',
       fontSize: isLandscape ? Math.round((pdfStyles?.pdf_subtitle_size ?? 18) * 0.78) : (pdfStyles?.pdf_subtitle_size ?? 18),
       color: COLORS.primaryLight,
       alignment: 'right',
@@ -487,6 +590,15 @@ function buildBudgetDocDefinition(
             { text: 'Proyecto:', bold: true, color: COLORS.muted, fontSize: 10 },
             { text: projectName || budget.budget.name, bold: true, fontSize: 12, color: COLORS.text },
           ],
+          // PRES-1: el cliente, justo debajo del proyecto.
+          ...(clientName ? [[
+            { text: 'Cliente:', bold: true, color: COLORS.muted, fontSize: 10 },
+            { text: clientName, bold: true, fontSize: 11, color: COLORS.text },
+          ]] : []),
+          ...(clientFiscalLine ? [[
+            { text: '', fontSize: 10 },
+            { text: clientFiscalLine, fontSize: 9, color: COLORS.muted },
+          ]] : []),
           [
             { text: 'Presupuesto:', bold: true, color: COLORS.muted, fontSize: 10 },
             { text: budget.budget.name, fontSize: 11, color: COLORS.text },
@@ -855,6 +967,26 @@ function buildBudgetDocDefinition(
       ],
     ]
 
+    // PRES-5: GG + BI -> PEC, solo si estan puestos.
+    if (usaPec) {
+      if (overheadRate > 0) {
+        calcRows.push([
+          { text: `Gastos generales (${overheadRate}%)`, fontSize: 10, color: COLORS.muted, margin: [8, 6, 8, 6] },
+          { text: fmtCurrency(overhead), fontSize: 10, color: COLORS.muted, alignment: 'right', margin: [8, 6, 8, 6] },
+        ])
+      }
+      if (profitRate > 0) {
+        calcRows.push([
+          { text: `Beneficio industrial (${profitRate}%)`, fontSize: 10, color: COLORS.muted, margin: [8, 6, 8, 6] },
+          { text: fmtCurrency(profit), fontSize: 10, color: COLORS.muted, alignment: 'right', margin: [8, 6, 8, 6] },
+        ])
+      }
+      calcRows.push([
+        { text: 'Presupuesto de Ejecucion por Contrata (PEC)', fontSize: 10, bold: true, color: COLORS.text, margin: [8, 8, 8, 8] },
+        { text: fmtCurrency(pec), fontSize: 10, bold: true, color: COLORS.text, alignment: 'right', margin: [8, 8, 8, 8] },
+      ])
+    }
+
     if (ivaRate > 0) {
       calcRows.push([
         { text: `IVA (${ivaRate}%)`, fontSize: 10, color: COLORS.muted, margin: [8, 6, 8, 6] },
@@ -903,7 +1035,10 @@ function buildBudgetDocDefinition(
 
     if (ivaRate === 0) {
       summaryPage.push({
-        text: 'Los importes corresponden al Presupuesto de Ejecucion Material, sin IVA.',
+        // PRES-5: con GG/BI el documento ya no es "de ejecucion material".
+        text: usaPec
+          ? 'Los importes corresponden al Presupuesto de Ejecucion por Contrata, sin IVA.'
+          : 'Los importes corresponden al Presupuesto de Ejecucion Material, sin IVA.',
         fontSize: 9,
         color: COLORS.muted,
         italics: true,
@@ -970,7 +1105,7 @@ function buildBudgetDocDefinition(
   if (generalConditions && generalConditions.trim()) {
     summaryPage.push({
       id: 'budget-conditions',
-      text: 'CONDICIONES GENERALES',
+      text: 'CONDICIONES DE LA OFERTA',
       fontSize: 16,
       bold: true,
       color: COLORS.primary,
@@ -985,6 +1120,321 @@ function buildBudgetDocDefinition(
     })
   }
 
+  // ─── ANEXO I. MEDICIONES POR ZONA ──────────────────────────────────
+  // PRES-2 — La tabla cruzada zona x partida del modelo de presupuesto
+  // completo: de un vistazo se ve de donde salen los metros de cada partida.
+  // Las mediciones YA se guardaban (uds/largo/ancho/alto/parcial) pero no
+  // salian nunca en el PDF.
+  //
+  // Un capitulo con muchas partidas no cabe a lo ancho, asi que la tabla se
+  // parte en bloques de 5 columnas. Las mediciones sin zona van a una fila
+  // "Sin zona asignada" para que los totales sigan cuadrando.
+  const annexPages: any[] = []
+  if (includeMeasurementsAnnex) {
+    const SIN_ZONA = 'Sin zona asignada'
+    const MAX_COLS = 5
+
+    const chaptersConMediciones = chapters
+      .map(({ chapter, items }) => ({
+        chapter,
+        items: items.filter((it) => (it.measurements?.length || 0) > 0 && it.is_active !== false),
+      }))
+      .filter((c) => c.items.length > 0)
+
+    if (chaptersConMediciones.length > 0) {
+      annexPages.push({
+        id: 'budget-annex-measurements',
+        text: 'ANEXO I. MEDICIONES POR ZONA',
+        fontSize: 16,
+        bold: true,
+        color: COLORS.primary,
+        margin: [0, 0, 0, 16],
+        pageBreak: 'before' as const,
+      })
+
+      for (const { chapter, items } of chaptersConMediciones) {
+        annexPages.push({
+          text: `Capitulo ${chapter.code}. ${chapter.name}`,
+          fontSize: 11,
+          bold: true,
+          color: COLORS.text,
+          margin: [0, 10, 0, 6],
+        })
+
+        // Zonas del capitulo. Se ordenan por el sort_order mas bajo con el que
+        // aparecen en CUALQUIER partida: asi las plantas salen en el orden en
+        // que se midieron y no segun que partida se mire primero (una zona que
+        // solo tiene una partida acababa descolgada al final).
+        const ordenZona = new Map<string, number>()
+        for (const it of items) {
+          for (const m of it.measurements || []) {
+            const z = (m.zone || '').trim() || SIN_ZONA
+            const orden = Number(m.sort_order) || 0
+            const previo = ordenZona.get(z)
+            if (previo === undefined || orden < previo) ordenZona.set(z, orden)
+          }
+        }
+        const zonas = [...ordenZona.keys()].sort((a, b) => {
+          if (a === SIN_ZONA) return 1          // "sin zona" siempre al final
+          if (b === SIN_ZONA) return -1
+          return (ordenZona.get(a) ?? 0) - (ordenZona.get(b) ?? 0)
+        })
+
+        // Suma de parciales por (zona, partida).
+        const valor = (it: typeof items[number], zona: string) =>
+          (it.measurements || [])
+            .filter((m) => ((m.zone || '').trim() || SIN_ZONA) === zona)
+            .reduce((sum, m) => sum + (Number(m.partial) || 0), 0)
+
+        for (let desde = 0; desde < items.length; desde += MAX_COLS) {
+          const bloque = items.slice(desde, desde + MAX_COLS)
+
+          const cabecera = [
+            { text: 'Zona', fontSize: 8, bold: true, color: COLORS.white },
+            ...bloque.map((it) => ({
+              text: `${it.code} ${it.name}`.slice(0, 40) + ` (${it.unit})`,
+              fontSize: 7,
+              bold: true,
+              color: COLORS.white,
+              alignment: 'right' as const,
+            })),
+          ]
+
+          const filas = zonas
+            .map((z) => {
+              const celdas = bloque.map((it) => valor(it, z))
+              if (celdas.every((v) => v === 0)) return null   // zona que no toca estas partidas
+              return [
+                { text: z, fontSize: 8, color: COLORS.text },
+                ...celdas.map((v) => ({
+                  text: v === 0 ? '—' : fmt(v),
+                  fontSize: 8,
+                  color: v === 0 ? COLORS.muted : COLORS.text,
+                  alignment: 'right' as const,
+                })),
+              ]
+            })
+            .filter(Boolean) as any[][]
+
+          const totales = [
+            { text: 'TOTAL', fontSize: 8, bold: true, color: COLORS.text },
+            ...bloque.map((it) => ({
+              text: fmt((it.measurements || []).reduce((sum, m) => sum + (Number(m.partial) || 0), 0)),
+              fontSize: 8,
+              bold: true,
+              color: COLORS.text,
+              alignment: 'right' as const,
+            })),
+          ]
+
+          annexPages.push({
+            table: {
+              headerRows: 1,
+              widths: ['*', ...bloque.map(() => 58)],
+              body: [cabecera, ...filas, totales],
+            },
+            layout: {
+              hLineWidth: (i: number, node: any) =>
+                (i === 0 || i === 1 || i === node.table.body.length - 1 || i === node.table.body.length) ? 0.8 : 0.3,
+              vLineWidth: () => 0,
+              hLineColor: () => COLORS.border,
+              fillColor: (rowIndex: number, node: any) => {
+                if (rowIndex === 0) return COLORS.primary
+                if (rowIndex === node.table.body.length - 1) return COLORS.light
+                return null
+              },
+              paddingTop: () => 3,
+              paddingBottom: () => 3,
+            },
+            margin: [0, 0, 0, 10],
+          })
+        }
+      }
+    }
+  }
+
+  // ─── ANEXO II. REPORTAJE FOTOGRAFICO ───────────────────────────────
+  // PRES-3 — Fotos agrupadas por zona, dos por fila, con pie numerado
+  // ("Foto 1", "Foto 2"...) como en el modelo de presupuesto completo.
+  if (photos.length > 0) {
+    const anchoCaja = isLandscape ? 340 : 240   // puntos; dos columnas
+    const altoCaja = Math.round(anchoCaja * 0.75)
+
+    annexPages.push({
+      id: 'budget-annex-photos',
+      text: 'ANEXO II. REPORTAJE FOTOGRÁFICO',
+      fontSize: 16,
+      bold: true,
+      color: COLORS.primary,
+      margin: [0, 0, 0, 16],
+      pageBreak: 'before' as const,
+    })
+
+    // Agrupar por zona manteniendo el orden en que vienen.
+    const porZona: { zona: string; fotos: typeof photos }[] = []
+    for (const foto of photos) {
+      const zona = foto.zone || 'Sin zona asignada'
+      let grupo = porZona.find((g) => g.zona === zona)
+      if (!grupo) { grupo = { zona, fotos: [] }; porZona.push(grupo) }
+      grupo.fotos.push(foto)
+    }
+
+    let numero = 0
+    for (const grupo of porZona) {
+      annexPages.push({
+        text: grupo.zona,
+        fontSize: 11,
+        bold: true,
+        color: COLORS.text,
+        margin: [0, 10, 0, 6],
+      })
+
+      for (let i = 0; i < grupo.fotos.length; i += 2) {
+        const pareja = grupo.fotos.slice(i, i + 2)
+        annexPages.push({
+          columns: pareja.map((foto) => {
+            numero++
+            // Encajar la foto en la caja sin deformarla.
+            const escala = Math.min(anchoCaja / foto.width, altoCaja / foto.height)
+            return {
+              width: anchoCaja,
+              stack: [
+                {
+                  image: foto.dataUrl,
+                  width: Math.round(foto.width * escala),
+                  height: Math.round(foto.height * escala),
+                },
+                {
+                  text: foto.caption ? `Foto ${numero}. ${foto.caption}` : `Foto ${numero}`,
+                  fontSize: 8,
+                  color: COLORS.muted,
+                  margin: [0, 3, 0, 0],
+                },
+              ],
+            }
+          }),
+          columnGap: 16,
+          margin: [0, 0, 0, 12],
+        })
+      }
+    }
+  }
+
+  // ─── ANEXO III. CUADRO DE PRECIOS DESCOMPUESTOS ────────────────────
+  // PRES-5 — Solo en la VERSION INTERNA: son costes (mano de obra, material,
+  // maquinaria...), no el precio de venta. No se le manda al cliente.
+  if (showCosts && breakdown.length > 0) {
+    const ETIQUETA: Record<string, string> = {
+      labor: 'Mano de obra',
+      material: 'Material',
+      equipment: 'Maquinaria',
+      subcontract: 'Subcontrata',
+      other: 'Otros',
+    }
+
+    const porItem = new Map<string, typeof breakdown>()
+    for (const l of breakdown) {
+      const lista = porItem.get(l.budget_item_id) || []
+      lista.push(l)
+      porItem.set(l.budget_item_id, lista)
+    }
+
+    const conDescompuesto = chapters
+      .map(({ chapter, items }) => ({
+        chapter,
+        items: items.filter((it) => (porItem.get(it.id)?.length || 0) > 0),
+      }))
+      .filter((c) => c.items.length > 0)
+
+    if (conDescompuesto.length > 0) {
+      annexPages.push({
+        id: 'budget-annex-breakdown',
+        text: 'ANEXO III. CUADRO DE PRECIOS DESCOMPUESTOS',
+        fontSize: 16,
+        bold: true,
+        color: COLORS.primary,
+        margin: [0, 0, 0, 6],
+        pageBreak: 'before' as const,
+      })
+      annexPages.push({
+        text: 'Version interna: son costes, no el precio de venta. No compartir con el cliente.',
+        fontSize: 9,
+        italics: true,
+        color: '#d97706',
+        margin: [0, 0, 0, 14],
+      })
+
+      for (const { chapter, items } of conDescompuesto) {
+        annexPages.push({
+          text: `Capitulo ${chapter.code}. ${chapter.name}`,
+          fontSize: 11,
+          bold: true,
+          color: COLORS.text,
+          margin: [0, 10, 0, 6],
+        })
+
+        for (const it of items) {
+          const lineas = porItem.get(it.id) || []
+          const costeUd = lineas.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0), 0)
+
+          annexPages.push({
+            table: {
+              headerRows: 2,
+              widths: [70, '*', 28, 44, 50, 56],
+              body: [
+                [
+                  { text: `${it.code}  ${it.name}`, colSpan: 4, fontSize: 9, bold: true, color: COLORS.white },
+                  {}, {}, {},
+                  { text: `${fmt(it.quantity)} ${it.unit}`, fontSize: 8, color: COLORS.white, alignment: 'right' },
+                  { text: fmtCurrency(it.unit_price), fontSize: 8, bold: true, color: COLORS.white, alignment: 'right' },
+                ],
+                [
+                  { text: 'Tipo', fontSize: 7, bold: true, color: COLORS.muted },
+                  { text: 'Concepto', fontSize: 7, bold: true, color: COLORS.muted },
+                  { text: 'Ud.', fontSize: 7, bold: true, color: COLORS.muted },
+                  { text: 'Cant.', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+                  { text: 'Coste', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+                  { text: 'Importe', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+                ],
+                ...lineas.map((l) => {
+                  const importe = (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0)
+                  return [
+                    { text: ETIQUETA[l.resource_type] || l.resource_type, fontSize: 8, color: COLORS.muted },
+                    { text: l.description || '', fontSize: 8, color: COLORS.text },
+                    { text: l.unit || '', fontSize: 8, color: COLORS.muted },
+                    { text: fmt(Number(l.quantity) || 0), fontSize: 8, color: COLORS.text, alignment: 'right' },
+                    { text: fmtCurrency(Number(l.unit_cost) || 0), fontSize: 8, color: COLORS.text, alignment: 'right' },
+                    { text: fmtCurrency(importe), fontSize: 8, color: COLORS.text, alignment: 'right' },
+                  ]
+                }),
+                [
+                  { text: 'Coste por unidad', colSpan: 5, fontSize: 8, bold: true, color: COLORS.text },
+                  {}, {}, {}, {},
+                  { text: fmtCurrency(costeUd), fontSize: 8, bold: true, color: COLORS.text, alignment: 'right' },
+                ],
+              ],
+            },
+            layout: {
+              hLineWidth: (i: number, node: any) =>
+                (i === 0 || i === 2 || i === node.table.body.length - 1 || i === node.table.body.length) ? 0.8 : 0.3,
+              vLineWidth: () => 0,
+              hLineColor: () => COLORS.border,
+              fillColor: (rowIndex: number, node: any) => {
+                if (rowIndex === 0) return COLORS.primary
+                if (rowIndex === node.table.body.length - 1) return COLORS.light
+                return null
+              },
+              paddingTop: () => 2,
+              paddingBottom: () => 2,
+            },
+            margin: [0, 0, 0, 10],
+            dontBreakRows: true,
+          })
+        }
+      }
+    }
+  }
+
   // ─── Build Document Definition ─────────────────────────────────────
   return {
     pageSize: 'A4' as const,
@@ -995,6 +1445,7 @@ function buildBudgetDocDefinition(
       ...indexPage,
       ...chapterPages,
       ...summaryPage,
+      ...annexPages,
     ],
     // pageBreakBefore: ensure the budget summary and conditions section start on a fresh
     // page, but ONLY if the node would otherwise land mid-page. We check `startPosition.top`
@@ -1054,7 +1505,23 @@ export async function generateBudgetPdfBlob(
   const fontFamily = options?.pdfStyles?.pdf_font_family ?? 'Roboto'
   const fonts = getFonts(fontFamily)
   const logoBase64 = await fetchImageAsBase64(company.company_logo_url)
-  const docDef = buildBudgetDocDefinition(budget, projectName, company, options, logoBase64)
+
+  // PRES-3: las fotos del anexo se cargan y reescalan aqui (buildDocDefinition
+  // es sincrona). Las que fallen se saltan: mejor un anexo con menos fotos que
+  // un PDF que no se genera.
+  let photos = options?.photos
+  if (!photos && options?.photoSources?.length) {
+    const cargadas = await Promise.all(options.photoSources.map(async (ps) => {
+      const img = await fetchPhotoAsBase64(ps.url)
+      if (!img) return null
+      return { zone: (ps.zone || '').trim(), caption: (ps.caption || '').trim(), ...img }
+    }))
+    photos = cargadas.filter(Boolean) as NonNullable<typeof photos>
+  }
+
+  const docDef = buildBudgetDocDefinition(
+    budget, projectName, company, { ...options, photos }, logoBase64,
+  )
   return new Promise<Blob>((resolve) => {
     pdf.createPdf(docDef, null, fonts, pdf.vfs).getBlob((blob: Blob) => resolve(blob))
   })

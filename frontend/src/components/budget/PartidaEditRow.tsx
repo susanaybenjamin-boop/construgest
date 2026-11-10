@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import type { BudgetItem, Measurement } from '@/types'
 import { useBudgetStore } from '@/stores/budgetStore'
 import { useNotificationStore } from '@/stores/notificationStore'
@@ -73,7 +73,7 @@ interface SimilarPartida {
 }
 
 export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onToggleExpand, isSelected, onSelect }: Props) {
-  const { updateItem, deleteItem, duplicateItem, addMeasurement, updateMeasurement, deleteMeasurement, autoRenumberAll, activeItemId, setActiveItemId } = useBudgetStore()
+  const { updateItem, deleteItem, duplicateItem, addMeasurement, updateMeasurement, deleteMeasurement, autoRenumberAll, activeItemId, setActiveItemId, activeBudget } = useBudgetStore()
   const { addToast } = useNotificationStore()
   const isActiveTarget = activeItemId === item.id
   const [showBreakdown, setShowBreakdown] = useState(false)
@@ -133,6 +133,18 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
     setLocalPrice(String(item.unit_price))
     setLocalCost(String(item.cost_price ?? 0))
   }
+
+  // PRES-2: zonas ya escritas en ESTE presupuesto, para ofrecerlas como
+  // sugerencia y que no se escriban de diez maneras distintas.
+  const zonesListId = `zonas-${item.id}`
+  const zonasUsadas = useMemo(() => {
+    const set = new Set<string>()
+    activeBudget?.chapters?.forEach((c) => c.items?.forEach((i) => i.measurements?.forEach((m) => {
+      const z = (m.zone || '').trim()
+      if (z) set.add(z)
+    })))
+    return [...set].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [activeBudget])
 
   const hasMeasurements = (item.measurements?.length || 0) > 0
   const measurements = item.measurements || []
@@ -704,9 +716,14 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
                 </div>
               </div>
 
+              <datalist id={zonesListId}>
+                {zonasUsadas.map((z) => <option key={z} value={z} />)}
+              </datalist>
+
               {/* Column headers */}
               {hasMeasurements && (
-                <div className="grid grid-cols-[1fr_64px_72px_72px_72px_80px_28px] gap-px px-2 py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">
+                <div className="grid grid-cols-[104px_1fr_60px_68px_68px_68px_76px_28px] gap-px px-2 py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100">
+                  <span className="px-1">Zona</span>
                   <span className="px-1">Descripción</span>
                   <span className="px-1 text-right">Uds.</span>
                   <span className="px-1 text-right">Largo</span>
@@ -724,6 +741,7 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
                   measurement={m}
                   onBlur={handleMeasurementBlur}
                   onDelete={() => deleteMeasurement(m.id)}
+                  zonesListId={zonesListId}
                 />
               ))}
 
@@ -736,7 +754,8 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
 
               {/* Total row */}
               {hasMeasurements && (
-                <div className="grid grid-cols-[1fr_64px_72px_72px_72px_80px_28px] gap-px px-2 py-1.5 bg-blue-50/60 border-t border-gray-200">
+                <div className="grid grid-cols-[104px_1fr_60px_68px_68px_68px_76px_28px] gap-px px-2 py-1.5 bg-blue-50/60 border-t border-gray-200">
+                  <span></span>
                   <span className="px-1 text-xs font-semibold text-gray-700">TOTAL</span>
                   <span></span>
                   <span></span>
@@ -788,10 +807,12 @@ function MeasurementRow({
   measurement: m,
   onBlur,
   onDelete,
+  zonesListId,
 }: {
   measurement: Measurement
   onBlur: (m: Measurement, field: string, value: string) => void
   onDelete: () => void
+  zonesListId: string
 }) {
   const partial = m.partial || calcPartial(m)
   // Spacer: units=0 and all dimensions=0 → just a text separator line
@@ -799,7 +820,8 @@ function MeasurementRow({
 
   if (isSpacer) {
     return (
-      <div className="grid grid-cols-[1fr_64px_72px_72px_72px_80px_28px] gap-px px-2 py-0.5 border-b border-gray-50 group/row hover:bg-amber-50/50 items-center bg-gray-50/30">
+      <div className="grid grid-cols-[104px_1fr_60px_68px_68px_68px_76px_28px] gap-px px-2 py-0.5 border-b border-gray-50 group/row hover:bg-amber-50/50 items-center bg-gray-50/30">
+        <span />
         {/* Spacer description spans all columns visually */}
         <input
           className="px-1 py-0.5 text-xs text-gray-500 italic rounded border border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full bg-transparent"
@@ -825,7 +847,18 @@ function MeasurementRow({
   }
 
   return (
-    <div className="grid grid-cols-[1fr_64px_72px_72px_72px_80px_28px] gap-px px-2 py-0.5 border-b border-gray-50 group/row hover:bg-gray-50/50 items-center">
+    <div className="grid grid-cols-[104px_1fr_60px_68px_68px_68px_76px_28px] gap-px px-2 py-0.5 border-b border-gray-50 group/row hover:bg-gray-50/50 items-center">
+      {/* PRES-2 — Zona de la obra. Texto libre, con las zonas ya usadas en este
+          presupuesto como sugerencia para no escribirlas otra vez. */}
+      <input
+        className="px-1 py-0.5 text-xs text-gray-600 rounded border border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full bg-transparent"
+        defaultValue={m.zone || ''}
+        placeholder="Zona..."
+        list={zonesListId}
+        title="Zona de la obra (planta 5ª, portal…). Agrupa el anexo de mediciones."
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur() }}
+        onBlur={(e) => onBlur(m, 'zone', e.target.value)}
+      />
       {/* Description */}
       <input
         className="px-1 py-0.5 text-xs text-gray-700 rounded border border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full bg-transparent"

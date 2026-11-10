@@ -419,6 +419,28 @@ export default function AdminSettingsPage() {
                       </select>
                     </div>
                   </div>
+                  {/* PRES-4: plantilla de condiciones de la oferta */}
+                  <div className="pt-5 border-t border-gray-200">
+                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-3">
+                      Condiciones de la oferta
+                    </h3>
+                    <textarea
+                      value={settings.defaults.budget_conditions_default}
+                      onChange={(e) => settings.updateDefaults('budget_conditions_default', e.target.value)}
+                      rows={6}
+                      className={`${inputClass} resize-none font-mono text-xs`}
+                      placeholder={`Validez de la oferta: 30 dias.
+Forma de pago: 40% a la firma, resto a la finalizacion.
+Plazo de ejecucion: 3 semanas desde el inicio.
+Garantia: 1 ano sobre los trabajos ejecutados.
+No incluye: licencias ni tasas municipales.`}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Se precargan en cada presupuesto NUEVO y luego se pueden retocar en ese
+                      presupuesto concreto sin cambiar esta plantilla. Salen al final del PDF.
+                    </p>
+                  </div>
+
                   <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                     <p className="text-sm font-medium text-blue-900 mb-2">Fórmula de cálculo:</p>
                     <p className="text-sm text-blue-700 font-mono">

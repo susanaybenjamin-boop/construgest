@@ -4,6 +4,7 @@ import express from 'express'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
 import { initRealtime } from './services/realtimeHub.js'
+import { runMigrations } from './db/migrate.js'
 import { getVersionStatus, getCurrentVersion } from './services/version.js'
 
 // Route imports
@@ -17,6 +18,7 @@ import planRoutes from './routes/plans.js'
 import aiRoutes from './routes/ai.js'
 import libraryRoutes from './routes/library.js'
 import suppliersRoutes from './routes/suppliers.js'
+import clientsRoutes from './routes/clients.js'
 import settingsRoutes from './routes/settings.js'
 import workLogRoutes from './routes/workLogs.js'
 import supplierMaterialRoutes from './routes/supplierMaterials.js'
@@ -130,6 +132,7 @@ app.use('/api/plans', planRoutes)
 app.use('/api/ai', aiLimiter, aiRoutes)
 app.use('/api/library', libraryRoutes)
 app.use('/api/suppliers', suppliersRoutes)
+app.use('/api/clients', clientsRoutes)
 app.use('/api/settings', settingsRoutes)
 app.use('/api/work-logs', workLogRoutes)
 app.use('/api/supplier-materials', supplierMaterialRoutes)
@@ -170,6 +173,20 @@ server.on('error', (err) => {
   }
   process.exit(1)
 })
+
+// MIG-1: el esquema se pone al día ANTES de servir. El 01_schema.sql solo se
+// aplica al crear la BD, así que sin esto una instalación ya existente nunca
+// recibía las columnas nuevas. Si falla, se dice claro y se sale: servir con el
+// esquema a medias solo produce errores de SQL incomprensibles más adelante.
+try {
+  const { applied } = await runMigrations()
+  if (applied.length) {
+    console.log(`[migraciones] aplicadas ${applied.length}: ${applied.join(', ')}`)
+  }
+} catch (err) {
+  console.error(`FATAL: no se pudo poner al día el esquema de la base de datos.\n${err.message}`)
+  process.exit(1)
+}
 
 initRealtime(server)
 server.listen(PORT, () => {

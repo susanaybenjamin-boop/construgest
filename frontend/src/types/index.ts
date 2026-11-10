@@ -24,6 +24,9 @@ export interface ProjectInfo {
   location: string | null;
   client_name: string | null;
   client_contact: string | null;
+  /** PRES-1: ficha de cliente reutilizable. Manda sobre client_name cuando existe. */
+  client_id?: string | null;
+  client?: Client | null;
   address: string | null;
   city: string | null;
   province: string | null;
@@ -154,6 +157,8 @@ export interface Budget {
   overhead_pct: number;
   profit_pct: number;
   notes: string | null;
+  /** PRES-4: condiciones de la oferta (validez, forma de pago, plazo, garantía). */
+  conditions?: string | null;
   submitted_at: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -180,6 +185,8 @@ export interface Measurement {
   id: string;
   budget_item_id: string;
   description: string | null;
+  /** PRES-2: zona de la obra donde se mide (planta 5ª, portal…). Texto libre. */
+  zone?: string | null;
   units: number;
   length: number;
   width: number;
@@ -537,6 +544,46 @@ export interface PlanCalibration {
 }
 
 // ─── Suppliers ──────────────────────────────────────────────────────
+// PRES-1: ficha de cliente reutilizable entre obras (antes el cliente era solo
+// texto suelto en el proyecto y no tenia NIF ni direccion fiscal).
+export interface Client {
+  id: string;
+  organization_id: string;
+  name: string;
+  legal_name: string | null;
+  tax_id: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  postal_code: string | null;
+  city: string | null;
+  province: string | null;
+  country: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// PRES-3: foto del anexo fotografico del presupuesto. No duplica el fichero:
+// apunta al que ya esta subido al proyecto y le anade zona, pie y orden.
+export interface BudgetPhoto {
+  id: string;
+  budget_id: string;
+  file_id: string;
+  zone: string | null;
+  caption: string | null;
+  sort_order: number;
+  created_at: string;
+  file?: {
+    id: string;
+    original_name: string;
+    storage_path: string;
+    file_type: string;
+  } | null;
+}
+
 export interface Supplier {
   id: string;
   organization_id: string;

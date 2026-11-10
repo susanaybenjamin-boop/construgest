@@ -27,7 +27,7 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   Plus, Loader2, Calculator, ChevronDown, ChevronRight,
   Trash2, FileDown, FileUp, Send, Check, RotateCcw, GripVertical, BookmarkPlus, Eye, EyeOff, X,
-  ArrowRightLeft, FileText, List, Library, Search, Undo2
+  ArrowRightLeft, FileText, List, Library, Search, Undo2, Images
 } from 'lucide-react'
 import type { PricePickMessage } from '@/types'
 import { formatCurrency } from '@/lib/utils'
@@ -37,6 +37,7 @@ import ImportBudgetDialog from '@/components/budget/ImportBudgetDialog'
 import ImportFromLibraryDialog from '@/components/budget/ImportFromLibraryDialog'
 import PickFromLibraryDialog from '@/components/budget/PickFromLibraryDialog'
 import BudgetPdfPreviewModal from '@/components/budget/BudgetPdfPreviewModal'
+import BudgetPhotosPanel from '@/components/budget/BudgetPhotosPanel'
 import ChapterMappingDialog from '@/components/budget/ChapterMappingDialog'
 import BudgetComparisonModal from '@/components/budget/BudgetComparisonModal'
 import BudgetTrashModal from '@/components/budget/BudgetTrashModal'
@@ -175,6 +176,7 @@ export default function BudgetPage() {
   const [batchSaving, setBatchSaving] = useState(false)
   const [showChapterMapping, setShowChapterMapping] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
+  const [showPhotos, setShowPhotos] = useState(false)
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null)
   const [deletingInProgress, setDeletingInProgress] = useState(false)
   const [editingChapterCode, setEditingChapterCode] = useState<string | null>(null)
@@ -720,10 +722,20 @@ export default function BudgetPage() {
     (sum, ch) => ch.chapter.is_active === false ? sum : sum + calcChapterTotal(ch.items),
     0,
   ) || 0
+  // PRES-5: gastos generales y beneficio industrial. A 0 (lo de siempre) el
+  // presupuesto es PEM -> IVA -> TOTAL; si se ponen, pasa a ser por contrata:
+  // PEM -> GG -> BI -> PEC -> IVA -> TOTAL.
+  const overheadPct = Number(activeBudget?.budget.overhead_pct) || 0
+  const profitPct = Number(activeBudget?.budget.profit_pct) || 0
+  const overhead = totalPEM * (overheadPct / 100)
+  const profit = totalPEM * (profitPct / 100)
+  const totalPEC = totalPEM + overhead + profit
+  const usaPec = overheadPct > 0 || profitPct > 0
+
   const ivaEnabled = (activeBudget?.budget.tax_rate || 0) > 0
   const ivaRate = activeBudget?.budget.tax_rate || 0
-  const iva = totalPEM * (ivaRate / 100)
-  const totalFinal = totalPEM + iva
+  const iva = totalPEC * (ivaRate / 100)
+  const totalFinal = totalPEC + iva
 
   // Filter chapter templates by search
   const filteredTemplates = CHAPTER_TEMPLATES.filter(t =>
@@ -854,6 +866,13 @@ export default function BudgetPage() {
                   title="Importar presupuesto desde PDF"
                 >
                   <FileUp className="w-4 h-4" /> Importar desde...
+                </button>
+                <button
+                  onClick={() => setShowPhotos(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition shadow-sm"
+                  title="Anexo fotográfico del presupuesto"
+                >
+                  <Images className="w-4 h-4" /> Fotos
                 </button>
                 <button
                   onClick={() => setShowPdfPreview(true)}
@@ -1321,6 +1340,48 @@ export default function BudgetPage() {
                 <span className="font-bold">{formatCurrency(totalPEM)}</span>
               </div>
 
+              {/* PRES-5 — Gastos generales y beneficio industrial */}
+              <div className="flex items-center justify-between border-t pt-2 gap-3">
+                <span className="text-gray-600">Gastos generales</span>
+                <div className="flex items-center gap-2">
+                  <DecimalInput
+                    min="0"
+                    max="100"
+                    value={overheadPct}
+                    onChange={(v) => updateBudget(activeBudget.budget.id, { overhead_pct: v })}
+                    className="w-16 px-2 py-0.5 text-sm text-right border border-gray-300 rounded outline-none focus:border-blue-500"
+                  />
+                  <span className="text-gray-500">%</span>
+                  <span className="text-gray-600 w-24 text-right">
+                    {overheadPct > 0 ? formatCurrency(overhead) : '—'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-gray-600">Beneficio industrial</span>
+                <div className="flex items-center gap-2">
+                  <DecimalInput
+                    min="0"
+                    max="100"
+                    value={profitPct}
+                    onChange={(v) => updateBudget(activeBudget.budget.id, { profit_pct: v })}
+                    className="w-16 px-2 py-0.5 text-sm text-right border border-gray-300 rounded outline-none focus:border-blue-500"
+                  />
+                  <span className="text-gray-500">%</span>
+                  <span className="text-gray-600 w-24 text-right">
+                    {profitPct > 0 ? formatCurrency(profit) : '—'}
+                  </span>
+                </div>
+              </div>
+              {usaPec && (
+                <div className="flex justify-between border-t pt-2">
+                  <span className="font-medium text-gray-700">
+                    Presupuesto de Ejecución por Contrata (PEC)
+                  </span>
+                  <span className="font-bold">{formatCurrency(totalPEC)}</span>
+                </div>
+              )}
+
               {/* IVA toggle */}
               <div className="flex items-center justify-between border-t pt-2">
                 <div className="flex items-center gap-3">
@@ -1362,7 +1423,8 @@ export default function BudgetPage() {
 
               {!ivaEnabled && (
                 <p className="text-xs text-gray-400 italic">
-                  Presupuesto sin IVA. Los importes mostrados corresponden al Presupuesto de Ejecución Material.
+                  Presupuesto sin IVA. Los importes mostrados corresponden al Presupuesto de Ejecución
+                  {usaPec ? ' por Contrata.' : ' Material.'}
                 </p>
               )}
 
@@ -1485,14 +1547,27 @@ export default function BudgetPage() {
         />
       )}
 
-      {/* PDF Preview Modal */}
+      {/* PDF Preview Modal + anexo fotografico */}
       {activeBudget && (
+        <>
+        <BudgetPhotosPanel
+          isOpen={showPhotos}
+          onClose={() => setShowPhotos(false)}
+          budgetId={activeBudget.budget.id}
+          projectId={projectId}
+          zones={[...new Set(
+            activeBudget.chapters.flatMap((c) => c.items.flatMap((i) =>
+              (i.measurements || []).map((m) => (m.zone || '').trim()).filter(Boolean))),
+          )]}
+        />
         <BudgetPdfPreviewModal
           isOpen={showPdfPreview}
           onClose={() => setShowPdfPreview(false)}
           budget={activeBudget}
           projectName={activeProject?.name || projectId}
+          client={activeProject?.client}
         />
+        </>
       )}
 
       {/* Budget Comparison Modal */}

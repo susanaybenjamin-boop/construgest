@@ -237,11 +237,30 @@ router.get('/:id/full', budgetAccessMiddleware('budget'), async (req, res, next)
 // POST /api/budgets - Create budget
 router.post('/', budgetAccessMiddleware('project', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { project_id, name, tax_rate, overhead_pct, profit_pct, notes } = req.body
+    // PRES-4: `conditions` son las condiciones de la oferta (validez, forma de
+    // pago, plazo, garantía). Si el presupuesto nace sin ellas, se precargan con
+    // la PLANTILLA de Ajustes. Se resuelve aquí y no en el navegador porque la
+    // pantalla de presupuesto no carga el store de ajustes: desde ahí llegaba
+    // vacío y el presupuesto nuevo salía sin condiciones.
+    const { project_id, name, tax_rate, overhead_pct, profit_pct, notes, conditions } = req.body
+
+    let condicionesIniciales = conditions
+    if (condicionesIniciales == null || condicionesIniciales === '') {
+      const { data: plantilla } = await supabase
+        .from('cons_app_settings')
+        .select('value')
+        .eq('organization_id', req.project.organization_id)
+        .eq('key', 'budget_conditions_default')
+        .single()
+      condicionesIniciales = plantilla?.value || null
+    }
 
     const { data, error } = await supabase
       .from('cons_budgets')
-      .insert({ project_id, name, tax_rate, overhead_pct, profit_pct, notes })
+      .insert({
+        project_id, name, tax_rate, overhead_pct, profit_pct, notes,
+        conditions: condicionesIniciales,
+      })
       .select()
       .single()
 
@@ -256,7 +275,7 @@ router.post('/', budgetAccessMiddleware('project', { requireWrite: true }), asyn
 // PUT /api/budgets/:id - Update budget (name, tax_rate, etc.)
 router.put('/:id', budgetAccessMiddleware('budget', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { name, tax_rate, overhead_pct, profit_pct, notes, version } = req.body
+    const { name, tax_rate, overhead_pct, profit_pct, notes, version, conditions } = req.body
     const updates = {}
     if (name !== undefined) updates.name = name
     if (tax_rate !== undefined) updates.tax_rate = tax_rate
@@ -264,6 +283,7 @@ router.put('/:id', budgetAccessMiddleware('budget', { requireWrite: true }), asy
     if (profit_pct !== undefined) updates.profit_pct = profit_pct
     if (notes !== undefined) updates.notes = notes
     if (version !== undefined) updates.version = version
+    if (conditions !== undefined) updates.conditions = conditions
 
     const { data, error } = await supabase
       .from('cons_budgets')
@@ -682,11 +702,12 @@ async function recomputePartidaQuantityFromMeasurements(itemId) {
 // POST /api/budgets/items/:itemId/measurements
 router.post('/items/:itemId/measurements', budgetAccessMiddleware('item', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { description, units, length, width, height, partial, sort_order } = req.body
+    // PRES-2: `zone` es la zona de la obra donde se mide (texto libre).
+    const { description, units, length, width, height, partial, sort_order, zone } = req.body
 
     const { data, error } = await supabase
       .from('cons_measurements')
-      .insert({ budget_item_id: req.params.itemId, description, units, length, width, height, partial, sort_order })
+      .insert({ budget_item_id: req.params.itemId, description, units, length, width, height, partial, sort_order, zone: zone || null })
       .select()
       .single()
 
@@ -716,6 +737,7 @@ router.post('/items/:itemId/measurements/bulk', budgetAccessMiddleware('item', {
       height: m.height ?? 0,
       partial: m.partial ?? 0,
       sort_order: m.sort_order ?? idx + 1,
+      zone: m.zone || null,
     }))
 
     const { data, error } = await supabase
@@ -735,11 +757,13 @@ router.post('/items/:itemId/measurements/bulk', budgetAccessMiddleware('item', {
 // PUT /api/budgets/measurements/:measurementId
 router.put('/measurements/:measurementId', budgetAccessMiddleware('measurement', { requireWrite: true }), async (req, res, next) => {
   try {
-    const { description, units, length, width, height, partial, sort_order } = req.body
+    const { description, units, length, width, height, partial, sort_order, zone } = req.body
 
     const { data, error } = await supabase
       .from('cons_measurements')
-      .update({ description, units, length, width, height, partial, sort_order })
+      // El shim ignora las claves `undefined`, así que esto es una actualización
+      // parcial: mandar solo `units` no borra la descripción ni la zona.
+      .update({ description, units, length, width, height, partial, sort_order, zone })
       .eq('id', req.params.measurementId)
       .select()
       .single()
@@ -1549,6 +1573,151 @@ router.get('/library-as-budget', async (req, res, next) => {
       },
       chapters: chaptersWithItems,
     })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// ════════════════════════════════════════════════════════════════════════════
+//  PRES-3 — ANEXO FOTOGRÁFICO
+//  Las fotos ya están subidas al proyecto; aquí solo se dice cuáles salen en
+//  este presupuesto, en qué zona y con qué pie.
+// ════════════════════════════════════════════════════════════════════════════
+
+// GET /api/budgets/:id/photos — fotos del anexo, con los datos del fichero
+router.get('/:id/photos', budgetAccessMiddleware('budget'), async (req, res, next) => {
+  try {
+    const { data: photos, error } = await supabase
+      .from('cons_budget_photos')
+      .select('*')
+      .eq('budget_id', req.params.id)
+      .order('sort_order', { ascending: true })
+    if (error) throw error
+    if (!photos || photos.length === 0) return res.json([])
+
+    const { data: files, error: fErr } = await supabase
+      .from('cons_project_files')
+      .select('id, original_name, storage_path, file_type')
+      .in('id', photos.map((p) => p.file_id))
+    if (fErr) throw fErr
+
+    const byId = new Map((files || []).map((f) => [f.id, f]))
+    res.json(photos.map((p) => ({ ...p, file: byId.get(p.file_id) || null })))
+  } catch (err) {
+    next(err)
+  }
+})
+
+// POST /api/budgets/:id/photos — añadir fotos (varias de una vez)
+router.post('/:id/photos', budgetAccessMiddleware('budget', { requireWrite: true }), async (req, res, next) => {
+  try {
+    const fileIds = Array.isArray(req.body?.file_ids) ? req.body.file_ids : []
+    if (fileIds.length === 0) {
+      return res.status(400).json({ error: 'No se ha indicado ninguna foto' })
+    }
+
+    // Las fotos tienen que ser del MISMO proyecto que el presupuesto.
+    const { data: validos, error: vErr } = await supabase
+      .from('cons_project_files')
+      .select('id')
+      .eq('project_id', req.project.id)
+      .in('id', fileIds)
+    if (vErr) throw vErr
+    const permitidos = new Set((validos || []).map((f) => f.id))
+    const aInsertar = fileIds.filter((id) => permitidos.has(id))
+    if (aInsertar.length === 0) {
+      return res.status(400).json({ error: 'Esas fotos no son de este proyecto' })
+    }
+
+    // Las que ya estaban se ignoran (la clave única no deja duplicados).
+    const { data: yaEstan } = await supabase
+      .from('cons_budget_photos')
+      .select('file_id')
+      .eq('budget_id', req.params.id)
+    const existentes = new Set((yaEstan || []).map((p) => p.file_id))
+    const nuevos = aInsertar.filter((id) => !existentes.has(id))
+    if (nuevos.length === 0) return res.json([])
+
+    const { data: ultimas } = await supabase
+      .from('cons_budget_photos')
+      .select('sort_order')
+      .eq('budget_id', req.params.id)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+    let orden = (ultimas?.[0]?.sort_order ?? 0)
+
+    const { data, error } = await supabase
+      .from('cons_budget_photos')
+      .insert(nuevos.map((file_id) => ({
+        budget_id: req.params.id, file_id, sort_order: ++orden,
+      })))
+      .select()
+    if (error) throw error
+
+    res.status(201).json(data)
+    notifyBudgetChange(req.params.id, 'budget-photo-add')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// PUT /api/budgets/photos/:photoId — zona, pie y orden
+router.put('/photos/:photoId', budgetAccessMiddleware('budgetPhoto', { requireWrite: true }), async (req, res, next) => {
+  try {
+    const { zone, caption, sort_order } = req.body
+    const { data, error } = await supabase
+      .from('cons_budget_photos')
+      .update({ zone, caption, sort_order })
+      .eq('id', req.params.photoId)
+      .select()
+      .single()
+    if (error) throw error
+    res.json(data)
+    notifyBudgetChange(req.resolvedBudgetId, 'budget-photo-update')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// DELETE /api/budgets/photos/:photoId — quitarla del anexo (el fichero sigue en el proyecto)
+router.delete('/photos/:photoId', budgetAccessMiddleware('budgetPhoto', { requireWrite: true }), async (req, res, next) => {
+  try {
+    const { error } = await supabase
+      .from('cons_budget_photos')
+      .delete()
+      .eq('id', req.params.photoId)
+    if (error) throw error
+    res.json({ success: true })
+    notifyBudgetChange(req.resolvedBudgetId, 'budget-photo-delete')
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/budgets/:id/breakdown — PRES-5: todas las lineas de descompuestos
+// del presupuesto de una vez, para el anexo del PDF (sin pedirlas partida a
+// partida). Son datos de COSTE, asi que el PDF solo las imprime en la version
+// interna.
+router.get('/:id/breakdown', budgetAccessMiddleware('budget'), async (req, res, next) => {
+  try {
+    const { data: chapters, error: cErr } = await supabase
+      .from('cons_chapters').select('id').eq('budget_id', req.params.id)
+    if (cErr) throw cErr
+    if (!chapters || chapters.length === 0) return res.json([])
+
+    const { data: items, error: iErr } = await supabase
+      .from('cons_budget_items').select('id').in('chapter_id', chapters.map((c) => c.id))
+    if (iErr) throw iErr
+    if (!items || items.length === 0) return res.json([])
+
+    const { data: lines, error: bErr } = await supabase
+      .from('cons_price_breakdown')
+      .select('*')
+      .in('budget_item_id', items.map((i) => i.id))
+      .order('sort_order', { ascending: true })
+    if (bErr) throw bErr
+
+    res.json(lines || [])
   } catch (err) {
     next(err)
   }
