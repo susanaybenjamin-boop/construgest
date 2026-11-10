@@ -1,8 +1,60 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-11-09
+> ## 📍 ESTADO ACTUAL — 2026-11-10
 >
-> ### Último (2026-11-09): PARSE-1 — un PDF de presupuesto ajeno daba error al importar
+> ### Último (2026-11-10): PRES-2 + PRES-3 + PRES-5: el bloque PRES, cerrado
+>
+> **PRES-2 — Anexo de mediciones por zona.** Las mediciones ya se guardaban y
+> alimentaban la cantidad de la partida, pero no salían en el PDF y no decían DÓNDE
+> se mide. Ahora: columna **Zona** en la tabla de mediciones (con las zonas ya escritas
+> en ese presupuesto como sugerencia, para no acabar con la misma zona de diez maneras)
+> y **ANEXO I. MEDICIONES POR ZONA** al final del PDF: por capítulo, tabla cruzada
+> zona × partida con el total de cada columna, igual que la del PDF de su hermano. Las
+> zonas se ordenan por el `sort_order` más bajo con el que aparecen (si no, una zona que
+> solo toca una partida se descolgaba al final); las mediciones sin zona van a
+> "Sin zona asignada" para que los totales cuadren; un capítulo con muchas partidas se
+> parte en bloques de 5 columnas.
+> *Verificado* con las mediciones REALES del ANEXO I de Parque Fórum (11 zonas,
+> 4 partidas): las cantidades que calcula la app salen **93,80 / 28,50 / 112,25 / 244,69**,
+> idénticas al PDF original.
+>
+> **PRES-3 — Anexo fotográfico por zonas.** Tabla `cons_budget_photos` que NO duplica el
+> fichero: apunta a la foto ya subida al proyecto y le añade zona, pie y orden. Panel
+> "Fotos" en el presupuesto con selector de miniaturas, y **ANEXO II. REPORTAJE
+> FOTOGRÁFICO** en el PDF, agrupado por zona y con pie numerado ("Foto 1. …").
+> Las fotos se **reescalan a 1100 px y se pasan a JPEG**: una de móvil de 4000×3000 entra
+> como 29 KB, y veinte fotos son 0,56 MB en vez de 5,19 MB. Si una foto no carga, se salta
+> en lugar de romper el PDF.
+> *Un aviso para el futuro*: el día anterior di por fallado el guardado de zona/pie porque
+> disparando el `blur` desde la consola no llega al `onBlur` de React (escucha `focusout`).
+> **Escribiendo con el teclado de verdad sí guarda.** Si una prueba por consola dice que
+> algo no se guarda, comprobarlo a mano antes de tocar el código.
+>
+> **PRES-5 — GG + BI y cuadro de descompuestos.** `overhead_pct` y `profit_pct` llevaban
+> desde el principio en la BD y en Ajustes **sin usarse en ningún cálculo**. Ahora, si se
+> ponen a más de 0, el presupuesto pasa a ser **por contrata**: PEM → GG → BI → **PEC** →
+> IVA → TOTAL (el IVA sobre el PEC), la portada dice "DE EJECUCIÓN POR CONTRATA" y el panel
+> de totales enseña los dos porcentajes con su importe. A 0 —como nacen los presupuestos
+> nuevos— no cambia nada. Y **ANEXO III. CUADRO DE PRECIOS DESCOMPUESTOS**, por partida,
+> **solo con "Versión interna" activada**: son COSTES, no precio de venta, y al cliente no
+> se le mandan (comprobado: con la versión interna apagada el documento pasa de 9 a 8
+> páginas y el anexo desaparece). Nuevo endpoint `GET /budgets/:id/breakdown`.
+>
+> **⚠️ Cambio de comportamiento de PRES-5**: un presupuesto que YA tuviera GG/BI guardados
+> distintos de 0 pasa a calcular PEC y **su total sube**. Los que crea la app nacen con 0,
+> pero conviene mirar el panel de totales de los presupuestos que ya existan: ahora se ve
+> el % y el importe de cada concepto, y se pone a 0 si no se quiere.
+>
+> **Verificado en ejecución** (Docker + frontend dev + login real): GG 13% y BI 6% sobre un
+> PEM de 7.179,47 € dan 933,33 + 430,77 → PEC 8.543,57 → IVA 1.794,15 → **TOTAL 10.337,72 €**,
+> lo mismo en el panel, en el lateral de la vista previa y en el PDF, con el total en letra
+> al día; el cuadro de descompuestos con 4 líneas y coste/ud 18,76 € (igual que el endpoint);
+> el ANEXO II con las fotos por zona y sus pies. `npm test` **39/39** y `tsc --noEmit` limpio.
+>
+> **El bloque PRES queda cerrado** (PRES-1 a PRES-5). Nada pusheado todavía.
+>
+>
+> ### Anterior (2026-11-09): PARSE-1 — un PDF de presupuesto ajeno daba error al importar
 > **Síntoma de Benjamin**: "ayer intenté subir este pdf para un proyecto nuevo y me dio error;
 > yo pienso que será porque tiene imágenes". El PDF: `Presupuesto_2026-023_Parque_Forum.pdf`
 > (23 páginas, 2,6 MB; lo redactó su hermano con ChatGPT para un cliente).
@@ -818,13 +870,13 @@ Lo que **NO** tenemos, en orden de "más valor por menos trabajo":
   CIF y dirección*. Hoy `cons_projects` solo guarda `client_name` y `client_contact` (texto
   libre) y al PDF solo se le pasa `projectName`. → Campos de cliente (nombre fiscal, NIF,
   dirección) + bloque en portada. **Pequeño.**
-- **PRES-2 · Anexo de mediciones.** El PDF ajeno trae *ANEXO I: mediciones por zona* (tabla
+- ~~**PRES-2 · Anexo de mediciones.**~~ **HECHO 2026-11-10** (tabla por zona). El PDF ajeno trae *ANEXO I: mediciones por zona* (tabla
   zonas × conceptos con totales por columna). Nosotros ya guardamos y editamos mediciones por
   partida (`cons_measurements`: uds/largo/ancho/alto/parcial) pero **no salen en el PDF** y no
   existe el concepto de **zona**. Dos tamaños: (a) imprimir las mediciones que ya hay como
   anexo por partida — **pequeño**; (b) añadir *zona* a la medición y sacar la tabla cruzada por
   zona como la del PDF — **mediano** (BD + UI + PDF).
-- **PRES-3 · Anexo fotográfico por zonas.** *ANEXO II*: 17 páginas de fotos numeradas agrupadas
+- ~~**PRES-3 · Anexo fotográfico por zonas.**~~ **HECHO 2026-11-10**. *ANEXO II*: 17 páginas de fotos numeradas agrupadas
   por zona. Hoy las fotos son ficheros del proyecto (`cons_project_files.category='photo'`) sin
   vínculo a capítulo, partida ni zona, y el PDF **no inserta ninguna imagen** salvo el logo.
   → Vincular foto ↔ zona/partida + sección de anexo con rejilla y pie de foto. **Mediano**
@@ -834,7 +886,7 @@ Lo que **NO** tenemos, en orden de "más valor por menos trabajo":
   ninguna parte**: se escribe, sale en ese PDF y se pierde al cerrar. → Persistirlo en el
   presupuesto (`cons_budgets.notes` está libre y sin uso) y/o una plantilla en Ajustes.
   **Pequeño y se nota en cada presupuesto.**
-- **PRES-5 · GG + BI y cuadro de descompuestos.** `overhead_pct` (13) y `profit_pct` (6) están
+- ~~**PRES-5 · GG + BI y cuadro de descompuestos.**~~ **HECHO 2026-11-10** (opcional, a 0 no cambia nada). `overhead_pct` (13) y `profit_pct` (6) están
   en la BD y en Ajustes pero **no se usan en ningún cálculo ni en el PDF**: el presupuesto va
   PEM → IVA → TOTAL, sin PEC. Y `cons_price_breakdown` (mano de obra / material / maquinaria /
   subcontrata) tiene UI pero tampoco se imprime. → Decidir si el presupuesto es **PEM** (como
