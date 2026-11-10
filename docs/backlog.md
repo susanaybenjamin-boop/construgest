@@ -46,6 +46,21 @@
 >
 >
 >
+>
+> **RELEASE v0.5.2 PUBLICADA (2026-11-10).** Bump en los tres `package.json` + lock, merge
+> `--no-ff` a `develop` (`cf5ff9f`), ramas pusheadas y release con `ConstruGest-0.5.2.msi`
+> (453 MB), **Latest** según la API. Benjamin confirmó el arrastre con el ratón antes de sacarla.
+>
+> **Comprobado antes de publicar**: gate de secretos (1.555 ficheros, sin credenciales); la
+> tabla `File` del instalador (4.964 ficheros) lleva las **7 migraciones** y **cero
+> credenciales**; y el frontend compilado que va dentro del paquete **contiene el código nuevo**
+> (`cg-drag-handle` aparece en los chunks de `resources/frontend/.next`), que es la forma de
+> asegurarse de que el build cogió los cambios y no una caché vieja.
+>
+> **REL-CLEAN**: borrado el `.msi` local de 0.5.0; quedan **0.5.1 (anterior) y 0.5.2 (actual)**.
+>
+> **Entorno de pruebas cerrado**: Docker abajo y los puertos 3000, 3001, 5000 y 3308 libres.
+>
 > **COND-4 (2026-11-10, noche): varias cláusulas de una vez y párrafos que se arrastran.**
 > Dos peticiones de Benjamin sobre el capítulo de condiciones:
 > - **Selección múltiple**: se marcan varias cláusulas y entran juntas. Cada una pide **sus**
@@ -69,11 +84,11 @@
 > plazo en 48 horas entran con sus datos; el tirador aparece al pasar por encima; y arrastrando
 > "LAS PARTIDAS VALORADAS A CERO" del quinto al primer puesto queda reordenado, sin perder ni
 > duplicar, y **así se guarda en la base de datos**.
-> ⚠️ El arrastre se probó lanzando **eventos de arrastre reales** sobre el editor, porque el
-> arrastre sintético del navegador de pruebas no dispara el drag-and-drop nativo. La lógica está
-> verificada de punta a punta, pero **falta probarlo con el ratón**.
+> El arrastre se probó lanzando **eventos de arrastre reales** sobre el editor (el arrastre
+> sintético del navegador de pruebas no dispara el drag-and-drop nativo), y **Benjamin lo
+> confirmó después con el ratón** antes de publicar la 0.5.2.
 >
-> **Pendiente**: COND-4 no está en la 0.5.1 (se publicó antes). Va en la siguiente.
+> **Publicado en la v0.5.2** (ver arriba).
 >
 > **RELEASE v0.5.1 PUBLICADA (2026-11-10).** Bump en los tres `package.json` + lock, merge
 > `--no-ff` a `develop` (`b58e944`), las dos ramas **pusheadas** y release en GitHub con
