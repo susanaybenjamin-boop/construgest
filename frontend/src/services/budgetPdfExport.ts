@@ -4,6 +4,7 @@
  * Ported from the desktop (Tauri) app styling
  */
 import type { FullBudget, ChapterWithItems } from '@/types'
+import { resolvePartidaRefs } from '@/lib/partidaRefs'
 import { AFM_DATA } from './afmData'
 import { ROBOTO_BOLD_DATA } from './robotoBoldData'
 
@@ -729,7 +730,12 @@ function buildBudgetDocDefinition(
     }
 
     if (isLegalText && ch.chapter.description) {
-      const richContent = htmlToPdfmake(ch.chapter.description, contentWidth)
+      // COND-3: las referencias a partidas se resuelven TAMBIÉN aquí, con la
+      // misma función que usa el editor, para que el PDF nunca imprima un
+      // código viejo aunque el texto guardado se haya quedado atrás.
+      const richContent = htmlToPdfmake(
+        resolvePartidaRefs(ch.chapter.description, budget.chapters), contentWidth,
+      )
       if (richContent.length > 0) {
         chapterPages.push(...richContent)
         if (ch.items.length > 0) {
@@ -911,6 +917,20 @@ function buildBudgetDocDefinition(
     { id: 'budget-summary', text: 'RESUMEN DE PRESUPUESTO', fontSize: 18, bold: true, color: COLORS.primary, margin: [0, 0, 0, 12] },
   ]
 
+  // PDF-3 — El CIERRE del resumen (cuadro de totales + total en letra + firma)
+  // viaja SIEMPRE junto, en un bloque `unbreakable`.
+  //
+  // OJO con `unbreakable`: pdfmake NO soporta bloques de más de una página
+  // ("no support for multi-page unbreakableBlocks", PageElementWriter.js:115)
+  // y se queda SOLO con la primera, perdiendo el resto en silencio. Por eso se
+  // usa únicamente en el cierre, que es corto y acotado, y NUNCA en la tabla de
+  // capítulos, que puede ser larguísima. La tabla de capítulos de
+  // arriba sí puede partirse: es una lista. Antes cada pieza era un nodo suelto
+  // y, en horizontal (el área útil son ~475 pt), al no caber se descolgaba una
+  // sola —primero la firma, y desde que el resumen tiene GG/BI/PEC, el cuadro
+  // de totales— dejando una página con el total arriba y el resto en blanco.
+  const cierreResumen: any[] = []
+
   // Chapter summary table
   const summaryBody: any[][] = showPrices
     ? [[
@@ -1020,7 +1040,7 @@ function buildBudgetDocDefinition(
       { text: fmtCurrency(grandTotal), fontSize: 16, bold: true, color: COLORS.white, fillColor: COLORS.primary, alignment: 'right', margin: [8, 10, 8, 10] },
     ])
 
-    summaryPage.push({
+    cierreResumen.push({
       table: {
         widths: ['*', 140],
         body: calcRows,
@@ -1034,7 +1054,7 @@ function buildBudgetDocDefinition(
     })
 
     if (ivaRate === 0) {
-      summaryPage.push({
+      cierreResumen.push({
         // PRES-5: con GG/BI el documento ya no es "de ejecucion material".
         text: usaPec
           ? 'Los importes corresponden al Presupuesto de Ejecucion por Contrata, sin IVA.'
@@ -1047,7 +1067,7 @@ function buildBudgetDocDefinition(
     }
 
     // Legal text
-    summaryPage.push({
+    cierreResumen.push({
       text: [
         { text: 'Asciende el presente presupuesto a la expresada cantidad de ', fontSize: 10, color: COLORS.text },
         { text: numberToWords(grandTotal), bold: true, fontSize: 10, color: COLORS.primary },
@@ -1061,7 +1081,7 @@ function buildBudgetDocDefinition(
   // atomic. dontBreakRows prevents pdfmake from splitting the canvas (lines) from the text
   // labels (which used to land alone on a near-empty extra page in landscape).
   const fullAddress = [companyCity, companyProvince].filter(Boolean).join(', ')
-  summaryPage.push({
+  cierreResumen.push({
     table: {
       widths: ['*'],
       body: [[
@@ -1100,6 +1120,11 @@ function buildBudgetDocDefinition(
     },
     layout: 'noBorders',
   })
+
+  // El cierre entero, como una sola pieza: si no cabe en lo que queda de
+  // página, pdfmake lo pasa COMPLETO a la siguiente en vez de descolgar un
+  // trozo y dejar media página en blanco.
+  summaryPage.push({ stack: cierreResumen, unbreakable: true })
 
   // ─── General Conditions (New Page) ─────────────────────────────────
   if (generalConditions && generalConditions.trim()) {
@@ -1454,9 +1479,20 @@ function buildBudgetDocDefinition(
     // Note: orphan chapter banners are handled structurally — banner + column headers + at
     // least one data row are part of the same table with `keepWithHeaderRows: 1`.
     pageBreakBefore: (currentNode: any) => {
-      if (currentNode.id === 'budget-summary' || currentNode.id === 'budget-conditions') {
+      // PDF-3 — El RESUMEN ya NO fuerza página nueva.
+      //
+      // Antes sí, y en horizontal (área útil ~475 pt) el resumen no cabía
+      // entero: la página del resumen se quedaba con el título y una tabla de
+      // dos filas, y el cuadro de totales se descolgaba a otra página casi en
+      // blanco. Ahora el resumen arranca donde toque y lo único que viaja
+      // entero es el cierre (totales + total en letra + firma), que es corto.
+      //
+      // Las CONDICIONES sí siguen empezando en página nueva: son un texto
+      // largo y propio, no la cola de una tabla.
+      if (currentNode.id === 'budget-conditions') {
         const top = currentNode?.startPosition?.top ?? 0
-        // Top margin is 60pt; anything below ~100pt means the node is not at the page top.
+        // El margen superior es de 60 pt; por debajo de ~100 pt el nodo ya no
+        // está al principio de la página.
         return top > 100
       }
       return false

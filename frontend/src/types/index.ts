@@ -584,6 +584,21 @@ export interface BudgetPhoto {
   } | null;
 }
 
+// COND-1: clausula reutilizable para el capitulo de condiciones. `body` es HTML
+// y puede llevar huecos {{etiqueta|valor}} que se piden al insertarla.
+export interface ConditionClause {
+  id: string;
+  organization_id: string;
+  block: 'general' | 'economica' | 'exclusion';
+  tag: string | null;
+  title: string;
+  body: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Supplier {
   id: string;
   organization_id: string;

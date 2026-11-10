@@ -7,6 +7,8 @@ import TextAlign from '@tiptap/extension-text-align'
 import { TextStyle, Color } from '@tiptap/extension-text-style'
 import Highlight from '@tiptap/extension-highlight'
 import { useRef, useCallback, useEffect } from 'react'
+import type { Editor } from '@tiptap/react'
+import { PartidaRef } from './partidaRefExtension'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   Heading1, Heading2, Heading3, Pilcrow,
@@ -19,6 +21,11 @@ interface Props {
   content: string
   onChange: (html: string) => void
   placeholder?: string
+  /**
+   * COND-2/3 — Botones extra al final de la barra (añadir cláusula, referenciar
+   * una partida). Reciben el editor para poder insertar donde está el cursor.
+   */
+  extraTools?: (editor: Editor) => React.ReactNode
 }
 
 // Toolbar button component
@@ -56,7 +63,7 @@ function Sep() {
 
 const ICON = 'w-4 h-4'
 
-export default function RichTextEditor({ content, onChange, placeholder }: Props) {
+export default function RichTextEditor({ content, onChange, placeholder, extraTools }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const handleUpdate = useCallback(
@@ -77,6 +84,10 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
   }, [])
 
   const editor = useEditor({
+    // Next renderiza este componente también en el servidor y TipTap 3 aborta
+    // con "SSR has been detected" si no se le dice que NO pinte de inmediato.
+    // Sin esto, abrir el capítulo de condiciones revienta la pantalla.
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
@@ -86,6 +97,8 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
       TextStyle,
       Color,
       Highlight.configure({ multicolor: true }),
+      // COND-3: referencia viva a una partida del presupuesto.
+      PartidaRef,
     ],
     content: content || '',
     editorProps: {
@@ -210,6 +223,13 @@ export default function RichTextEditor({ content, onChange, placeholder }: Props
         <TBtn onClick={() => editor.chain().focus().redo().run()} title="Rehacer (Ctrl+Y)">
           <Redo2 className={ICON} />
         </TBtn>
+
+        {extraTools && (
+          <>
+            <Sep />
+            {extraTools(editor)}
+          </>
+        )}
       </div>
 
       {/* ─── Editor Content ─── */}
