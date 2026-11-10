@@ -42,7 +42,24 @@
 > `01.99 PINTURA DE TECHOS Y ESCALERAS` actualiza sola la condición **en pantalla y en el
 > PDF**; borrarla deja `[partida eliminada]` con su aviso. `npm test` **39/39**, `tsc` limpio.
 >
-> **Pendiente**: esto NO está en la 0.5.0 (se publicó antes). Va en la siguiente versión.
+> **Publicado en la v0.5.1** (ver abajo).
+>
+>
+> **RELEASE v0.5.1 PUBLICADA (2026-11-10).** Bump en los tres `package.json` + lock, merge
+> `--no-ff` a `develop` (`b58e944`), las dos ramas **pusheadas** y release en GitHub con
+> `ConstruGest-0.5.1.msi` (453 MB), **Latest** según la API.
+>
+> **Comprobado antes de publicar**: gate de secretos (1.555 ficheros, sin credenciales) y,
+> leyendo la tabla `File` del instalador (4.964 ficheros), que viaja dentro **la migración
+> nueva `005_clausulas_condiciones`** junto a las cuatro anteriores, y **cero credenciales**.
+>
+> **REL-CLEAN**: borrado el `.msi` local de 0.4.9; quedan **0.5.0 (anterior) y 0.5.1 (actual)**.
+> Los publicados en GitHub, intactos.
+>
+> **Al instalar, mirar**: que el log diga `[migraciones] aplicadas 1: 005_clausulas_condiciones.sql`
+> **una sola vez**; que en Panel → **Cláusulas** aparezcan las 16 cláusulas; y que al abrir el
+> capítulo de condiciones de un presupuesto salgan los botones **Cláusula** y **Partida**
+> (antes de esta versión, abrir ese capítulo dejaba la pantalla en blanco).
 >
 > ### Anterior (2026-11-10): PRES-2 + PRES-3 + PRES-5: el bloque PRES, cerrado
 >
