@@ -54,6 +54,34 @@
 > **El bloque PRES queda cerrado** (PRES-1 a PRES-5). Nada pusheado todavía.
 >
 >
+>
+> **RELEASE v0.5.0 PUBLICADA (2026-11-10).** Versión de funciones, no parche. Bump en los
+> tres `package.json` + lock del backend, merge `--no-ff` a `develop` (`585fce3`), las dos
+> ramas **pusheadas** a `origin` y release en GitHub con
+> `ConstruGest-0.5.0.msi` (453 MB), marcada **Latest** por la API.
+>
+> **Comprobado ANTES de publicar** (lo que importaba de esta versión):
+> - **Gate de secretos**: 1.529 ficheros revisados, sin credenciales.
+> - **Las 4 migraciones viajan DENTRO del `.msi`** — leída la tabla `File` del instalador
+>   (4.938 ficheros): `001_clientes`, `002_condiciones_oferta`, `003_zona_mediciones` y
+>   `004_anexo_fotografico`. Era lo crítico: si no viajaran, la base de datos ya instalada
+>   no recibiría las columnas nuevas y el backend daría errores de SQL. En la misma lectura,
+>   **cero ficheros de credenciales**.
+> - Las dos migraciones viejas de Supabase también están en el paquete (viven en
+>   `backend/migrations/`, no en `migrations/mariadb/`), pero el migrador **no las ejecuta**
+>   y hay un test que lo vigila.
+>
+> **REL-CLEAN**: borrado el `.msi` local de 0.4.8 (−452,9 MB); en `desktop/dist` quedan
+> **0.4.9 (anterior) y 0.5.0 (actual)**. Los `.msi` publicados en GitHub no se han tocado
+> (0.4.6 a 0.5.0).
+>
+> **PENDIENTE**: Benjamin instala la 0.5.0 desde el aviso de la propia app y prueba en
+> producción. Lo primero que hay que mirar al arrancar: el log debe decir
+> `[migraciones] aplicadas 4: …` **una sola vez**, y a partir de ahí ninguna. Después:
+> el selector de cliente en Ajustes del proyecto, el panel de Fotos, y el PDF con sus
+> anexos. **Ojo al panel de totales de los presupuestos que ya existan**: si alguno tiene
+> gastos generales o beneficio industrial distintos de 0, ahora calcula PEC y su total sube.
+>
 > ### Anterior (2026-11-09): PARSE-1 — un PDF de presupuesto ajeno daba error al importar
 > **Síntoma de Benjamin**: "ayer intenté subir este pdf para un proyecto nuevo y me dio error;
 > yo pienso que será porque tiene imágenes". El PDF: `Presupuesto_2026-023_Parque_Forum.pdf`
