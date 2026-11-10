@@ -27,7 +27,7 @@ import { CSS } from '@dnd-kit/utilities'
 import {
   Plus, Loader2, Calculator, ChevronDown, ChevronRight,
   Trash2, FileDown, FileUp, Send, Check, RotateCcw, GripVertical, BookmarkPlus, Eye, EyeOff, X,
-  ArrowRightLeft, FileText, List, Library, Search, Undo2, Images
+  ArrowRightLeft, FileText, List, Library, Search, Undo2, Images, Link2
 } from 'lucide-react'
 import type { PricePickMessage } from '@/types'
 import { formatCurrency } from '@/lib/utils'
@@ -38,6 +38,10 @@ import ImportFromLibraryDialog from '@/components/budget/ImportFromLibraryDialog
 import PickFromLibraryDialog from '@/components/budget/PickFromLibraryDialog'
 import BudgetPdfPreviewModal from '@/components/budget/BudgetPdfPreviewModal'
 import BudgetPhotosPanel from '@/components/budget/BudgetPhotosPanel'
+import ClausePickerDialog from '@/components/budget/ClausePickerDialog'
+import PartidaRefDialog from '@/components/budget/PartidaRefDialog'
+import { resolvePartidaRefs, countMissingRefs } from '@/lib/partidaRefs'
+import type { Editor } from '@tiptap/react'
 import ChapterMappingDialog from '@/components/budget/ChapterMappingDialog'
 import BudgetComparisonModal from '@/components/budget/BudgetComparisonModal'
 import BudgetTrashModal from '@/components/budget/BudgetTrashModal'
@@ -177,6 +181,10 @@ export default function BudgetPage() {
   const [showChapterMapping, setShowChapterMapping] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
+  // COND-2/3 — diálogos del capítulo de condiciones. Se guarda el editor en el
+  // que se pulsó el botón para insertar justo donde está el cursor.
+  const [clauseEditor, setClauseEditor] = useState<Editor | null>(null)
+  const [refEditor, setRefEditor] = useState<Editor | null>(null)
   const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null)
   const [deletingInProgress, setDeletingInProgress] = useState(false)
   const [editingChapterCode, setEditingChapterCode] = useState<string | null>(null)
@@ -1270,13 +1278,41 @@ export default function BudgetPage() {
                   {ch.chapter.is_legal_text ? (
                     <div className="px-6 py-4 border-b border-gray-100 bg-amber-50/30">
                       <RichTextEditor
-                        content={ch.chapter.description || ''}
+                        content={resolvePartidaRefs(ch.chapter.description || '', activeBudget.chapters)}
                         onChange={(html) => handleChapterDescriptionBlur(ch.chapter.id, html)}
                         placeholder="Escriba aquí el texto legal, condiciones generales, normativa..."
+                        extraTools={(editor) => (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setClauseEditor(editor)}
+                              title="Añadir una cláusula de la biblioteca"
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 rounded transition"
+                            >
+                              <List className="w-3.5 h-3.5" /> Cláusula
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRefEditor(editor)}
+                              title="Referenciar una partida del presupuesto"
+                              className="flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 rounded transition"
+                            >
+                              <Link2 className="w-3.5 h-3.5" /> Partida
+                            </button>
+                          </>
+                        )}
                       />
                       <p className="text-[11px] text-gray-400 mt-1">
                         Capítulo de texto legal — use la barra de herramientas para dar formato.
+                        Con <strong>Cláusula</strong> inserta textos de la biblioteca y con{' '}
+                        <strong>Partida</strong> una referencia que se actualiza sola.
                       </p>
+                      {countMissingRefs(ch.chapter.description || '', activeBudget.chapters) > 0 && (
+                        <p className="text-[11px] text-red-600 mt-1">
+                          Hay {countMissingRefs(ch.chapter.description || '', activeBudget.chapters)} referencia(s)
+                          a partidas que ya no existen: aparecen como [partida eliminada].
+                        </p>
+                      )}
                     </div>
                   ) : (
                     /* Normal chapter — show items with drag-and-drop */
@@ -1550,6 +1586,17 @@ export default function BudgetPage() {
       {/* PDF Preview Modal + anexo fotografico */}
       {activeBudget && (
         <>
+        <ClausePickerDialog
+          isOpen={clauseEditor !== null}
+          onClose={() => setClauseEditor(null)}
+          onInsert={(html) => clauseEditor?.chain().focus().insertContent(html).run()}
+        />
+        <PartidaRefDialog
+          isOpen={refEditor !== null}
+          onClose={() => setRefEditor(null)}
+          chapters={activeBudget.chapters}
+          onPick={(ref) => refEditor?.chain().focus().insertPartidaRef(ref).run()}
+        />
         <BudgetPhotosPanel
           isOpen={showPhotos}
           onClose={() => setShowPhotos(false)}

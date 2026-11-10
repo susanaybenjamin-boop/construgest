@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import {
   Building2, LayoutDashboard, Library, Truck, Settings,
   LogOut, Loader2, HardHat, Users, GitBranch, Mail,
-  Trash2, Contact,
+  Trash2, Contact, ScrollText,
 } from 'lucide-react'
 import NotificationBell from '@/components/ui/NotificationBell'
 import UpdateBanner from '@/components/ui/UpdateBanner'
@@ -26,6 +26,7 @@ const navItems = [
   { key: 'branches', label: 'Sucursales', icon: GitBranch, href: '/admin/branches' },
   { key: 'mailbox', label: 'Buzón', icon: Mail, href: '/admin/mailbox' },
   { key: 'clients', label: 'Clientes', icon: Contact, href: '/admin/clients' },
+  { key: 'clauses', label: 'Cláusulas', icon: ScrollText, href: '/admin/clauses' },
   { key: 'suppliers', label: 'Proveedores', icon: Truck, href: '/admin/suppliers' },
   { key: 'subcontractors', label: 'Subcontratas', icon: HardHat, href: '/admin/subcontractors' },
   { key: 'settings', label: 'Configuración', icon: Settings, href: '/admin/settings' },

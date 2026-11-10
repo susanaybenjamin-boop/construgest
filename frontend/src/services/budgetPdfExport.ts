@@ -4,6 +4,7 @@
  * Ported from the desktop (Tauri) app styling
  */
 import type { FullBudget, ChapterWithItems } from '@/types'
+import { resolvePartidaRefs } from '@/lib/partidaRefs'
 import { AFM_DATA } from './afmData'
 import { ROBOTO_BOLD_DATA } from './robotoBoldData'
 
@@ -729,7 +730,12 @@ function buildBudgetDocDefinition(
     }
 
     if (isLegalText && ch.chapter.description) {
-      const richContent = htmlToPdfmake(ch.chapter.description, contentWidth)
+      // COND-3: las referencias a partidas se resuelven TAMBIÉN aquí, con la
+      // misma función que usa el editor, para que el PDF nunca imprima un
+      // código viejo aunque el texto guardado se haya quedado atrás.
+      const richContent = htmlToPdfmake(
+        resolvePartidaRefs(ch.chapter.description, budget.chapters), contentWidth,
+      )
       if (richContent.length > 0) {
         chapterPages.push(...richContent)
         if (ch.items.length > 0) {
