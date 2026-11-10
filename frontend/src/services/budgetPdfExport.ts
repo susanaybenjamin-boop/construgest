@@ -1212,7 +1212,7 @@ function buildBudgetDocDefinition(
 
     annexPages.push({
       id: 'budget-annex-photos',
-      text: 'ANEXO II. REPORTAJE FOTOGRAFICO',
+      text: 'ANEXO II. REPORTAJE FOTOGRÁFICO',
       fontSize: 16,
       bold: true,
       color: COLORS.primary,
