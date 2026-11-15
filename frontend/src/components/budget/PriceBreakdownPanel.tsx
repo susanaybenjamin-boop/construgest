@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PriceBreakdownLine } from '@/types'
 import api from '@/lib/api'
 import { formatCurrency, parseLocaleNumber } from '@/lib/utils'
@@ -14,6 +14,15 @@ interface Props {
   itemName: string
   isOpen: boolean
   onClose: () => void
+  /**
+   * A1: se llama al cerrar SI se ha tocado alguna línea, para que quien abrió
+   * el panel recargue el presupuesto y la fila enseñe el coste y el margen
+   * nuevos sin que el usuario pulse refrescar.
+   *
+   * No basta con el realtime: si el WebSocket está caído (pasa al reiniciar el
+   * backend), la fila se quedaba con el coste viejo.
+   */
+  onChanged?: () => void
 }
 
 const RESOURCE_TYPES = [
@@ -42,7 +51,20 @@ function getResourceConfig(type: string) {
   return RESOURCE_TYPES.find((r) => r.value === type) || RESOURCE_TYPES[4]
 }
 
-export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose }: Props) {
+export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose, onChanged }: Props) {
+  // A1: ¿se ha tocado alguna línea mientras estaba abierto? Si sí, al cerrar
+  // hay que avisar para que la fila recargue su coste y su margen.
+  const dirty = useRef(false)
+
+  /** Cierra avisando (una sola recarga por sesión de edición, no por tecla). */
+  const handleClose = () => {
+    if (dirty.current) {
+      dirty.current = false
+      onChanged?.()
+    }
+    onClose()
+  }
+
   const [lines, setLines] = useState<PriceBreakdownLine[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -82,6 +104,7 @@ export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose 
         sort_order: lines.length,
       })
       setLines([...lines, res.data])
+      dirty.current = true
       setNewLine({ resource_type: 'material', description: '', unit: 'ud', quantity: 1, unit_cost: 0 })
       setAdding(false)
     } catch (err) {
@@ -106,6 +129,7 @@ export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose 
 
     try {
       await api.put(`/budgets/breakdown/${id}`, { [field]: val })
+      dirty.current = true
     } catch (err) {
       console.error('Error updating breakdown line:', err)
       loadBreakdown() // Revert on error
@@ -116,6 +140,7 @@ export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose 
     setLines((prev) => prev.filter((l) => l.id !== id))
     try {
       await api.delete(`/budgets/breakdown/${id}`)
+      dirty.current = true
     } catch (err) {
       console.error('Error deleting breakdown line:', err)
       loadBreakdown()
@@ -143,7 +168,7 @@ export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose 
             <h2 className="text-lg font-semibold text-gray-900">Descomposición de Precio</h2>
             <p className="text-sm text-gray-500">{itemName}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition">
+          <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -398,7 +423,7 @@ export default function PriceBreakdownPanel({ itemId, itemName, isOpen, onClose 
             )}
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition text-sm"
           >
             Cerrar

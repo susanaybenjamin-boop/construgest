@@ -5,6 +5,7 @@
  */
 import type { FullBudget, ChapterWithItems } from '@/types'
 import { resolvePartidaRefs } from '@/lib/partidaRefs'
+import { amountToWords } from '@/lib/utils'
 import { AFM_DATA } from './afmData'
 import { ROBOTO_BOLD_DATA } from './robotoBoldData'
 
@@ -101,50 +102,31 @@ const fmtCurrency = (n: number) =>
 const chTotal = (ch: ChapterWithItems) =>
   ch.chapter.is_legal_text ? 0 : ch.items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0)
 
-const numberToWords = (n: number): string => {
-  const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE']
-  const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE']
-  const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
-  const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS']
+/**
+ * B1 — Reparte `total` entre varias partes, en proporcion a sus pesos, de forma
+ * que los importes redondeados a 2 decimales sumen EXACTAMENTE `total`.
+ *
+ * La diferencia de redondeo se le da a la parte mas grande (es donde menos se
+ * nota). Hace falta porque el Cuadro de Precios nº 2 tiene que sumar el mismo
+ * importe que el nº 1: si se descuadra un centimo, el documento esta mal.
+ */
+const repartirProporcional = (pesos: number[], total: number): number[] => {
+  const suma = pesos.reduce((s, p) => s + p, 0)
+  if (pesos.length === 0) return []
+  if (suma <= 0) return pesos.map(() => 0)
 
-  if (n === 0) return 'CERO'
-  const integer = Math.floor(n)
-  const decimal = Math.round((n - integer) * 100)
+  const importes = pesos.map((p) => Math.round(((p / suma) * total) * 100) / 100)
+  const sumaRedondeada = importes.reduce((s, r) => s + r, 0)
+  const diferencia = Math.round((total - sumaRedondeada) * 100) / 100
 
-  const convertGroup = (num: number): string => {
-    if (num === 0) return ''
-    if (num === 100) return 'CIEN'
-    let result = ''
-    let r = num
-    if (r >= 100) { result += hundreds[Math.floor(r / 100)] + ' '; r %= 100 }
-    if (r >= 20) {
-      result += tens[Math.floor(r / 10)]
-      if (r % 10 !== 0) result += ' Y ' + units[r % 10]
-    } else if (r >= 10) {
-      result += teens[r - 10]
-    } else if (r > 0) {
-      result += units[r]
-    }
-    return result.trim()
+  if (diferencia !== 0) {
+    let mayor = 0
+    for (let i = 1; i < importes.length; i++) if (importes[i] > importes[mayor]) mayor = i
+    importes[mayor] = Math.round((importes[mayor] + diferencia) * 100) / 100
   }
-
-  let text = ''
-  if (integer >= 1000000) {
-    const millions = Math.floor(integer / 1000000)
-    text += (millions === 1 ? 'UN MILLÓN' : convertGroup(millions) + ' MILLONES') + ' '
-  }
-  const remainder = integer % 1000000
-  if (remainder >= 1000) {
-    const thousands = Math.floor(remainder / 1000)
-    text += (thousands === 1 ? 'MIL' : convertGroup(thousands) + ' MIL') + ' '
-  }
-  const lastThree = remainder % 1000
-  if (lastThree > 0) text += convertGroup(lastThree)
-
-  text = text.trim() + ' EUROS'
-  if (decimal > 0) text += ' CON ' + convertGroup(decimal) + ' CÉNTIMOS'
-  return text
+  return importes
 }
+
 
 // ─── HTML → pdfmake converter (for rich text chapters) ─────────────────
 
@@ -387,6 +369,23 @@ export interface BudgetPdfOptions {
   /** PRES-2: anexo con la tabla de mediciones por zona al final del documento. */
   includeMeasurementsAnnex?: boolean
   /**
+   * B1: CUADRO DE PRECIOS Nº 1 — cada unidad de obra con su precio en cifra y
+   * EN LETRA. Es documento contractual, asi que va con el precio de VENTA y se
+   * puede entregar al cliente. Por defecto apagado: es largo y no siempre se pide.
+   */
+  includePriceSchedule1?: boolean
+  /**
+   * B1: CUADRO DE PRECIOS Nº 2 — cada unidad de obra desglosada por naturalezas
+   * (mano de obra, maquinaria, materiales).
+   *
+   * OJO con de donde salen las cifras: en Construgest la descomposicion es
+   * COSTE y el precio impreso es VENTA, asi que las naturalezas se ESCALAN en
+   * proporcion hasta sumar el precio de venta (decision de Benjamin, 2026-11-15).
+   * Asi el documento cuadra con el Cuadro nº 1 y no deja deducir el margen.
+   * Una partida sin descomposicion sale entera como "Resto de obra".
+   */
+  includePriceSchedule2?: boolean
+  /**
    * PRES-3: fotos del anexo fotografico, YA cargadas y reescaladas
    * (generateBudgetPdfBlob las prepara a partir de `photoSources`).
    */
@@ -434,6 +433,8 @@ function buildBudgetDocDefinition(
     showCosts = false,
     generalConditions,
     includeMeasurementsAnnex = true,
+    includePriceSchedule1 = false,
+    includePriceSchedule2 = false,
     photos = [],
     breakdown = [],
     client,
@@ -1070,7 +1071,7 @@ function buildBudgetDocDefinition(
     cierreResumen.push({
       text: [
         { text: 'Asciende el presente presupuesto a la expresada cantidad de ', fontSize: 10, color: COLORS.text },
-        { text: numberToWords(grandTotal), bold: true, fontSize: 10, color: COLORS.primary },
+        { text: amountToWords(grandTotal), bold: true, fontSize: 10, color: COLORS.primary },
         { text: '.', fontSize: 10, color: COLORS.text },
       ],
       margin: [0, 6, 0, 18],
@@ -1456,6 +1457,196 @@ function buildBudgetDocDefinition(
             dontBreakRows: true,
           })
         }
+      }
+    }
+  }
+
+  // ─── CUADRO DE PRECIOS Nº 1 ────────────────────────────────────────
+  // B1 — Documento CONTRACTUAL: cada unidad de obra con su precio en cifra y
+  // en letra. Lleva el precio de VENTA, asi que se le puede entregar al
+  // cliente (a diferencia del Anexo III, que son costes).
+  const capitulosConPartidas = chapters.filter(
+    (c) => !c.chapter.is_legal_text && c.items.length > 0
+  )
+
+  if (includePriceSchedule1 && showPrices && capitulosConPartidas.length > 0) {
+    annexPages.push({
+      id: 'budget-price-schedule-1',
+      text: 'CUADRO DE PRECIOS Nº 1',
+      fontSize: 16,
+      bold: true,
+      color: COLORS.primary,
+      margin: [0, 0, 0, 6],
+      pageBreak: 'before' as const,
+    })
+    annexPages.push({
+      text: 'Importe de cada unidad de obra, en cifra y en letra.',
+      fontSize: 9,
+      italics: true,
+      color: COLORS.muted,
+      margin: [0, 0, 0, 14],
+    })
+
+    for (const { chapter, items } of capitulosConPartidas) {
+      annexPages.push({
+        text: `Capítulo ${chapter.code}. ${chapter.name}`,
+        fontSize: 11,
+        bold: true,
+        color: COLORS.text,
+        margin: [0, 10, 0, 6],
+      })
+
+      const body: any[] = [
+        [
+          { text: 'Nº', fontSize: 7, bold: true, color: COLORS.muted },
+          { text: 'Ud.', fontSize: 7, bold: true, color: COLORS.muted },
+          { text: 'Designación', fontSize: 7, bold: true, color: COLORS.muted },
+          { text: 'Importe', fontSize: 7, bold: true, color: COLORS.muted, alignment: 'right' },
+        ],
+      ]
+
+      for (const it of items) {
+        body.push([
+          { text: it.code, fontSize: 8, bold: true, color: COLORS.text },
+          { text: it.unit || '', fontSize: 8, color: COLORS.muted },
+          { text: it.name, fontSize: 8, color: COLORS.text },
+          { text: fmtCurrency(it.unit_price), fontSize: 8, bold: true, color: COLORS.text, alignment: 'right' },
+        ])
+        // El importe en letra, que es lo que le da valor contractual al documento
+        body.push([
+          {},
+          {},
+          {
+            text: amountToWords(it.unit_price),
+            colSpan: 2,
+            fontSize: 7.5,
+            italics: true,
+            color: COLORS.muted,
+            margin: [0, 0, 0, 3],
+          },
+          {},
+        ])
+      }
+
+      annexPages.push({
+        table: { headerRows: 1, widths: [52, 30, '*', 62], body },
+        layout: {
+          hLineWidth: (i: number) => (i === 0 || i === 1 ? 0.8 : 0.3),
+          vLineWidth: () => 0,
+          hLineColor: () => COLORS.border,
+          // Solo se raya entre partidas, no entre la cifra y su letra
+          hLineStyle: (i: number) => (i > 1 && i % 2 === 1 ? { dash: { length: 1, space: 2 } } : null),
+          paddingTop: () => 2,
+          paddingBottom: () => 2,
+        },
+        margin: [0, 0, 0, 8],
+      })
+    }
+  }
+
+  // ─── CUADRO DE PRECIOS Nº 2 ────────────────────────────────────────
+  // B1 — Cada unidad de obra repartida por naturalezas. Las naturalezas salen
+  // de la descomposicion (que es COSTE) ESCALADAS hasta sumar el precio de
+  // VENTA: asi cuadra con el Cuadro nº 1 y no se deduce el margen.
+  if (includePriceSchedule2 && showPrices && capitulosConPartidas.length > 0) {
+    const ETIQUETA_NAT: Record<string, string> = {
+      labor: 'Mano de obra',
+      equipment: 'Maquinaria',
+      material: 'Materiales',
+      subcontract: 'Subcontrata',
+      other: 'Otros',
+    }
+    // Orden convencional del documento
+    const ORDEN_NAT = ['labor', 'equipment', 'material', 'subcontract', 'other']
+
+    const porItem = new Map<string, typeof breakdown>()
+    for (const l of breakdown) {
+      const lista = porItem.get(l.budget_item_id) || []
+      lista.push(l)
+      porItem.set(l.budget_item_id, lista)
+    }
+
+    annexPages.push({
+      id: 'budget-price-schedule-2',
+      text: 'CUADRO DE PRECIOS Nº 2',
+      fontSize: 16,
+      bold: true,
+      color: COLORS.primary,
+      margin: [0, 0, 0, 6],
+      pageBreak: 'before' as const,
+    })
+    annexPages.push({
+      text: 'Descomposición por naturalezas del importe de cada unidad de obra.',
+      fontSize: 9,
+      italics: true,
+      color: COLORS.muted,
+      margin: [0, 0, 0, 14],
+    })
+
+    for (const { chapter, items } of capitulosConPartidas) {
+      annexPages.push({
+        text: `Capítulo ${chapter.code}. ${chapter.name}`,
+        fontSize: 11,
+        bold: true,
+        color: COLORS.text,
+        margin: [0, 10, 0, 6],
+      })
+
+      for (const it of items) {
+        const lineas = porItem.get(it.id) || []
+
+        // Coste por naturaleza, en el orden convencional del documento
+        const porNaturaleza = new Map<string, number>()
+        for (const l of lineas) {
+          const importe = (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0)
+          porNaturaleza.set(l.resource_type, (porNaturaleza.get(l.resource_type) || 0) + importe)
+        }
+        const naturalezas = ORDEN_NAT
+          .filter((t) => (porNaturaleza.get(t) || 0) > 0)
+          .map((t) => ({ tipo: t, peso: porNaturaleza.get(t) || 0 }))
+
+        // Sin descomposicion (o toda a cero) no hay nada que repartir: el
+        // importe entero va a "Resto de obra", que es la linea de cajon.
+        const filas =
+          naturalezas.length > 0
+            ? repartirProporcional(naturalezas.map((n) => n.peso), it.unit_price)
+                .map((importe, i) => ({ etiqueta: ETIQUETA_NAT[naturalezas[i].tipo], importe }))
+            : [{ etiqueta: 'Resto de obra', importe: it.unit_price }]
+
+        annexPages.push({
+          table: {
+            widths: ['*', 62],
+            body: [
+              [
+                { text: `${it.code}  ${it.name}`, fontSize: 9, bold: true, color: COLORS.white },
+                { text: it.unit || '', fontSize: 8, color: COLORS.white, alignment: 'right' },
+              ],
+              ...filas.map((f) => [
+                { text: f.etiqueta, fontSize: 8, color: COLORS.text, margin: [10, 0, 0, 0] },
+                { text: fmtCurrency(f.importe), fontSize: 8, color: COLORS.text, alignment: 'right' },
+              ]),
+              [
+                { text: 'TOTAL POR UNIDAD', fontSize: 8, bold: true, color: COLORS.text },
+                { text: fmtCurrency(it.unit_price), fontSize: 8, bold: true, color: COLORS.text, alignment: 'right' },
+              ],
+            ],
+          },
+          layout: {
+            hLineWidth: (i: number, node: any) =>
+              (i === 0 || i === 1 || i === node.table.body.length - 1 || i === node.table.body.length) ? 0.8 : 0.3,
+            vLineWidth: () => 0,
+            hLineColor: () => COLORS.border,
+            fillColor: (rowIndex: number, node: any) => {
+              if (rowIndex === 0) return COLORS.primary
+              if (rowIndex === node.table.body.length - 1) return COLORS.light
+              return null
+            },
+            paddingTop: () => 2,
+            paddingBottom: () => 2,
+          },
+          margin: [0, 0, 0, 8],
+          dontBreakRows: true,
+        })
       }
     }
   }

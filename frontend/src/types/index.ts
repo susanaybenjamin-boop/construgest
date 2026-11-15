@@ -239,6 +239,10 @@ export interface BudgetItem {
   certified_total?: number;
   /** Agregado desde GET /budgets/:id/full. null si is_auxiliary=true (sin tope). */
   remaining?: number | null;
+  /** A1: nº de líneas de descomposición. Agregado desde GET /budgets/:id/full. */
+  breakdown_lines?: number;
+  /** A1: con descomposición, el coste lo manda ella y no se teclea a mano. */
+  cost_linked?: boolean;
   /** Traza del origen del precio (copiado desde otro presupuesto o biblioteca). */
   price_source?: PriceSource | null;
 }

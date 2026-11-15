@@ -5,6 +5,7 @@
  */
 import type { CertificationSummary, CertificationItem, ProjectInfo, FullBudget } from '@/types'
 import { getFonts, loadPdfMake } from './budgetPdfExport'
+import { amountToWords } from '@/lib/utils'
 
 /**
  * Fetch an image URL and convert to base64 data URI for pdfmake
@@ -42,50 +43,6 @@ function formatDate(date: string | Date | null): string {
   }).format(new Date(date))
 }
 
-const numberToWords = (n: number): string => {
-  const units = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE']
-  const teens = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE']
-  const tens = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA']
-  const hundreds = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS']
-
-  if (n === 0) return 'CERO'
-  const integer = Math.floor(n)
-  const decimal = Math.round((n - integer) * 100)
-
-  const convertGroup = (num: number): string => {
-    if (num === 0) return ''
-    if (num === 100) return 'CIEN'
-    let result = ''
-    let r = num
-    if (r >= 100) { result += hundreds[Math.floor(r / 100)] + ' '; r %= 100 }
-    if (r >= 20) {
-      result += tens[Math.floor(r / 10)]
-      if (r % 10 !== 0) result += ' Y ' + units[r % 10]
-    } else if (r >= 10) {
-      result += teens[r - 10]
-    } else if (r > 0) {
-      result += units[r]
-    }
-    return result.trim()
-  }
-
-  let text = ''
-  if (integer >= 1000000) {
-    const millions = Math.floor(integer / 1000000)
-    text += (millions === 1 ? 'UN MILLÓN' : convertGroup(millions) + ' MILLONES') + ' '
-  }
-  const remainder = integer % 1000000
-  if (remainder >= 1000) {
-    const thousands = Math.floor(remainder / 1000)
-    text += (thousands === 1 ? 'MIL' : convertGroup(thousands) + ' MIL') + ' '
-  }
-  const lastThree = remainder % 1000
-  if (lastThree > 0) text += convertGroup(lastThree)
-
-  text = text.trim() + ' EUROS'
-  if (decimal > 0) text += ' CON ' + convertGroup(decimal) + ' CÉNTIMOS'
-  return text
-}
 
 // ─── Color palette (defaults) ───────────────────────────────────────────
 const DEFAULT_COLORS = {
@@ -543,7 +500,7 @@ function buildCertificationDocDefinition(
   summaryPage.push({
     text: [
       { text: 'Asciende la presente certificacion a la expresada cantidad de ', fontSize: 10, color: COLORS.text },
-      { text: numberToWords(certification.total_current), bold: true, fontSize: 10, color: COLORS.primary },
+      { text: amountToWords(certification.total_current), bold: true, fontSize: 10, color: COLORS.primary },
       { text: '.', fontSize: 10, color: COLORS.text },
     ],
     margin: [0, 0, 0, 30],
