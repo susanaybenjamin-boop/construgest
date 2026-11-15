@@ -11,6 +11,8 @@
 >
 > **Estado al cerrar:**
 > - Última versión: **v0.7.0**, publicada en GitHub con su `.msi` y marcada *Latest*.
+> - ✅ **Benjamin la instaló y confirmó que TODAS las skills de IA funcionan** en el equipo
+>   real, con la app instalada (no en el entorno de desarrollo). Es la comprobación que vale.
 > - `develop` y `feat/benjamin` al día y pusheadas. `main` se quedó en la 0.3.4: las
 >   releases desde la 0.5.1 se publican **desde `develop`** (ojo: `scripts/release.sh` no
 >   sirve tal cual, exige estar en `main`).
