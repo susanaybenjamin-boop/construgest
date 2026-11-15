@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import type { PricePickMessage } from '@/types'
 import { formatCurrency } from '@/lib/utils'
+import { exportBudgetToBC3 } from '@/services/bc3Export'
 import { DecimalInput } from '@/components/ui/DecimalInput'
 import { useProjectStore } from '@/stores/projectStore'
 import ImportBudgetDialog from '@/components/budget/ImportBudgetDialog'
@@ -178,6 +179,7 @@ export default function BudgetPage() {
   const [showLibraryImport, setShowLibraryImport] = useState(false)
   const [pickLibraryForChapter, setPickLibraryForChapter] = useState<string | null>(null)
   const [batchSaving, setBatchSaving] = useState(false)
+  const [exportingBc3, setExportingBc3] = useState(false)
   const [showChapterMapping, setShowChapterMapping] = useState(false)
   const [showPdfPreview, setShowPdfPreview] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
@@ -433,6 +435,32 @@ export default function BudgetPage() {
   const handleBatchSaveToLibrary = () => {
     if (!activeBudget) return
     setShowChapterMapping(true)
+  }
+
+  // Exportar el presupuesto en BC3 (FIEBDC-3) para mandarlo fuera de Construgest
+  const handleExportBc3 = async () => {
+    if (!activeBudget) return
+    setExportingBc3(true)
+    try {
+      const { stats, warnings } = await exportBudgetToBC3(activeBudget.budget.id)
+      const plural = (n: number, sing: string, plur: string) => `${n} ${n === 1 ? sing : plur}`
+      addToast(
+        'success',
+        `BC3 generado: ${plural(stats.chapters, 'capítulo', 'capítulos')}, ` +
+        `${plural(stats.items, 'partida', 'partidas')}, ` +
+        `${plural(stats.measurements, 'línea de medición', 'líneas de medición')}. ` +
+        `Total PEM ${formatCurrency(stats.total)}.`
+      )
+      // Los avisos ya vienen agrupados del backend (uno por tipo, no por partida)
+      warnings.forEach((w) => addToast('warning', w, 10000))
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        'No se pudo generar el BC3'
+      addToast('error', message)
+    } finally {
+      setExportingBc3(false)
+    }
   }
 
   // Execute batch save with chapter mapping
@@ -888,6 +916,15 @@ export default function BudgetPage() {
                   title="Vista previa del PDF"
                 >
                   <Eye className="w-4 h-4" /> Vista Previa PDF
+                </button>
+                <button
+                  onClick={handleExportBc3}
+                  disabled={exportingBc3}
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-gray-300 hover:bg-gray-100 active:bg-gray-200 rounded-lg transition shadow-sm disabled:opacity-50"
+                  title="Exportar en BC3 (FIEBDC-3) para enviarlo a otro programa de presupuestos"
+                >
+                  {exportingBc3 ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                  Exportar BC3
                 </button>
                 {budgets.length >= 2 && (
                   <button

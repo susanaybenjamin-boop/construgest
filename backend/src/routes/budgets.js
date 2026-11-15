@@ -7,6 +7,8 @@ import {
   pickGreedyMatches,
   orderBudgetIds,
 } from '../services/budgetMatching.js'
+import { buildBC3Buffer } from '../services/bc3-export.js'
+import { getCurrentVersion } from '../services/version.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -229,6 +231,116 @@ router.get('/:id/full', budgetAccessMiddleware('budget'), async (req, res, next)
     }))
 
     res.json({ budget, chapters: chaptersWithItems })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/budgets/:id/export-bc3 - Exportar el presupuesto en BC3 (FIEBDC-3)
+//
+// Devuelve JSON con el fichero en base64 (no el binario directo) para poder
+// mandar ADEMAS los avisos de la exportacion sin inventar cabeceras propias ni
+// tocar la configuracion de CORS. El fichero va en latin1 (ANSI), que es lo que
+// declara el ~V; el navegador lo reconstruye byte a byte desde el base64.
+router.get('/:id/export-bc3', budgetAccessMiddleware('budget'), async (req, res, next) => {
+  try {
+    const budgetId = req.params.id
+
+    const { data: budget, error: bErr } = await supabase
+      .from('cons_budgets')
+      .select('*')
+      .eq('id', budgetId)
+      .single()
+    if (bErr) throw bErr
+
+    const { data: project, error: pErr } = await supabase
+      .from('cons_projects')
+      .select('*')
+      .eq('id', budget.project_id)
+      .single()
+    if (pErr) throw pErr
+
+    // Quien exporta: la empresa, que es la que firma el presupuesto (~V PROPIEDAD)
+    let author = ''
+    if (req.user?.organization_id) {
+      const { data: org } = await supabase
+        .from('cons_organizations')
+        .select('name')
+        .eq('id', req.user.organization_id)
+        .single()
+      author = org?.name || ''
+    }
+
+    const { data: chapters, error: chErr } = await supabase
+      .from('cons_chapters')
+      .select('*')
+      .eq('budget_id', budgetId)
+      .order('sort_order')
+    if (chErr) throw chErr
+
+    const chapterIds = (chapters || []).map(c => c.id)
+    let items = []
+    if (chapterIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cons_budget_items')
+        .select('*')
+        .in('chapter_id', chapterIds)
+        .order('sort_order')
+      if (error) throw error
+      items = data || []
+    }
+
+    const itemIds = items.map(i => i.id)
+    let measurements = []
+    if (itemIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cons_measurements')
+        .select('*')
+        .in('budget_item_id', itemIds)
+        .order('sort_order')
+      if (error) throw error
+      measurements = data || []
+    }
+
+    const chapterBlocks = (chapters || []).map(ch => ({
+      chapter: ch,
+      items: items
+        .filter(it => it.chapter_id === ch.id)
+        .map(it => ({
+          ...it,
+          measurements: measurements.filter(m => m.budget_item_id === it.id),
+        })),
+    }))
+
+    const { buffer, stats, warnings } = buildBC3Buffer({
+      budget,
+      project,
+      chapters: chapterBlocks,
+      programVersion: getCurrentVersion(),
+      author,
+    })
+
+    // Nombre de fichero seguro: sin acentos ni caracteres raros
+    const safe = (s, fallback) => {
+      const out = String(s || '')
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^A-Za-z0-9._-]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 60)
+      return out || fallback
+    }
+    const filename =
+      `${safe(project?.name, 'Obra')}_${safe(budget?.name, 'Presupuesto')}` +
+      `_v${budget?.version ?? 1}.bc3`
+
+    res.json({
+      filename,
+      content_base64: buffer.toString('base64'),
+      bytes: buffer.length,
+      stats,
+      warnings,
+    })
   } catch (err) {
     next(err)
   }

@@ -1,9 +1,113 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-11-10
+> ## 📍 ESTADO ACTUAL — 2026-11-15
 >
 >
-> ### Último (2026-11-10, tarde): COND-1/2/3 (cláusulas) y PDF-3 (la página casi vacía)
+> ### Último (2026-11-15): BC3-1 — EXPORTACIÓN A BC3 (FIEBDC-3)
+>
+> La carencia B2 de la comparativa, cerrada: Construgest ya **manda** presupuestos en el
+> formato del sector, no solo los importa. Botón **Exportar BC3** en la barra del
+> presupuesto, junto a "Vista Previa PDF".
+>
+> - `backend/src/services/bc3-export.js` — el generador. Formato verificado contra la
+>   **spec oficial FIEBDC-3/2024** (descargada de fiebdc.es), no de memoria: `~V` (tipo
+>   información 2 = presupuesto, juego ANSI), `~K` (decimales en negativo = "máximo", y
+>   CI\GG\BI\BAJA\IVA con los porcentajes del presupuesto), `~C`, `~D`, `~T`, `~M`.
+> - `GET /api/budgets/:id/export-bc3` — devuelve JSON con el fichero en base64 + avisos
+>   (así no hacen falta cabeceras propias ni tocar CORS).
+> - `frontend/src/services/bc3Export.ts` + botón en la pantalla de presupuesto.
+> - `backend/tests/bc3Export.test.js` — 16 tests. Suite completa: **55/55**. `tsc` limpio.
+>
+> **DOS DECISIONES DE ALCANCE** (están explicadas en la cabecera del servicio):
+> 1. Se exporta el **PEM**: precio de venta por partida, y GG/BI/IVA como PORCENTAJES en
+>    el `~K`, que es donde el formato los pone. El que recibe aplica los coeficientes.
+> 2. **NO se exporta la descomposición de precios.** No es pereza: la spec dice que si un
+>    concepto lleva descomposición su precio DEBE ser el resultado de ella y *"en caso de
+>    discrepancia tendrá preponderancia el resultado obtenido por la descomposición"*. En
+>    Construgest la descomposición suma COSTE y el precio exportado es VENTA, así que el
+>    receptor recalcularía la obra a precio de coste. **Esto se desbloquea al cerrar A1.**
+>
+> **TRES FALLOS CAZADOS EN EJECUCIÓN** (ninguno los habría visto "compilando"):
+> 1. El precio de la raíz salía **un céntimo corto**: se sumaban los totales de capítulo
+>    sin redondear y se imprimían redondeados. Ahora se redondea a 2 decimales EN CADA
+>    NIVEL al acumular, y el fichero cuadra consigo mismo. Hay test que lo vigila.
+> 2. `fmt()` recortaba los ceros de cola a ciegas: con `decimals=0`, `1000` salía `1`.
+> 3. **Lo que no cabe en latin1 salía corrupto y en silencio.** `Buffer.from(s,'latin1')`
+>    se queda con el BYTE BAJO del carácter: un guión largo `—` (U+2014) salía como 0x14,
+>    que es un **carácter de control**, y partía el fichero. Entra en cuanto se pega texto
+>    de Word. Ahora hay `toLatin1Safe()` (comillas curvas, guiones, €, …, ½) y un test con
+>    la invariante: `Buffer.from(texto,'latin1').toString('latin1') === texto`.
+>
+> **Verificado en ejecución** (Docker + backend + Next en el navegador):
+> - **Round-trip sobre el presupuesto REAL de CYPE (Huetor Vega, 111 partidas)**: exportar
+>   → reimportar por `/ai/parse-budget-file` (el endpoint del diálogo "Importar desde...")
+>   → **111/111 partidas idénticas** (cantidad, precio, unidad, nombre), 278 líneas de
+>   medición → 278, y **108.073,09 € en los tres puntos** (origen, BC3, tras reimportar).
+>   Acentos intactos. Las 10 descomposiciones cuadran, 0 descuadres.
+> - Casos de rechazo: sin token 401, token inválido 401, presupuesto inexistente 404.
+> - UI: el botón exporta, el fichero **se descarga de verdad** y los toasts dan el recuento
+>   y los avisos agrupados ("1 partida va con precio 0: 01.03", no un aviso por partida).
+>
+> **DOS COSAS QUE DEJO ANOTADAS, no tocadas:**
+> - 🐛 **Crear una partida sin `cost_price` da 500** (`Column 'cost_price' cannot be null`):
+>   `POST /budgets/chapters/:id/items` lo inserta tal cual y la columna es NOT NULL. La UI
+>   no lo sufre porque siempre lo manda, pero la API es frágil. No es de este slice.
+> - ⚠️ En el presupuesto **demo** ("Obra Demo" → "Presupuesto v1"), probando, sobrescribí
+>   de la partida `01.01` la **unidad (m3), la cantidad (125,5) y el precio (23,15)**. No sé
+>   qué tenían antes. Ojo: la cantidad 125,5 **no cuadra con su única medición (3 uds)**,
+>   y la app calcula la cantidad desde las mediciones. Borradas ya las partidas de prueba
+>   que creé (01.02 y 01.03) y limpiado el texto roto. Los datos reales, intactos.
+>
+> ### PRÓXIMA SESIÓN (prompt sugerido)
+>
+> > Lee `docs/comparativa-presto.md`. Toca **A1: que el precio de la partida salga de su
+> > descomposición**. Hoy `PriceBreakdownPanel.tsx` calcula el total y solo lo MUESTRA, y
+> > los handlers de `/breakdown` no tocan `cost_price`. Antes de picar nada, pregúntame la
+> > decisión: ¿el precio pasa a ser SOLO la suma de la descomposición (como Presto), o
+> > sigue editable y la app avisa de la desviación? Al cerrarlo se desbloquean el cuadro de
+> > precios nº2, el coste objetivo y exportar la descomposición en el BC3.
+>
+>
+> ### Anterior (2026-11-15): COMPARATIVA CON PRESTO — carencias identificadas
+>
+> Benjamin instaló Presto para que se estudiaran sus funciones a fondo y se comparasen con
+> Construgest. **La copia era Presto 8.7 con parche de licencia (`PRESTO87_crk.exe`), así que
+> NO se ejecutó**; él la desinstaló. La comparativa se hizo con la documentación oficial de
+> RIB, el estándar FIEBDC-3 y **lectura directa del código** (todo lo afirmado sobre
+> Construgest está verificado con fichero:línea).
+>
+> **Informe completo: [`docs/comparativa-presto.md`](comparativa-presto.md).**
+>
+> Las tres carencias que importan, verificadas en el código:
+> 1. **El precio de la partida NO sale de su descomposición.** `PriceBreakdownPanel.tsx:133`
+>    calcula el total y solo lo MUESTRA ("Coste Total Unitario"); los handlers de
+>    `/breakdown` (`budgets.js:824-866`) no tocan `cost_price` ni `unit_price`. O sea: la
+>    descomposición es decorativa y el Anexo III puede imprimir un desglose que no cuadra
+>    con el precio de al lado.
+> 2. **No hay exportación BC3.** `bc3-parser.js` solo importa. Construgest es hoy una calle
+>    de sentido único: entra BC3, no sale. Es lo más barato y lo que más se nota desde fuera.
+> 3. **No hay precios auxiliares reutilizables.** `cons_price_breakdown` es una lista plana
+>    con FK solo a `cons_materials`. Ojo: `is_auxiliary` aquí significa "partida sin tope de
+>    cantidad" en partes/certificaciones, NO el auxiliar de Presto.
+>
+> Faltan además, por bloques: cuadros de precios nº1 y nº2 (barato, los datos ya están),
+> descomposición en la biblioteca, costes indirectos por partida, coste objetivo + Valor
+> Ganado, planificación/periodificación (módulo entero), compras con contrato/pedido/albarán
+> (módulo entero) y gestión de cambios.
+>
+> **Orden recomendado: B2 (exportar BC3) + A1 (el precio sale de la descomposición).**
+> A1 necesita una decisión de Benjamin: ¿el precio pasa a ser SOLO la suma de la
+> descomposición (como Presto), o sigue editable y la app avisa de la desviación?
+>
+> ✅ **B2 hecho el mismo día** (ver BC3-1 arriba). Siguiente: **A1**.
+>
+> Decisión de Benjamin sobre **A2 (precios auxiliares reutilizables)**: se deja para más
+> adelante. *"Sería si yo tuviera una base de datos completa, con materiales, costes de
+> mano de obra, etc., pero no la tengo."* Sin esa base no aporta nada hoy; cuando la haya,
+> se retoma.
+>
+>
+> ### Anterior (2026-11-10, tarde): COND-1/2/3 (cláusulas) y PDF-3 (la página casi vacía)
 >
 > **PDF-3 — La página casi vacía antes del total, en horizontal.** Síntoma de Benjamin:
 > *"cuando lo cambio a horizontal, según la cantidad de partidas me deja el total en una
