@@ -2,6 +2,29 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-11-15
 >
+> **RELEASE v0.6.0 PUBLICADA (2026-11-15).** Sube la MINOR (no la patch) porque son tres
+> funciones nuevas: exportar BC3, el coste desde la descomposición y los cuadros de precios.
+> Bump en los tres `package.json` + sus locks, merge `--no-ff` a `develop` (`855d91f`), las
+> dos ramas pusheadas y release con `ConstruGest-0.6.0.msi` (453 MB), **Latest** según la API.
+>
+> **Comprobado antes de publicar**: gate de secretos del build (1.559 ficheros, sin
+> credenciales); las **8 migraciones** dentro del payload, incluida la nueva
+> `006_coste_desde_descomposicion`; y que el frontend compilado **lleva el código nuevo**
+> (aparecen `CUADRO DE PRECIOS`, `VEINTITR`, `Exportar BC3` y `descomposici` en los chunks
+> de `resources/frontend/.next`), que es la forma de asegurarse de que el build no cogió una
+> caché vieja. 62/62 tests y `tsc` limpio sobre `develop`.
+>
+> ⚠️ **Ojo con el proceso**: `scripts/release.sh` NO sirve tal cual, exige estar en `main` y
+> `main` sigue en la 0.3.4. Las releases 0.5.1, 0.5.2 y 0.6.0 se han publicado desde
+> `develop` con `gh release create --target develop`. Y `--target <sha-corto>` lo rechaza
+> GitHub con *"Release.target_commitish is invalid"*: hay que pasar el NOMBRE de la rama.
+>
+> **REL-CLEAN pendiente**: en `desktop/dist/` quedan los tres `.msi` (0.5.1, 0.5.2 y 0.6.0).
+> Sobra el de 0.5.1; la convención es dejar solo el anterior y el actual.
+>
+> **Entorno de pruebas cerrado**: Docker abajo (sin `-v`, el volumen de datos intacto) y los
+> puertos 3000, 3001, 5000 y 3308 libres.
+>
 >
 > ### Último (2026-11-15): B1 — CUADRO DE PRECIOS Nº 1 Y Nº 2
 >
