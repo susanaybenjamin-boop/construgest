@@ -8,6 +8,7 @@ import {
   suggestOptimizations,
   normalizeReference,
   findSimilar,
+  lookupPrices,
 } from '../services/price-reference.js'
 import { loadPublicPriceBases } from '../services/price-base.js'
 import { recordCorrection, getRecentCorrections, fewShotFor, CORRECTION_SKILLS } from '../services/ai-corrections.js'
@@ -129,11 +130,48 @@ router.post('/suggest-optimizations', async (req, res, next) => {
 // POST /api/ai/detect-issues — Detección de problemas e inconsistencias.
 // 100% determinista (sin LLM): duplicados, partidas sin valorar/sin cantidad,
 // capítulos vacíos, descripciones vagas y descuadres. Consistente e instantáneo.
-router.post('/detect-issues', (req, res, next) => {
+router.post('/detect-issues', async (req, res, next) => {
   try {
     if (!req.body?.data) return res.status(400).json({ error: 'Datos requeridos para el análisis' })
     const a = analyzeBudget(req.body.data)
-    res.json(a.issues)   // ya en el shape {id,severity,message,affected_items,recommendation}
+    const issues = [...a.issues]   // {id,severity,message,affected_items,recommendation}
+
+    // AI-8 — Revisión previa al envío: precio contra coste y contra la
+    // biblioteca. Hace falta leer de la BD porque el payload de la pantalla de
+    // IA no trae ni el id de la partida ni la biblioteca. Si no viene
+    // `budget_id`, se devuelven los avisos de siempre y ya está: esto AMPLÍA,
+    // no sustituye.
+    const budgetId = req.body?.budget_id
+    if (budgetId) {
+      try {
+        const { data: chapters } = await supabase
+          .from('cons_chapters').select('id').eq('budget_id', budgetId)
+        const chapterIds = (chapters || []).map((c) => c.id)
+        let items = []
+        if (chapterIds.length > 0) {
+          const { data } = await supabase
+            .from('cons_budget_items').select('*').in('chapter_id', chapterIds).order('sort_order')
+          items = data || []
+        }
+
+        if (items.length > 0) {
+          const reference = await loadPriceReference(req.user.organization_id)
+          const priced = reference.length > 0
+            ? lookupPrices(
+                items.map((it) => ({ code: it.code, name: it.name, unit: it.unit, unit_price: it.unit_price })),
+                reference
+              )
+            : []
+          const { reviewBudget } = await import('../services/budget-review.js')
+          issues.push(...reviewBudget(items, { priced }))
+        }
+      } catch (err) {
+        // Que falle la ampliación no puede cargarse los avisos de siempre.
+        console.warn('[detect-issues] revisión de precios no disponible:', err.message)
+      }
+    }
+
+    res.json(issues)
   } catch (err) {
     next(err)
   }
@@ -578,6 +616,72 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
 // ================================================================
 
 // POST /api/ai/parse-budget-file — Parse BC3 or PZH binary file
+// POST /api/ai/check-measurements — revisión de la hoja de mediciones.
+// TOOL: las mediciones del presupuesto, leídas aquí (el payload de la pantalla
+// de IA no las lleva). Aritmética pura, SIN LLM: parciales que no salen de sus
+// dimensiones, cantidades que no son la suma de lo medido, líneas a cero y
+// zonas escritas de varias formas.
+router.post('/check-measurements', async (req, res, next) => {
+  try {
+    const budgetId = req.body?.budget_id
+    if (!budgetId) return res.status(400).json({ error: 'Falta el presupuesto a revisar' })
+
+    const { data: chapters, error: chErr } = await supabase
+      .from('cons_chapters')
+      .select('*')
+      .eq('budget_id', budgetId)
+      .order('sort_order')
+    if (chErr) throw chErr
+
+    const chapterIds = (chapters || []).map((c) => c.id)
+    let items = []
+    if (chapterIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cons_budget_items')
+        .select('*')
+        .in('chapter_id', chapterIds)
+        .order('sort_order')
+      if (error) throw error
+      items = data || []
+    }
+
+    const itemIds = items.map((i) => i.id)
+    let measurements = []
+    if (itemIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cons_measurements')
+        .select('*')
+        .in('budget_item_id', itemIds)
+        .order('sort_order')
+      if (error) throw error
+      measurements = data || []
+    }
+
+    const bloques = (chapters || []).map((ch) => ({
+      chapter: ch,
+      items: items
+        .filter((it) => it.chapter_id === ch.id)
+        .map((it) => ({ ...it, measurements: measurements.filter((m) => m.budget_item_id === it.id) })),
+    }))
+
+    const { checkMeasurements } = await import('../services/measurement-check.js')
+    res.json(checkMeasurements(bloques))
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/ai/model-info — con qué modelo y contra qué host habla la IA.
+// Diagnóstico: evita adivinar si la app instalada está usando el Ollama que toca.
+router.get('/model-info', async (req, res, next) => {
+  try {
+    const { getModelInfo } = await import('../services/ai-service.js')
+    res.json(getModelInfo())
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.post('/parse-budget-file', async (req, res, next) => {
   try {
     const { fileData, fileType } = req.body

@@ -2,6 +2,75 @@
 
 > ## 📍 ESTADO ACTUAL — 2026-11-15
 >
+> ### Último (2026-11-15, tarde): EL EMPAREJAMIENTO DE NOMBRES Y DOS SKILLS NUEVAS
+>
+> **🐛 El emparejamiento de nombres tiraba los códigos.** Benjamin hizo una comparativa de
+> precios de materiales y el análisis le propuso agrupar como equivalentes **siete vigas
+> distintas** ("TIPO V1 MF+" … "TIPO V7 MF+"), las 21 parejas **al 100 %**. Dos fallos que se
+> sumaban en `budget-analytics.js`:
+> 1. `nameTokens` descartaba todo token de ≤2 caracteres, así que de "TIPO V1 MF+" solo
+>    sobrevivía `tipo`: se tiraban `v1` y `v2`, que es lo único que las distingue.
+> 2. `tokenMatch` emparejaba por prefijo con 3 caracteres, que casaba "hormigon" con
+>    "hormigonera" (el material con la máquina).
+>
+> En construcción **el número ES la especificación**. Ahora un token con dígitos no se
+> descarta nunca y solo vale si es idéntico, el prefijo pide 4 caracteres y poca diferencia
+> de longitud, y hay **regla de CONFLICTO de códigos**: si cada nombre lleva un código que al
+> otro le falta, la similitud se capa a 0,3. Hacía falta porque mirar si comparten alguno NO
+> basta — "Tornillo M8 DIN 933" y "Tornillo M10 DIN 933" comparten el 933 (lo cazó un test al
+> fallar). Verificado con los nombres reales: **de 21 parejas al 100 % a cero**.
+> Afecta a tres sitios a la vez: duplicados de materiales, precio de referencia y find-similar.
+>
+> **⏱️ Las llamadas a Ollama no tenían timeout.** Un `fetch` sin tope deja la petición colgada.
+> Ahora 90 s, configurable.
+>
+> **🤖 Se probó un modelo más grande y SE DESCARTÓ.** Medido en el equipo de Benjamin con una
+> lista de proveedor real: `qwen2.5:3b` → **31 s y los 6 materiales exactos**; `llama3:8b` →
+> el triple, agotó el timeout y recortó nombres. Y Benjamin comprobó lo que no sale en un
+> cronómetro: **le ralentiza el portátil entero**. El 3b NO se queda corto.
+> **Si hace falta más capacidad: más skills y más tools deterministas, no un modelo mayor.**
+> Queda escrito en `ai-service.js` para que no se reintente dentro de unos meses.
+>
+> **🆕 Skill: Revisión de Mediciones** (`/ai/check-measurements`, tarjeta propia). Aritmética
+> pura: parciales que no son uds × largo × ancho × alto, cantidades que no son la suma de lo
+> medido, líneas a cero y la misma zona escrita de varias formas. *Trampa:* el ordinal `ª` NO
+> se descompone con NFD, así que "Planta 1ª" y "planta 1a" no se igualaban (lo cazó un test).
+>
+> **🆕 Skill: Revisión previa al envío** — amplía `detect-issues`, no crea tarjeta nueva.
+> Partidas vendidas bajo coste (con la pérdida calculada), márgenes que huelen a dígito de
+> más, partidas sin coste y precios desviados >30 % de la biblioteca. **Solo es posible desde
+> A1**: antes el `cost_price` podía mentir. Sin `budget_id` devuelve los avisos de siempre, y
+> si la parte nueva falla no se carga el análisis.
+>
+> **PENDIENTES, aparcadas por Benjamin**: las skills de **precios caducados** y **CAE de
+> subcontratas**. *"Son funciones que no voy a utilizar"* — se retoman si el programa sube de
+> versión y hacen falta. **No hay nada suyo a medias**: se comprobó que la pantalla de IA
+> tiene 7 tarjetas y 7 endpoints, todos implementados, sin botones huérfanos.
+>
+>
+ **RELEASE v0.6.0 PUBLICADA (2026-11-15).** Sube la MINOR (no la patch) porque son tres
+> funciones nuevas: exportar BC3, el coste desde la descomposición y los cuadros de precios.
+> Bump en los tres `package.json` + sus locks, merge `--no-ff` a `develop` (`855d91f`), las
+> dos ramas pusheadas y release con `ConstruGest-0.6.0.msi` (453 MB), **Latest** según la API.
+>
+> **Comprobado antes de publicar**: gate de secretos del build (1.559 ficheros, sin
+> credenciales); las **8 migraciones** dentro del payload, incluida la nueva
+> `006_coste_desde_descomposicion`; y que el frontend compilado **lleva el código nuevo**
+> (aparecen `CUADRO DE PRECIOS`, `VEINTITR`, `Exportar BC3` y `descomposici` en los chunks
+> de `resources/frontend/.next`), que es la forma de asegurarse de que el build no cogió una
+> caché vieja. 62/62 tests y `tsc` limpio sobre `develop`.
+>
+> ⚠️ **Ojo con el proceso**: `scripts/release.sh` NO sirve tal cual, exige estar en `main` y
+> `main` sigue en la 0.3.4. Las releases 0.5.1, 0.5.2 y 0.6.0 se han publicado desde
+> `develop` con `gh release create --target develop`. Y `--target <sha-corto>` lo rechaza
+> GitHub con *"Release.target_commitish is invalid"*: hay que pasar el NOMBRE de la rama.
+>
+> **REL-CLEAN pendiente**: en `desktop/dist/` quedan los tres `.msi` (0.5.1, 0.5.2 y 0.6.0).
+> Sobra el de 0.5.1; la convención es dejar solo el anterior y el actual.
+>
+> **Entorno de pruebas cerrado**: Docker abajo (sin `-v`, el volumen de datos intacto) y los
+> puertos 3000, 3001, 5000 y 3308 libres.
+>
 >
 > ### Último (2026-11-15): B1 — CUADRO DE PRECIOS Nº 1 Y Nº 2
 >

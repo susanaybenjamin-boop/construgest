@@ -28,7 +28,26 @@ function normName(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
 }
-function nameTokens(s) { return new Set(normName(s).split(' ').filter((w) => w.length > 2)) }
+/**
+ * ¿El token lleva algún dígito? En construcción el NÚMERO es la especificación:
+ * una viga V1 no es una V2, un mortero M-5 no es un M-10, un redondo D12 no es
+ * un D16 y un HEB 200 no es un HEB 300. Esos tokens discriminan y no se tocan.
+ */
+function hasDigit(t) { return /\d/.test(t) }
+
+/**
+ * Tokens significativos de un nombre.
+ *
+ * OJO con el filtro de longitud: descartaba TODO token de 2 caracteres o menos,
+ * y eso se cargaba justo los discriminantes. "TIPO V1 MF+" y "TIPO V2 MF+" se
+ * quedaban los dos en {"tipo"} -> 100% de similitud -> el análisis de materiales
+ * proponía agrupar como equivalentes siete vigas distintas (visto en los datos
+ * reales de Benjamin, 2026-11-15). Ahora un token con dígitos se queda SIEMPRE,
+ * mida lo que mida.
+ */
+function nameTokens(s) {
+  return new Set(normName(s).split(' ').filter((w) => w.length > 2 || hasDigit(w)))
+}
 // Similitud de Jaccard entre dos nombres (0..1).
 function jaccard(a, b) {
   const A = nameTokens(a), B = nameTokens(b)
@@ -44,10 +63,22 @@ function normUnit(u) { return String(u || '').toLowerCase().replace(/[²³]/g, (
 // se escribe "HORM. ARM." o "HORMIGON ARMADO". Se usa al emparejar entre fuentes
 // distintas (presupuesto↔biblioteca/base); para duplicados dentro de un presupuesto
 // se usa el Jaccard estricto (más conservador).
+/**
+ * ¿Dos tokens son "el mismo"? Tolera el plural y pequeñas variantes, pero ya no
+ * vale con que empiecen igual.
+ *
+ * Antes bastaba `l.startsWith(s)` con 3 caracteres, y eso emparejaba cosas que
+ * no tienen nada que ver: "hormigon" con "hormigonera" (el material con la
+ * máquina), o "v1" con "v12". Ahora:
+ *   - un token con dígitos solo vale si es IDÉNTICO (v1 nunca es v2);
+ *   - el prefijo pide 4 caracteres y que la palabra larga no se dispare más de
+ *     2 (coge "hormigon"/"hormigones", no "hormigon"/"hormigonera").
+ */
 function tokenMatch(a, b) {
   if (a === b) return true
+  if (hasDigit(a) || hasDigit(b)) return false
   const [s, l] = a.length <= b.length ? [a, b] : [b, a]
-  return s.length >= 3 && l.startsWith(s)
+  return s.length >= 4 && l.startsWith(s) && l.length - s.length <= 2
 }
 function fuzzyJaccard(a, b) {
   const A = [...nameTokens(a)], B = [...nameTokens(b)]
@@ -60,7 +91,30 @@ function fuzzyJaccard(a, b) {
       if (tokenMatch(ta, B[k])) { usedB.add(k); inter++; break }
     }
   }
-  return inter / (A.length + B.length - inter)
+  const sim = inter / (A.length + B.length - inter)
+
+  // Los códigos mandan sobre el texto: si AMBOS nombres llevan tokens con
+  // dígitos y no coincide NINGUNO, no son el mismo producto por mucho que el
+  // resto del nombre sea idéntico. Sin esto, "Tornillo M8 inoxidable DIN 933" y
+  // "Tornillo M10 inoxidable DIN 933" salían a 0,67 y se proponían como
+  // equivalentes. Se deja un valor bajo (no 0) porque siguen siendo parientes:
+  // vale para ordenar sugerencias, no para agrupar.
+  // Hay CONFLICTO cuando cada nombre lleva un código que al otro le falta:
+  // M8 vs M10, V1 vs V2, HEB 200 vs HEB 300. No vale con mirar si comparten
+  // alguno, porque "Tornillo M8 DIN 933" y "Tornillo M10 DIN 933" comparten el
+  // 933 y aun así son tornillos distintos.
+  //
+  // Que a uno le sobre un código (p.ej. "Mortero M-5" contra "Mortero M-5 25
+  // kg") NO es conflicto: suele ser el mismo producto con el formato detallado.
+  const soloEnA = A.filter((t) => hasDigit(t) && !B.includes(t))
+  const soloEnB = B.filter((t) => hasDigit(t) && !A.includes(t))
+  if (soloEnA.length > 0 && soloEnB.length > 0) {
+    // Se deja un valor bajo (no 0) porque siguen siendo parientes: sirve para
+    // ordenar sugerencias, nunca para agrupar ni para tomar un precio.
+    return Math.min(sim, 0.3)
+  }
+
+  return sim
 }
 
 function safeParse(raw) {
