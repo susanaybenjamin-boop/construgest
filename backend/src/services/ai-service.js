@@ -17,6 +17,23 @@ import { createHash } from 'crypto'
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://host.docker.internal:11434'
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:3b'
 
+// Tope de espera de una generación. Antes NO había ninguno: un `fetch` sin
+// timeout deja la petición colgada hasta que se rinde el navegador, y con el
+// modelo generando a ~10 tok/s en CPU eso pasa de verdad.
+const TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS) || 90_000
+
+// ── Por qué NO hay un "modelo grande" aquí (decidido el 2026-11-15) ──
+// Se probó cablear uno mayor a las skills de extracción, que es donde en teoría
+// más se notaría. Medido con una lista de proveedor real en el equipo de
+// Benjamin (i5, sin GPU):
+//   - qwen2.5:3b  -> 31 s, los 6 materiales con nombre, unidad y precio exactos.
+//   - llama3:8b   -> el triple de tiempo, agotó el timeout y encima recortó
+//                    nombres ("TIPO V1 MF+" perdía el "(hasta 4,00 m)").
+// Y Benjamin comprobó algo que no sale en ningún cronómetro: el modelo grande
+// le RALENTIZA el portátil entero mientras genera.
+// Conclusión: el 3b no se queda corto. Si hace falta más capacidad, el camino
+// es MÁS SKILLS (y más tools deterministas) para el 3b, no un modelo mayor.
+
 // ── Caché en memoria de respuestas (dedup de extracciones repetidas) ──
 // Clave = sha256 del prompt (texto + imágenes). LRU con tope y TTL.
 const AI_CACHE_TTL_MS = 30 * 60 * 1000
@@ -82,10 +99,13 @@ async function tryLocal(textPrompt, imageFiles, options) {
     body.images = imageFiles.map((i) => i.data)
   }
 
+  // Timeout SIEMPRE: sin esto una generación lenta (modelo grande en CPU) deja
+  // la petición colgada hasta que el navegador se rinde.
   const res = await fetch(`${OLLAMA_HOST}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(options.timeoutMs || TIMEOUT_MS),
   })
   if (!res.ok) throw new Error(`Ollama HTTP ${res.status}`)
   const data = await res.json()
@@ -113,6 +133,11 @@ export async function callAI(prompt, options = {}) {
   const result = await tryLocal(textPrompt, imageFiles, options)
   if (cacheKey) aiCacheSet(cacheKey, result)
   return result
+}
+
+/** Con qué modelo y contra qué host se está hablando (diagnóstico). */
+export function getModelInfo() {
+  return { model: OLLAMA_MODEL, host: OLLAMA_HOST, timeout_ms: TIMEOUT_MS }
 }
 
 /**
