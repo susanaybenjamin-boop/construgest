@@ -7,7 +7,7 @@ import api from '@/lib/api'
 import {
   Brain, TrendingUp, AlertTriangle, BarChart3, FileText,
   DollarSign, Loader2, ChevronDown, ChevronUp, Sparkles,
-  CheckCircle, XCircle, Info, TrendingDown,
+  CheckCircle, XCircle, Info, TrendingDown, Ruler,
 } from 'lucide-react'
 
 interface AnalysisType {
@@ -23,6 +23,7 @@ const analysisTypes: AnalysisType[] = [
   { id: 'budget', name: 'Análisis de Presupuesto', description: 'Analiza desviaciones, márgenes y coherencia del presupuesto', icon: BarChart3, endpoint: '/ai/analyze-budget', color: 'blue' },
   { id: 'optimize', name: 'Optimización de Costes', description: 'Sugiere oportunidades de ahorro y optimización', icon: TrendingUp, endpoint: '/ai/suggest-optimizations', color: 'green' },
   { id: 'issues', name: 'Detección de Problemas', description: 'Identifica errores, inconsistencias y riesgos', icon: AlertTriangle, endpoint: '/ai/detect-issues', color: 'amber' },
+  { id: 'measurements', name: 'Revisión de Mediciones', description: 'Parciales que no salen de sus dimensiones, cantidades que no cuadran y zonas mal escritas', icon: Ruler, endpoint: '/ai/check-measurements', color: 'teal' },
   { id: 'report', name: 'Informe Ejecutivo', description: 'Genera un resumen ejecutivo completo del proyecto', icon: FileText, endpoint: '/ai/executive-report', color: 'purple' },
   { id: 'prices', name: 'Comparación de Precios', description: 'Compara precios unitarios con referencias del mercado', icon: DollarSign, endpoint: '/ai/compare-prices', color: 'rose' },
   { id: 'contingency', name: 'Estimación de Contingencia', description: 'Calcula reservas de contingencia recomendadas', icon: Sparkles, endpoint: '/ai/estimate-contingency', color: 'indigo' },
@@ -35,11 +36,13 @@ const colorMap: Record<string, string> = {
   purple: 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-400',
   rose: 'bg-rose-50 text-rose-700 border-rose-200 hover:border-rose-400',
   indigo: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:border-indigo-400',
+  teal: 'bg-teal-50 text-teal-700 border-teal-200 hover:border-teal-400',
 }
 
 const iconBgMap: Record<string, string> = {
   blue: 'bg-blue-100', green: 'bg-green-100', amber: 'bg-amber-100',
   purple: 'bg-purple-100', rose: 'bg-rose-100', indigo: 'bg-indigo-100',
+  teal: 'bg-teal-100',
 }
 
 function fmt(n: number) {
@@ -425,6 +428,9 @@ export default function AIPage() {
       const { data } = await api.post(analysis.endpoint, {
         data: budgetData,
         project_id: projectId,
+        // check-measurements lee las mediciones del servidor: no viajan en
+        // `data`, que solo lleva código, cantidad y precio de cada partida.
+        budget_id: current?.budget.id,
       })
 
       setResults((prev) => ({ ...prev, [analysis.id]: data }))

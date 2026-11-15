@@ -578,6 +578,72 @@ router.post('/parse-budget-pdf', async (req, res, next) => {
 // ================================================================
 
 // POST /api/ai/parse-budget-file — Parse BC3 or PZH binary file
+// POST /api/ai/check-measurements — revisión de la hoja de mediciones.
+// TOOL: las mediciones del presupuesto, leídas aquí (el payload de la pantalla
+// de IA no las lleva). Aritmética pura, SIN LLM: parciales que no salen de sus
+// dimensiones, cantidades que no son la suma de lo medido, líneas a cero y
+// zonas escritas de varias formas.
+router.post('/check-measurements', async (req, res, next) => {
+  try {
+    const budgetId = req.body?.budget_id
+    if (!budgetId) return res.status(400).json({ error: 'Falta el presupuesto a revisar' })
+
+    const { data: chapters, error: chErr } = await supabase
+      .from('cons_chapters')
+      .select('*')
+      .eq('budget_id', budgetId)
+      .order('sort_order')
+    if (chErr) throw chErr
+
+    const chapterIds = (chapters || []).map((c) => c.id)
+    let items = []
+    if (chapterIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cons_budget_items')
+        .select('*')
+        .in('chapter_id', chapterIds)
+        .order('sort_order')
+      if (error) throw error
+      items = data || []
+    }
+
+    const itemIds = items.map((i) => i.id)
+    let measurements = []
+    if (itemIds.length > 0) {
+      const { data, error } = await supabase
+        .from('cons_measurements')
+        .select('*')
+        .in('budget_item_id', itemIds)
+        .order('sort_order')
+      if (error) throw error
+      measurements = data || []
+    }
+
+    const bloques = (chapters || []).map((ch) => ({
+      chapter: ch,
+      items: items
+        .filter((it) => it.chapter_id === ch.id)
+        .map((it) => ({ ...it, measurements: measurements.filter((m) => m.budget_item_id === it.id) })),
+    }))
+
+    const { checkMeasurements } = await import('../services/measurement-check.js')
+    res.json(checkMeasurements(bloques))
+  } catch (err) {
+    next(err)
+  }
+})
+
+// GET /api/ai/model-info — con qué modelo y contra qué host habla la IA.
+// Diagnóstico: evita adivinar si la app instalada está usando el Ollama que toca.
+router.get('/model-info', async (req, res, next) => {
+  try {
+    const { getModelInfo } = await import('../services/ai-service.js')
+    res.json(getModelInfo())
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.post('/parse-budget-file', async (req, res, next) => {
   try {
     const { fileData, fileType } = req.body
