@@ -1,6 +1,50 @@
 # Backlog operativo CONSTRUGEST
 
-> ## 📍 ESTADO ACTUAL — 2026-11-15
+> # 🏁 PROYECTO DADO POR TERMINADO — 2026-11-15, en la v0.7.0
+>
+> Decisión de Benjamin, y es la correcta: *"si seguimos, no vamos a terminarla nunca,
+> siempre va a tener algo que poder actualizar o subir de nivel"*.
+>
+> **Construgest hace lo que tenía que hacer.** Está publicada, instalada y en uso. Lo que
+> queda escrito debajo NO es trabajo pendiente: es el mapa de por dónde seguiría quien lo
+> retome, si algún día hace falta.
+>
+> **Estado al cerrar:**
+> - Última versión: **v0.7.0**, publicada en GitHub con su `.msi` y marcada *Latest*.
+> - `develop` y `feat/benjamin` al día y pusheadas. `main` se quedó en la 0.3.4: las
+>   releases desde la 0.5.1 se publican **desde `develop`** (ojo: `scripts/release.sh` no
+>   sirve tal cual, exige estar en `main`).
+> - **100/100 tests** y `tsc` limpio.
+> - Entorno de pruebas cerrado y puertos libres.
+>
+> **Si se retoma, por orden de valor** (todo el detalle en
+> [`docs/comparativa-presto.md`](comparativa-presto.md)):
+> 1. **E1 — coste objetivo y desviaciones.** Aparcado porque hoy solo se hacen presupuestos
+>    básicos. Sale casi gratis ahora que el coste es de fiar, pero hay una decisión que
+>    tomar antes: cómo repartir el coste de un parte de trabajo entre las partidas que tocó
+>    ese día, y si el coste real debe llevar IVA o no.
+> 2. **A3** — descomposición en la biblioteca. **A4** — costes indirectos por partida.
+> 3. **Skills de precios caducados y CAE de subcontratas.** Diseñadas y descartadas por
+>    Benjamin: *"son funciones que no voy a utilizar"*. **No hay nada a medias**: la pantalla
+>    de IA tiene 7 tarjetas y 7 endpoints, todos implementados, sin botones huérfanos.
+> 4. **A2** — precios auxiliares reutilizables. Esperando a que exista una base de materiales
+>    y mano de obra; sin ella no aporta.
+> 5. **C1** planificación y **D1** compras: módulos enteros, solo si el negocio los pide.
+>
+> **Dos cosas sueltas anotadas, ninguna bloqueante:**
+> - 🐛 Crear una partida sin `cost_price` por la API da 500 (`Column 'cost_price' cannot be
+>   null`). La UI no lo sufre porque siempre lo manda.
+> - ⚠️ El importe en letra del PDF de **certificaciones** usa la función compartida
+>   (`amountToWords`), verificada a través del PDF de presupuesto pero no ejercitada en una
+>   certificación real. Mirarlo la próxima vez que se emita una.
+>
+> **Lo que NO se debe volver a intentar**, con los números en `ai-service.js`: subir el modelo
+> de IA. Se probó, es más lento, extrae algo peor y le ralentiza el portátil a Benjamin. Si
+> hiciera falta más capacidad: **más skills y más tools deterministas para el 3b**.
+>
+> ---
+>
+> ## 📍 ESTADO AL CERRAR — 2026-11-15
 >
 > ### Último (2026-11-15, tarde): EL EMPAREJAMIENTO DE NOMBRES Y DOS SKILLS NUEVAS
 >
