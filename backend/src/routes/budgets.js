@@ -9,6 +9,7 @@ import {
 } from '../services/budgetMatching.js'
 import { buildBC3Buffer } from '../services/bc3-export.js'
 import { getCurrentVersion } from '../services/version.js'
+import { recalcItemCost, isCostLinked } from '../services/price-breakdown.js'
 
 const router = Router()
 router.use(authMiddleware)
@@ -182,6 +183,19 @@ router.get('/:id/full', budgetAccessMiddleware('budget'), async (req, res, next)
       measurements = measData || []
     }
 
+    // A1: cuantas lineas de descomposicion tiene cada partida. Si tiene alguna,
+    // su coste lo manda la descomposicion y la UI lo pinta de solo lectura.
+    const breakdownByItem = {}
+    if (itemIds.length > 0) {
+      const { data: bdLines } = await supabase
+        .from('cons_price_breakdown')
+        .select('budget_item_id')
+        .in('budget_item_id', itemIds)
+      ;(bdLines || []).forEach(l => {
+        breakdownByItem[l.budget_item_id] = (breakdownByItem[l.budget_item_id] || 0) + 1
+      })
+    }
+
     // Aggregates per item: executed (partes de obra) y certified (certificaciones)
     // Ambas suman sobre TODO el proyecto (no solo este presupuesto) usando budget_item_id.
     const executedByItem = {}
@@ -220,12 +234,16 @@ router.get('/:id/full', budgetAccessMiddleware('budget'), async (req, res, next)
           const remaining = item.is_auxiliary
             ? null
             : Math.max(0, Math.round((quantity - Math.max(executed_total, certified_total)) * 10000) / 10000)
+          const breakdown_lines = breakdownByItem[item.id] || 0
           return {
             ...item,
             measurements: measurements.filter(m => m.budget_item_id === item.id),
             executed_total,
             certified_total,
             remaining,
+            breakdown_lines,
+            // A1: con descomposicion, el coste no se teclea: lo manda ella
+            cost_linked: breakdown_lines > 0,
           }
         }),
     }))
@@ -629,7 +647,14 @@ router.put('/items/:itemId', budgetAccessMiddleware('item', { requireWrite: true
     if (unit !== undefined) updates.unit = unit
     if (quantity !== undefined) updates.quantity = quantity
     if (unit_price !== undefined) updates.unit_price = unit_price
-    if (cost_price !== undefined) updates.cost_price = cost_price
+    // A1: si la partida tiene descomposicion, su coste lo manda ELLA. Se ignora
+    // el cost_price que llegue para que la API no pueda descuadrarlo (la UI lo
+    // pone de solo lectura, pero eso solo seria cosmetico sin esto).
+    let costIgnored = false
+    if (cost_price !== undefined) {
+      if (await isCostLinked(req.params.itemId)) costIgnored = true
+      else updates.cost_price = cost_price
+    }
     if (sort_order !== undefined) updates.sort_order = sort_order
     if (notes !== undefined) updates.notes = notes
     if (is_active !== undefined) updates.is_active = is_active
@@ -638,15 +663,28 @@ router.put('/items/:itemId', budgetAccessMiddleware('item', { requireWrite: true
     // Requiere: ALTER TABLE cons_budget_items ADD COLUMN price_source JSONB NULL;
     if (price_source !== undefined) updates.price_source = price_source
 
-    const { data, error } = await supabase
-      .from('cons_budget_items')
-      .update(updates)
-      .eq('id', req.params.itemId)
-      .select()
-      .single()
+    // Puede no quedar NADA que actualizar: pasa cuando lo unico que venia era
+    // el cost_price de una partida cuyo coste manda su descomposicion (y la UI
+    // manda un solo campo por edicion). Un UPDATE vacio devuelve una respuesta
+    // rota, asi que en ese caso se lee la partida y se devuelve tal cual.
+    let data, error
+    if (Object.keys(updates).length === 0) {
+      ;({ data, error } = await supabase
+        .from('cons_budget_items')
+        .select('*')
+        .eq('id', req.params.itemId)
+        .single())
+    } else {
+      ;({ data, error } = await supabase
+        .from('cons_budget_items')
+        .update(updates)
+        .eq('id', req.params.itemId)
+        .select()
+        .single())
+    }
 
     if (error) throw error
-    res.json(data)
+    res.json(costIgnored ? { ...data, cost_locked_by_breakdown: true } : data)
     notifyBudgetChange(req.resolvedBudgetId, 'item-update')
   } catch (err) {
     next(err)
@@ -943,7 +981,9 @@ router.post('/items/:itemId/breakdown', budgetAccessMiddleware('item', { require
       .select()
       .single()
     if (error) throw error
-    res.status(201).json(data)
+    // A1: el coste de la partida lo manda su descomposicion
+    const cost = await recalcItemCost(req.params.itemId)
+    res.status(201).json({ ...data, item_cost_price: cost.cost })
     notifyBudgetChange(req.resolvedBudgetId, 'breakdown-create')
   } catch (err) { next(err) }
 })
@@ -959,7 +999,9 @@ router.put('/breakdown/:id', budgetAccessMiddleware('breakdown', { requireWrite:
       .select()
       .single()
     if (error) throw error
-    res.json(data)
+    // A1: el coste de la partida lo manda su descomposicion
+    const cost = await recalcItemCost(data.budget_item_id)
+    res.json({ ...data, item_cost_price: cost.cost })
     notifyBudgetChange(req.resolvedBudgetId, 'breakdown-update')
   } catch (err) { next(err) }
 })
@@ -968,12 +1010,23 @@ router.put('/breakdown/:id', budgetAccessMiddleware('breakdown', { requireWrite:
 router.delete('/breakdown/:id', budgetAccessMiddleware('breakdown', { requireWrite: true }), async (req, res, next) => {
   try {
     const budgetId = req.resolvedBudgetId
+    // Hay que saber de que partida era ANTES de borrar la linea
+    const { data: line } = await supabase
+      .from('cons_price_breakdown')
+      .select('budget_item_id')
+      .eq('id', req.params.id)
+      .single()
+
     const { error } = await supabase
       .from('cons_price_breakdown')
       .delete()
       .eq('id', req.params.id)
     if (error) throw error
-    res.json({ success: true })
+
+    // A1: recalcular con las lineas que quedan. Si era la ultima, el coste se
+    // queda como estaba y la partida vuelve a ser manual (no se pone a 0).
+    const cost = line ? await recalcItemCost(line.budget_item_id) : { cost: null, linked: false }
+    res.json({ success: true, item_cost_price: cost.cost, cost_linked: cost.linked })
     notifyBudgetChange(budgetId, 'breakdown-delete')
   } catch (err) { next(err) }
 })

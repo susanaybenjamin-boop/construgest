@@ -73,7 +73,7 @@ interface SimilarPartida {
 }
 
 export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onToggleExpand, isSelected, onSelect }: Props) {
-  const { updateItem, deleteItem, duplicateItem, addMeasurement, updateMeasurement, deleteMeasurement, autoRenumberAll, activeItemId, setActiveItemId, activeBudget } = useBudgetStore()
+  const { updateItem, deleteItem, duplicateItem, addMeasurement, updateMeasurement, deleteMeasurement, autoRenumberAll, activeItemId, setActiveItemId, activeBudget, loadFullBudget } = useBudgetStore()
   const { addToast } = useNotificationStore()
   const isActiveTarget = activeItemId === item.id
   const [showBreakdown, setShowBreakdown] = useState(false)
@@ -285,7 +285,9 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
   const certifiedAmount = certifiedTotal * livePrice
   const certifiedPct = liveQty > 0 ? (certifiedTotal / liveQty) * 100 : 0
   const remaining = item.remaining ?? (isAux ? null : Math.max(0, liveQty - Math.max(executedTotal, certifiedTotal)))
-  const hasActivity = certifiedTotal > 0 || executedTotal > 0 || liveCost > 0 || isAux
+  // A1: si la partida tiene descomposición, su coste lo manda ella (no se teclea)
+  const costLinked = !!item.cost_linked
+  const hasActivity = certifiedTotal > 0 || executedTotal > 0 || liveCost > 0 || isAux || costLinked
 
   // Duplicar con cantidad custom (p.ej. partida agotada que continúa)
   const handleDuplicateWithQuantity = async () => {
@@ -587,19 +589,36 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
         {/* ─── Metrics strip: coste, margen, certificado, pendiente ─── */}
         {(hasActivity || isExpanded) && (
           <div className="pl-[104px] pr-3 pb-1.5 pt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500 -mt-1">
-            <label className="flex items-center gap-1" title="Coste unitario">
-              <span className="text-gray-400">Coste</span>
-              <input
-                {...numInputProps}
-                className="w-[70px] px-1 py-0.5 rounded border border-gray-200 hover:border-gray-300 focus:border-blue-500 outline-none text-right bg-white"
-                value={localCost}
-                onChange={(e) => setLocalCost(e.target.value)}
-                onBlur={(e) => handleBlur('cost_price', e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="0"
-              />
-              <span className="text-gray-400">€/{item.unit}</span>
-            </label>
+            {/* A1: con descomposición el coste lo manda ella, no se teclea */}
+            {costLinked ? (
+              <button
+                type="button"
+                onClick={() => setShowBreakdown(true)}
+                className="flex items-center gap-1 group"
+                title={`Coste calculado por la descomposición (${item.breakdown_lines} línea${item.breakdown_lines === 1 ? '' : 's'}). Pulsa para abrirla y editarla.`}
+              >
+                <span className="text-gray-400">Coste</span>
+                <span className="w-[70px] px-1 py-0.5 rounded border border-dashed border-gray-300 text-right bg-gray-50 text-gray-700 group-hover:border-blue-400 group-hover:text-blue-700">
+                  {liveCost.toFixed(2).replace('.', ',')}
+                </span>
+                <span className="text-gray-400">€/{item.unit}</span>
+                <Layers className="w-3 h-3 text-gray-400 group-hover:text-blue-600" />
+              </button>
+            ) : (
+              <label className="flex items-center gap-1" title="Coste unitario">
+                <span className="text-gray-400">Coste</span>
+                <input
+                  {...numInputProps}
+                  className="w-[70px] px-1 py-0.5 rounded border border-gray-200 hover:border-gray-300 focus:border-blue-500 outline-none text-right bg-white"
+                  value={localCost}
+                  onChange={(e) => setLocalCost(e.target.value)}
+                  onBlur={(e) => handleBlur('cost_price', e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0"
+                />
+                <span className="text-gray-400">€/{item.unit}</span>
+              </label>
+            )}
             {liveCost > 0 && (
               <span
                 className={`font-medium ${marginPct < 0 ? 'text-red-600' : marginPct < 10 ? 'text-amber-600' : 'text-emerald-600'}`}
@@ -778,6 +797,12 @@ export default function PartidaEditRow({ item, dragHandleProps, isExpanded, onTo
         itemName={`${item.code} - ${item.name}`}
         isOpen={showBreakdown}
         onClose={() => setShowBreakdown(false)}
+        // A1: al cerrar con cambios, recargar para que la fila enseñe el coste
+        // y el margen nuevos sin depender de que el realtime esté vivo.
+        onChanged={() => {
+          const budgetId = activeBudget?.budget.id
+          if (budgetId) loadFullBudget(budgetId)
+        }}
       />
 
       {/* Chapter Selector Dialog */}
