@@ -3,7 +3,113 @@
 > ## 📍 ESTADO ACTUAL — 2026-11-15
 >
 >
-> ### Último (2026-11-15): BC3-1 — EXPORTACIÓN A BC3 (FIEBDC-3)
+> ### Último (2026-11-15): B1 — CUADRO DE PRECIOS Nº 1 Y Nº 2
+>
+> Los dos documentos contractuales que pide la dirección facultativa y la administración.
+> Dos interruptores nuevos en la vista previa del PDF, **apagados por defecto** (son largos
+> y solo se piden cuando hacen falta).
+>
+> - **Cuadro nº 1**: cada partida con su precio en cifra y **en letra**. Lleva el precio de
+>   VENTA, así que se le puede entregar al cliente (al revés que el Anexo III, que son costes).
+> - **Cuadro nº 2**: cada partida repartida por naturalezas (mano de obra, maquinaria,
+>   materiales), sumando su precio de venta.
+>
+> **DECISIÓN DE BENJAMIN sobre el nº 2:** en Construgest la descomposición es COSTE y el
+> precio impreso es VENTA, así que la diferencia **es el margen**. Si se imprimiera el coste
+> real con una línea "Resto de obra", el cliente podría calcularlo restando. Decidido:
+> **las naturalezas se ESCALAN en proporción hasta sumar exactamente el precio de venta.**
+> El documento cuadra con el nº 1 y no deja deducir el margen. Una partida sin descomposición
+> sale entera como "Resto de obra", y la pantalla **avisa de cuántas hay antes de generarlo**.
+>
+> **EL FALLO QUE SACÓ EL PDF** (y que solo se ve mirando el documento, no compilando):
+> el importe en letra decía **"VEINTE Y TRES EUROS"**. En español es **"VEINTITRÉS"**: del
+> 21 al 29 va en UNA palabra. En un cuadro de precios el importe en letra es la cifra que
+> manda, así que esto no podía quedarse. De paso salían mal el singular ("UN EUROS") y los
+> millones redondos ("UN MILLÓN EUROS", sin el "DE").
+>
+> La función estaba **DUPLICADA palabra por palabra** en `budgetPdfExport.ts` y en
+> `certificationPdfExport.ts`, con el mismo fallo en las dos. Se ha extraído a
+> `lib/utils.ts` como `amountToWords()`, arreglada, y la usan las dos. Una sola copia.
+>
+> **Verificado en ejecución, sobre el PDF generado de verdad** (no sobre una copia de la
+> función): se crearon 13 partidas de prueba, se generó el PDF, se extrajo su texto y se
+> comprobó máquina a máquina.
+> - Importe en letra, todos los casos límite: 1 € → "UN EURO" (singular); 0,01 € → "CERO
+>   EUROS CON UN CÉNTIMO"; 21 → "VEINTIÚN"; 23,15 → "VEINTITRÉS ... CON QUINCE CÉNTIMOS";
+>   26 → "VEINTISÉIS"; 31 → "TREINTA Y UN"; 100 → "CIEN"; 101,02 → "CIENTO UN ... CON DOS";
+>   1.000.000 → "UN MILLÓN **DE** EUROS"; 2.500.000 → "DOS MILLONES QUINIENTOS MIL EUROS"
+>   (sin "de", porque hay resto).
+> - **Cuadro nº 2: 14/14 bloques suman su total y cuadran con el nº 1.** Incluido el caso
+>   que fuerza el redondeo: precio 100 € con tres naturalezas de igual peso → 33,34 + 33,33
+>   + 33,33 = **100,00** (el céntimo sobrante se le da a la línea mayor; si no, el nº 2 no
+>   sumaría lo que dice el nº 1). Lo hace `repartirProporcional()`.
+> - Maquetación de las dos páginas revisada en pantalla. Cero errores de consola.
+> - 62/62 tests y `tsc` limpio.
+>
+> ⚠️ **LO ÚNICO NO EJERCITADO**: el PDF de **certificaciones** usa ahora la función
+> compartida. `amountToWords()` está verificada en ejecución a través del PDF de
+> presupuesto, y el import es idéntico, pero no se pudo generar un PDF de certificación sin
+> certificar importes de verdad en los datos, y no se tocaron. **Mirar el importe en letra
+> la próxima vez que se emita una certificación.**
+>
+>
+> ### Anterior (2026-11-15): A1 — EL COSTE DE LA PARTIDA SALE DE SU DESCOMPOSICIÓN
+>
+> La carencia de fondo de la comparativa, cerrada. Antes la descomposición era **decorativa**:
+> el panel sumaba las líneas y solo las ENSEÑABA, mientras `cost_price` se tecleaba a mano.
+> Una partida podía decir 42 € y su propia descomposición sumar 51, y el Anexo III del PDF
+> imprimía las dos cifras juntas.
+>
+> **DECISIONES DE BENJAMIN** (preguntadas antes de picar nada):
+> 1. **El coste lo manda la descomposición.** Si la partida tiene líneas, su coste ES la suma
+>    y el recuadro pasa a solo lectura. Sin líneas, se sigue tecleando a mano.
+> 2. **La venta NO se toca.** Vender es decisión suya, no una fórmula. Lo que cambia es el
+>    margen, que pasa a decir la verdad.
+>
+> - `backend/src/services/price-breakdown.js` — `sumBreakdown()` (pura) y `recalcItemCost()`.
+> - Cableado en los 3 endpoints de descomposición (alta, edición, borrado).
+> - `PUT /items/:id` **ignora** el `cost_price` que llegue si la partida tiene descomposición,
+>   y avisa con `cost_locked_by_breakdown`. Sin esto el "solo lectura" de la UI sería
+>   cosmético y la API podría seguir descuadrando el coste.
+> - `GET /:id/full` devuelve `breakdown_lines` y `cost_linked` por partida.
+> - UI: el coste sale con borde discontinuo y abre la descomposición al pulsarlo.
+> - Migración `006_coste_desde_descomposicion.sql`.
+> - `backend/tests/priceBreakdown.test.js` (7 tests). Suite: **62/62**. `tsc` limpio.
+>
+> **Al borrar la última línea el coste NO se pone a 0**: se queda con el último valor y la
+> partida vuelve a ser manual. Poner 0 sería destruir un dato sin que nadie lo pida.
+>
+> **DOS FALLOS CAZADOS EN EJECUCIÓN:**
+> 1. `PUT /items/:id` con **solo** `cost_price` en el cuerpo dejaba `updates` vacío, y un
+>    UPDATE vacío devolvía una respuesta rota. Importaba porque la UI manda **un campo por
+>    edición**, así que era el camino normal. Ahora, si no queda nada que actualizar, se lee
+>    la partida y se devuelve tal cual.
+> 2. **El auto-refresh dependía del realtime.** El panel de descomposición no recargaba nada:
+>    la fila se actualizaba solo porque llegaba el aviso por WebSocket. Con el WS caído (pasa
+>    al reiniciar el backend) la fila se quedaba con el coste viejo → se saltaba la REGLA DURA
+>    de auto-refresh. Ahora el panel avisa al cerrarse si se tocó algo (`onChanged`) y se
+>    recarga el presupuesto: **una recarga por sesión de edición, no por tecla**.
+>
+> **Verificado en ejecución** (Docker + backend + navegador):
+> - 9 comprobaciones contra la API sobre una partida de usar y tirar: alta de línea (coste
+>   pasa a 1,90 y `cost_linked=true`), suma de la segunda, recálculo al editar (24,30),
+>   `PUT cost_price=999` **ignorado**, la venta intacta en 50, borrado de línea, borrado de la
+>   última (el coste se queda y vuelve a manual) y vuelta a aceptar el coste a mano.
+> - UI: cambiar el precio del oficial de 22,40 a 30 €/h dejó la fila en **32,50 € y margen
+>   18,8%**; cambiar el ladrillo a 0,60 €, en **33,34 € y 16,6% · 133,20 €**, **sin recargar**
+>   y con el `GET /full` visible en la pestaña de red. **Cero errores de consola** en carga
+>   limpia.
+> - La migración puso al día las 2 partidas que descuadraban:
+>   "QA partida" 3,00 → 16,00 € y "TRATAMIENTO DE FISURAS FINAS" 0,00 → 18,76 €.
+>   ⚠️ Ojo: "QA partida" ahora enseña margen **−220%** (coste 16, venta 5). Eso ya era así,
+>   solo que estaba oculto. Es justo lo que se buscaba.
+>
+> **Lo que esto DESBLOQUEA** (ver `docs/comparativa-presto.md`): el cuadro de precios nº2,
+> el coste objetivo (E1) y **exportar la descomposición en el BC3**, que no se podía hacer
+> porque la suma era el coste y el precio exportado la venta.
+>
+>
+> ### Anterior (2026-11-15): BC3-1 — EXPORTACIÓN A BC3 (FIEBDC-3)
 >
 > La carencia B2 de la comparativa, cerrada: Construgest ya **manda** presupuestos en el
 > formato del sector, no solo los importa. Botón **Exportar BC3** en la barra del
@@ -60,12 +166,13 @@
 >
 > ### PRÓXIMA SESIÓN (prompt sugerido)
 >
-> > Lee `docs/comparativa-presto.md`. Toca **A1: que el precio de la partida salga de su
-> > descomposición**. Hoy `PriceBreakdownPanel.tsx` calcula el total y solo lo MUESTRA, y
-> > los handlers de `/breakdown` no tocan `cost_price`. Antes de picar nada, pregúntame la
-> > decisión: ¿el precio pasa a ser SOLO la suma de la descomposición (como Presto), o
-> > sigue editable y la app avisa de la desviación? Al cerrarlo se desbloquean el cuadro de
-> > precios nº2, el coste objetivo y exportar la descomposición en el BC3.
+> > Lee `docs/comparativa-presto.md`. Cerrados ya B2 (exportar BC3), A1 (el coste sale de la
+> > descomposición) y B1 (cuadros de precios nº 1 y nº 2). Lo siguiente por valor/esfuerzo es
+> > **E1: coste objetivo y desviaciones**, que ahora sale casi gratis porque el coste ya es
+> > de fiar: descomposición × cantidad medida = lo que esa partida debería costar, y
+> > enfrentarlo a lo que llevan gastado los partes de obra y los gastos. Después, **A4**
+> > (costes indirectos por partida, que hacen falta para obra pública) o **exportar la
+> > descomposición en el BC3**, que A1 ha desbloqueado.
 >
 >
 > ### Anterior (2026-11-15): COMPARATIVA CON PRESTO — carencias identificadas

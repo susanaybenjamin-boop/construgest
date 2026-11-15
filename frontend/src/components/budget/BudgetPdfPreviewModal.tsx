@@ -42,6 +42,10 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
   const hayMediciones = budget.chapters.some((c) =>
     c.items.some((i) => (i.measurements?.length || 0) > 0))
   const [includeMeasurementsAnnex, setIncludeMeasurementsAnnex] = useState(true)
+  // B1: cuadros de precios. Apagados por defecto: son documentos largos y solo
+  // se piden cuando hace falta (proyecto, licitacion, direccion facultativa).
+  const [includePriceSchedule1, setIncludePriceSchedule1] = useState(false)
+  const [includePriceSchedule2, setIncludePriceSchedule2] = useState(false)
 
   // PRES-5: lineas de descompuestos (solo se imprimen en version interna).
   const [breakdown, setBreakdown] = useState<{
@@ -56,6 +60,15 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
       .catch(() => { if (!cancelado) setBreakdown([]) })
     return () => { cancelado = true }
   }, [isOpen, budget.budget.id])
+
+  // B1: cuantas partidas NO tienen descomposicion. El Cuadro de Precios nº 2 las
+  // saca enteras como "Resto de obra", asi que se avisa ANTES de generarlo y no
+  // despues de ver un documento soso.
+  const conDescomposicion = new Set(breakdown.map((l) => l.budget_item_id))
+  const sinDescomposicion = budget.chapters
+    .filter((c) => !c.chapter.is_legal_text)
+    .flatMap((c) => c.items)
+    .filter((it) => !conDescomposicion.has(it.id)).length
 
   // PRES-3: fotos del anexo. Se piden al abrir; si no hay, ni se ofrece la opcion.
   const [photos, setPhotos] = useState<BudgetPhoto[]>([])
@@ -114,6 +127,8 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
           showCosts,
           generalConditions: generalConditions || undefined,
           includeMeasurementsAnnex,
+          includePriceSchedule1,
+          includePriceSchedule2,
           breakdown,
           photoSources: includePhotoAnnex
             ? photos
@@ -143,7 +158,7 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
     }, 400)
 
     return () => clearTimeout(timer)
-  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, includePhotoAnnex, photos, breakdown, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
+  }, [isOpen, orientation, showPrices, showCosts, generalConditions, includeMeasurementsAnnex, includePriceSchedule1, includePriceSchedule2, includePhotoAnnex, photos, breakdown, client, budget, projectName, company, printSettings, pdfName, pdf_styles])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -252,6 +267,57 @@ export default function BudgetPdfPreviewModal({ isOpen, onClose, budget, project
             Tabla por zona al final, con los totales de cada partida
           </p>
         </div>
+      )}
+
+      {/* B1 — Cuadros de precios (documentos contractuales) */}
+      {showPrices && (
+        <>
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={includePriceSchedule1}
+                  onChange={(e) => setIncludePriceSchedule1(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-checked:bg-blue-600 rounded-full transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">Cuadro de precios nº 1</span>
+            </label>
+            <p className="text-xs text-gray-400 mt-1 ml-12">
+              Cada partida con su precio en cifra y en letra. Documento contractual.
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={includePriceSchedule2}
+                  onChange={(e) => setIncludePriceSchedule2(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-gray-200 peer-checked:bg-blue-600 rounded-full transition-colors" />
+                <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4" />
+              </div>
+              <span className="text-sm font-medium text-gray-700">Cuadro de precios nº 2</span>
+            </label>
+            <p className="text-xs text-gray-400 mt-1 ml-12">
+              Cada partida repartida por naturalezas (mano de obra, maquinaria, materiales),
+              sumando su precio de venta. No muestra tu margen.
+              {sinDescomposicion > 0 && (
+                <span className="block text-amber-600 mt-0.5">
+                  {sinDescomposicion === 1
+                    ? '1 partida no tiene descomposición y saldrá entera como "Resto de obra".'
+                    : `${sinDescomposicion} partidas no tienen descomposición y saldrán enteras como "Resto de obra".`}
+                </span>
+              )}
+            </p>
+          </div>
+        </>
       )}
 
       {/* PRES-3 — Anexo fotografico */}
