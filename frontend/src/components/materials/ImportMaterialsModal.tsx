@@ -288,9 +288,23 @@ export default function ImportMaterialsModal({
     materials: ExtractedMaterial[],
     supplierDescs: SupplierDescription[],
     fromAI = false,
+    /**
+     * Emparejamientos calculados por el BACKEND, que usa la misma función que
+     * el resto de la app. Si no llegan (fallo de red), se cae al cálculo local
+     * de siempre: importar nunca se queda bloqueado por esto.
+     */
+    serverMatches?: Map<string, { existing_material_id: string | null; existing_name: string | null; score: number }>,
   ): ReviewMaterial[] => {
     return materials.map(mat => {
-      const best = findBestMatch(mat.name, existingMaterials, supplierDescs)
+      const delServidor = serverMatches?.get(mat.name)
+      const best = delServidor?.existing_material_id
+        ? {
+            material: { id: delServidor.existing_material_id, name: delServidor.existing_name || '' } as Material,
+            score: delServidor.score,
+          }
+        : delServidor
+          ? null   // el servidor contestó y dijo que no hay candidato
+          : findBestMatch(mat.name, existingMaterials, supplierDescs)
       let action: MatchStatus = 'create'
       let existing_material_id: string | undefined
       let existing_name: string | undefined
@@ -333,6 +347,25 @@ export default function ImportMaterialsModal({
         supplierDescs = descRes.data || []
       } catch { /* ignore */ }
 
+      /**
+       * Pide al backend que empareje estos nombres contra el catálogo. Es la
+       * MISMA función que usa el resto de la app (la que sabe que "25" y
+       * "25kg" son la misma medida y que una viga V1 no es una V2).
+       * Si falla, se devuelve undefined y applyMatching tira de su cálculo local.
+       */
+      const pedirEmparejamientos = async (names: string[]) => {
+        if (names.length === 0) return undefined
+        try {
+          const { data } = await api.post<{ name: string; existing_material_id: string | null; existing_name: string | null; score: number }[]>(
+            '/materials/match-import',
+            { rows: names.map(name => ({ name })) },
+          )
+          return new Map((data || []).map(d => [d.name, d]))
+        } catch {
+          return undefined   // respaldo: el cálculo local de siempre
+        }
+      }
+
       await loadSuppliers()
 
       if (isExcel) {
@@ -359,7 +392,7 @@ export default function ImportMaterialsModal({
             setExtracting(false)
             return
           }
-          const reviewed = applyMatching(extracted, supplierDescs, true)
+          const reviewed = applyMatching(extracted, supplierDescs, true, await pedirEmparejamientos(extracted.map(m => m.name)))
           setSheetGroups([{
             sheetName: file.name.replace(/\.[^.]+$/, ''),
             materials: reviewed,
@@ -372,9 +405,11 @@ export default function ImportMaterialsModal({
           }])
         } else {
           // Direct parsing succeeded — create groups per sheet
+          // Un solo viaje al servidor para TODAS las hojas
+          const matches = await pedirEmparejamientos(sheets.flatMap(s => s.materials.map(m => m.name)))
           const groups: SheetGroup[] = sheets.map((s, i) => ({
             sheetName: s.sheetName,
-            materials: applyMatching(s.materials, supplierDescs),
+            materials: applyMatching(s.materials, supplierDescs, false, matches),
             supplierId: '',
             newSupplierName: '',
             showNewSupplier: false,
@@ -403,7 +438,7 @@ export default function ImportMaterialsModal({
           setExtracting(false)
           return
         }
-        const reviewed = applyMatching(extracted, supplierDescs, true)
+        const reviewed = applyMatching(extracted, supplierDescs, true, await pedirEmparejamientos(extracted.map(m => m.name)))
         setSheetGroups([{
           sheetName: file.name.replace(/\.[^.]+$/, ''),
           materials: reviewed,

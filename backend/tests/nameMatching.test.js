@@ -70,6 +70,41 @@ test('que a uno le sobre un codigo no impide emparejar', () => {
   assert.ok(fuzzyJaccard('Mortero M-5 gris', 'Mortero M-5 gris saco 25 kg') >= REF_THRESHOLD)
 })
 
+// ─── La unidad pegada o suelta es el MISMO codigo ───────────────────
+// Cada proveedor escribe "25 kg" o "25kg". Comparando los codigos como TEXTO
+// parecian distintos y el mismo saco de cemento de dos proveedores no se
+// proponia como equivalente (visto con los datos de Benjamin, 2026-11-21).
+
+test('el mismo producto escrito por dos proveedores SI se propone', () => {
+  const pares = [
+    ['CEMENTO GRIS CEM II/B-L 32,5 N SACO 25 KG', 'Cemento gris CEM II 32,5 saco 25kg'],
+    ['Ladrillo hueco doble 24x11,5x9', 'LADRILLO HUECO DOBLE 24X11.5X9'],
+    ['Yeso laminado 13 mm', 'Placa yeso laminado 13mm'],
+    ['Arena de rio lavada 0/4', 'Arena rio lavada 0/4 big bag'],
+  ]
+  for (const [a, b] of pares) {
+    const s = fuzzyJaccard(a, b)
+    assert.ok(s >= DUP_THRESHOLD, `"${a}" vs "${b}" da ${s}, no se propondria vincular`)
+  }
+})
+
+test('"25" y "25kg" son el mismo codigo, "v1" y "v2" no', () => {
+  // Misma medida escrita de dos formas -> emparejan
+  assert.ok(fuzzyJaccard('Saco cemento 25 kg', 'Saco cemento 25kg') >= DUP_THRESHOLD)
+  assert.ok(fuzzyJaccard('Tubo PVC 110 mm', 'Tubo PVC 110mm') >= DUP_THRESHOLD)
+  // Medidas distintas -> siguen sin emparejar
+  assert.ok(fuzzyJaccard('Saco cemento 25 kg', 'Saco cemento 40kg') < DUP_THRESHOLD)
+  assert.ok(fuzzyJaccard('Tubo PVC 110 mm', 'Tubo PVC 125mm') < DUP_THRESHOLD)
+})
+
+test('que a uno le sobre la unidad no rompe el conflicto de verdad', () => {
+  // El numero manda: 32,5 no es 42,5 por mucho que el resto coincida
+  assert.ok(
+    fuzzyJaccard('Cemento gris CEM II 32,5 saco 25 kg', 'Cemento blanco BL II 42,5 saco 25 kg')
+      < DUP_THRESHOLD
+  )
+})
+
 // ─── El prefijo ya no vale por si solo ──────────────────────────────
 
 test('el material y la maquina no son lo mismo aunque empiecen igual', () => {

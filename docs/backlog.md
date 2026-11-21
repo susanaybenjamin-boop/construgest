@@ -46,7 +46,46 @@
 >
 > ---
 >
-> ## 📍 ESTADO AL CERRAR — 2026-11-15
+> ## 📍 ESTADO AL CERRAR — 2026-11-21 (v0.7.1)
+>
+> ### Reapertura breve: los materiales de proveedores (2026-11-21)
+>
+> Benjamin, ya en producción: *"en proveedores, comparativa de precios… lo que no está
+> haciendo es proponer vinculación de materiales"*. Al mirarlo salieron **tres cosas**:
+>
+> **1. 🐛 Una regresión del arreglo del 15-nov (mía).** La regla de conflicto de códigos
+> comparaba los códigos como TEXTO, y cada proveedor escribe la unidad pegada o suelta:
+> `"25 kg"` deja el token `25` y `"25kg"` deja `25kg`. Como texto parecían códigos
+> distintos → el MISMO saco de cemento de dos proveedores se capaba a 0,3 y no se proponía
+> vincular. **Cuatro de seis pares del mismo producto salían a exactamente 30 %**, que es el
+> tope que yo había introducido. Ahora se comparan los **números**: `25` = `25kg`,
+> `13` = `13mm`, pero `v1` ≠ `v2` y `M8` ≠ `M10`.
+>
+> **2. ✨ Vincular no servía para nada.** Agrupar dos materiales (`material_group_id`) solo
+> hacía que dejara de sugerirse el duplicado: **la comparativa seguía mirando material por
+> material**. Ahora un GRUPO es un producto, junta las ofertas de todos sus miembros, da UN
+> aviso por grupo (no uno por material), avisa sobre el precio más caro que estás pagando y
+> dice de qué material vinculado sale la oferta buena.
+>
+> **3. 🔀 Había TRES implementaciones del mismo emparejamiento.** La pantalla de importar
+> tenía la suya, sin ninguno de los arreglos: duplicaba materiales al reimportar el listado
+> del mismo proveedor escrito distinto, y **podía fusionar una vigueta V1 con una V2** (el
+> fallo de las vigas, vivo todavía ahí). Ahora decide el servidor con la función buena
+> (`POST /materials/match-import`), con el cálculo local como respaldo si falla la red.
+>
+> **Sobre reimportar el mismo proveedor** (la pregunta de Benjamin): NO duplica. Se guarda
+> la descripción original del proveedor y al reimportar se busca coincidencia exacta con
+> ella; el enlace proveedor-material se ACTUALIZA (hay índice único) y se guarda histórico
+> de precios. Lo que fallaba era el camino de respaldo cuando el texto no venía idéntico.
+>
+> **Verificado en ejecución, no solo con tests**: reimportar el mismo listado escrito
+> distinto (nombre idéntico → actualiza; `saco 25kg` contra `SACO 25 KG` → 100 %, actualiza;
+> vigueta V3 nueva → crea, sin fusionar); y la comparativa sin vincular → 0 avisos,
+> vinculados → 1. **109/109 tests** y `tsc` limpio.
+>
+> ---
+>
+> ## 📍 ESTADO AL CERRAR — 2026-11-15 (v0.7.0)
 >
 > ### Último (2026-11-15, tarde): EL EMPAREJAMIENTO DE NOMBRES Y DOS SKILLS NUEVAS
 >
