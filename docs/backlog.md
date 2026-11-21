@@ -69,8 +69,9 @@
 > exacta: se va afinando solo.
 >
 > **REL-CLEAN**: borrado el `.msi` local de 0.6.0; quedan 0.7.0 (anterior) y 0.7.1 (actual).
-> Los publicados en GitHub, intactos. ⚠️ Quedan **17 `.wixpdb`** (208 MB) de builds desde la
-> 0.3.4: son intermedios de WiX, se pueden borrar sin perder nada.
+> Los publicados en GitHub, intactos. Borrados además los **17 `.wixpdb`** (208 MB) de
+> builds desde la 0.3.4: son los símbolos que genera WiX al enlazar y no hacen falta una vez
+> está el `.msi`; cada build se crea el suyo. En total, **661 MB liberados**.
 >
 > ### Reapertura breve: los materiales de proveedores (2026-11-21)
 >
