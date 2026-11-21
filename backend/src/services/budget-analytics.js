@@ -36,6 +36,25 @@ function normName(s) {
 function hasDigit(t) { return /\d/.test(t) }
 
 /**
+ * Los NÚMEROS que lleva un token, que es lo que de verdad especifica.
+ *
+ * Hace falta porque cada proveedor escribe la unidad pegada o suelta: "25 kg"
+ * deja el token "25" y "25kg" deja "25kg". Comparándolos como TEXTO parecen
+ * códigos distintos y el mismo saco de cemento de dos proveedores no se
+ * proponía como equivalente (visto con los datos de Benjamin, 2026-11-21).
+ * Comparando los números, "25" y "25kg" son lo mismo, y "v1" y "v2" siguen
+ * siendo distintos, que es lo que importa.
+ */
+function tokenNumbers(t) {
+  return (String(t).match(/\d+/g) || []).join('|')
+}
+
+/** Dos tokens con dígitos especifican lo mismo si llevan los mismos números. */
+function sameNumbers(a, b) {
+  return tokenNumbers(a) === tokenNumbers(b)
+}
+
+/**
  * Tokens significativos de un nombre.
  *
  * OJO con el filtro de longitud: descartaba TODO token de 2 caracteres o menos,
@@ -76,7 +95,10 @@ function normUnit(u) { return String(u || '').toLowerCase().replace(/[²³]/g, (
  */
 function tokenMatch(a, b) {
   if (a === b) return true
-  if (hasDigit(a) || hasDigit(b)) return false
+  if (hasDigit(a) || hasDigit(b)) {
+    // "13" y "13mm" son la misma medida escrita de dos formas; "v1" y "v2" no.
+    return hasDigit(a) && hasDigit(b) && sameNumbers(a, b)
+  }
   const [s, l] = a.length <= b.length ? [a, b] : [b, a]
   return s.length >= 4 && l.startsWith(s) && l.length - s.length <= 2
 }
@@ -106,8 +128,13 @@ function fuzzyJaccard(a, b) {
   //
   // Que a uno le sobre un código (p.ej. "Mortero M-5" contra "Mortero M-5 25
   // kg") NO es conflicto: suele ser el mismo producto con el formato detallado.
-  const soloEnA = A.filter((t) => hasDigit(t) && !B.includes(t))
-  const soloEnB = B.filter((t) => hasDigit(t) && !A.includes(t))
+  // Se compara por NÚMEROS, no por texto: si no, "25 kg" contra "25kg" parecía
+  // un conflicto de códigos y bloqueaba vincular el mismo producto de dos
+  // proveedores que lo escriben distinto.
+  const numsA = A.filter(hasDigit).map(tokenNumbers)
+  const numsB = B.filter(hasDigit).map(tokenNumbers)
+  const soloEnA = numsA.filter((n) => !numsB.includes(n))
+  const soloEnB = numsB.filter((n) => !numsA.includes(n))
   if (soloEnA.length > 0 && soloEnB.length > 0) {
     // Se deja un valor bajo (no 0) porque siguen siendo parientes: sirve para
     // ordenar sugerencias, nunca para agrupar ni para tomar un precio.
