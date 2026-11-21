@@ -27,13 +27,34 @@ function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 export function analyzeMaterials(materials = [], supplierLinks = [], suppliers = []) {
   const supplierName = new Map(suppliers.map((s) => [s.id, s.name]))
 
-  // Precio por proveedor de cada material.
-  const pricesByMat = new Map()  // material_id → [{supplier_id, price}]
+  // ── Un GRUPO es un producto ──────────────────────────────────────────
+  // Vincular dos materiales (mismo `material_group_id`) significa que son el
+  // mismo producto comprado a proveedores distintos. Antes el grupo solo
+  // servía para dejar de sugerir el duplicado: la comparativa seguía mirando
+  // material por material, así que vincular NO devolvía nada. Ahora las ofertas
+  // de todos los miembros se juntan y se comparan entre sí, que es justo para
+  // lo que se vincula.
+  const materialById = new Map(materials.map((m) => [m.id, m]))
+  /** Clave del grupo; un material sin vincular es un grupo de uno. */
+  const groupKey = (m) => m.material_group_id || `solo:${m.id}`
+
+  const pricesByGroup = new Map()   // grupo → [{supplier_id, price, material_name}]
   for (const l of supplierLinks) {
     const price = num(l.unit_price)
     if (price <= 0) continue
-    if (!pricesByMat.has(l.material_id)) pricesByMat.set(l.material_id, [])
-    pricesByMat.get(l.material_id).push({ supplier_id: l.supplier_id, price })
+    const m = materialById.get(l.material_id)
+    if (!m) continue
+    const k = groupKey(m)
+    if (!pricesByGroup.has(k)) pricesByGroup.set(k, [])
+    pricesByGroup.get(k).push({ supplier_id: l.supplier_id, price, material_name: m.name })
+  }
+
+  // Miembros de cada grupo, para poder valorar el grupo entero de una vez.
+  const membersByGroup = new Map()
+  for (const m of materials) {
+    const k = groupKey(m)
+    if (!membersByGroup.has(k)) membersByGroup.set(k, [])
+    membersByGroup.get(k).push(m)
   }
 
   // ── Duplicados sin agrupar (misma unidad, nombre muy similar) ──
@@ -62,23 +83,43 @@ export function analyzeMaterials(materials = [], supplierLinks = [], suppliers =
   const supplier_optimization = []
   let potential_unit_savings = 0
 
-  for (const m of materials) {
-    const offers = pricesByMat.get(m.id)
+  // Se recorre por GRUPO, no por material: si no, un producto vinculado a tres
+  // materiales soltaría tres avisos casi idénticos.
+  for (const [k, offers] of pricesByGroup) {
     if (!offers || offers.length === 0) continue
-    const cheapest = offers.reduce((a, b) => (b.price < a.price ? b : a))
-    const current = num(m.unit_price)
+    const miembros = membersByGroup.get(k) || []
+    const vinculado = miembros.length > 1
 
-    // Pagas más que la oferta más barata que tienes registrada.
-    if (current > 0 && cheapest.price < current * 0.9) {
+    const cheapest = offers.reduce((a, b) => (b.price < a.price ? b : a))
+    const proveedorBarato = supplierName.get(cheapest.supplier_id) || 'proveedor'
+
+    // Del grupo interesa el precio MÁS CARO que estás pagando: es donde está
+    // el ahorro. Y su nombre, para que sepas de cuál se habla.
+    const conPrecio = miembros.filter((m) => num(m.unit_price) > 0)
+    const peor = conPrecio.length > 0
+      ? conPrecio.reduce((a, b) => (num(b.unit_price) > num(a.unit_price) ? b : a))
+      : null
+    const current = peor ? num(peor.unit_price) : 0
+
+    if (peor && cheapest.price < current * 0.9) {
       const diffPct = round2(((current - cheapest.price) / current) * 100)
       potential_unit_savings += round2(current - cheapest.price)
       price_alerts.push({
-        material_name: m.name,
+        material_name: peor.name,
         current_price: current,
         best_supplier_price: cheapest.price,
-        best_supplier_name: supplierName.get(cheapest.supplier_id) || 'proveedor',
+        best_supplier_name: proveedorBarato,
         difference_percent: diffPct,
-        recommendation: `Comprar a "${supplierName.get(cheapest.supplier_id) || 'proveedor'}" (${cheapest.price} € vs ${current} €).`,
+        // Si el grupo está vinculado, la oferta buena puede venir de OTRO
+        // material: decir de cuál, o el aviso parece sacado de la nada.
+        ...(vinculado && cheapest.material_name !== peor.name
+          ? { linked_material_name: cheapest.material_name }
+          : {}),
+        recommendation:
+          `Comprar a "${proveedorBarato}" (${cheapest.price} € vs ${current} €)` +
+          (vinculado && cheapest.material_name !== peor.name
+            ? `, que lo tienes vinculado como "${cheapest.material_name}".`
+            : '.'),
       })
     }
 
@@ -86,8 +127,11 @@ export function analyzeMaterials(materials = [], supplierLinks = [], suppliers =
     if (offers.length >= 2) {
       const max = offers.reduce((a, b) => (b.price > a.price ? b : a))
       if (max.price > cheapest.price * 1.1) {
+        const nombre = peor?.name || miembros[0]?.name || cheapest.material_name
         supplier_optimization.push(
-          `${m.name}: más barato en "${supplierName.get(cheapest.supplier_id) || 'proveedor'}" (${cheapest.price} €) frente a ${max.price} € (${round2(((max.price - cheapest.price) / max.price) * 100)}% de diferencia).`
+          `${nombre}: más barato en "${proveedorBarato}" (${cheapest.price} €) frente a ${max.price} € ` +
+          `(${round2(((max.price - cheapest.price) / max.price) * 100)}% de diferencia)` +
+          (vinculado ? `, comparando los ${miembros.length} materiales que tienes vinculados.` : '.')
         )
       }
     }
@@ -97,7 +141,8 @@ export function analyzeMaterials(materials = [], supplierLinks = [], suppliers =
 
   return {
     total_items: materials.length,
-    materials_with_offers: pricesByMat.size,
+    // Productos con oferta: un grupo vinculado cuenta como UNO.
+    materials_with_offers: pricesByGroup.size,
     duplicates,
     price_alerts,
     supplier_optimization,
