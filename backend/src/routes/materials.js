@@ -400,6 +400,94 @@ router.get('/categories', async (req, res, next) => {
 
 // POST /api/materials/smart-import
 // Receives extracted materials, detects duplicates, creates/updates, links to supplier
+// POST /api/materials/match-import — empareja las filas de un listado de
+// proveedor contra el catálogo que ya existe, para decidir si ACTUALIZAR o
+// crear. Lo decide el servidor con la MISMA función que el resto de la app.
+//
+// Por qué existe: la pantalla de importar tenía su PROPIO emparejamiento (una
+// tercera implementación), que no sabía que "25" y "25kg" son la misma medida
+// ni protegía los códigos. Con listados del mismo proveedor escritos un poco
+// distinto duplicaba materiales, y podía llegar a fusionar una viga V1 con una
+// V2. Ahora hay una sola lógica, la corregida.
+//
+// Orden de preferencia, igual que antes:
+//   1. Coincidencia EXACTA con la descripción que mandó el proveedor la última vez.
+//   2. Parecido contra esas descripciones.
+//   3. Parecido contra el nombre del material del catálogo.
+router.post('/match-import', async (req, res, next) => {
+  try {
+    const orgId = req.user.organization_id
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
+    if (rows.length === 0) return res.json([])
+
+    const { data: materials, error: matErr } = await supabase
+      .from('cons_materials')
+      .select('id, name, unit')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+    if (matErr) throw matErr
+
+    const byId = new Map((materials || []).map((m) => [m.id, m]))
+
+    const { data: links } = await supabase
+      .from('cons_supplier_materials')
+      .select('material_id, supplier_description')
+      .not('supplier_description', 'is', null)
+    const descs = (links || []).filter((d) => byId.has(d.material_id))
+
+    const { _match } = await import('../services/budget-analytics.js')
+    const { fuzzyJaccard } = _match
+    const norm = (s) => String(s || '').trim().toLowerCase()
+
+    // Índice de descripciones exactas: el camino rápido y el que de verdad
+    // importa al reimportar el listado del mismo proveedor.
+    const exact = new Map()
+    for (const d of descs) {
+      const k = norm(d.supplier_description)
+      if (k && !exact.has(k)) exact.set(k, d.material_id)
+    }
+
+    const UMBRAL_MINIMO = 0.3   // por debajo no se devuelve candidato
+
+    const out = rows.map((row) => {
+      const name = String(row?.name || '')
+      const vacio = { name, existing_material_id: null, existing_name: null, score: 0, source: null }
+      if (!name.trim()) return vacio
+
+      const exacto = exact.get(norm(name))
+      if (exacto) {
+        const m = byId.get(exacto)
+        return { name, existing_material_id: m.id, existing_name: m.name, score: 1, source: 'descripcion-exacta' }
+      }
+
+      let best = null
+      for (const d of descs) {
+        const s = fuzzyJaccard(name, d.supplier_description)
+        if (!best || s > best.score) best = { id: d.material_id, score: s, source: 'descripcion' }
+      }
+      for (const m of (materials || [])) {
+        const s = fuzzyJaccard(name, m.name)
+        if (!best || s > best.score) best = { id: m.id, score: s, source: 'nombre' }
+      }
+
+      if (!best || best.score <= UMBRAL_MINIMO) return vacio
+      const m = byId.get(best.id)
+      if (!m) return vacio
+      return {
+        name,
+        existing_material_id: m.id,
+        existing_name: m.name,
+        score: Math.round(best.score * 1000) / 1000,
+        source: best.source,
+      }
+    })
+
+    res.json(out)
+  } catch (err) {
+    next(err)
+  }
+})
+
 router.post('/smart-import', async (req, res, next) => {
   try {
     const orgId = req.user.organization_id
