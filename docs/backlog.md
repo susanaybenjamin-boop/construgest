@@ -48,6 +48,30 @@
 >
 > ## 📍 ESTADO AL CERRAR — 2026-11-21 (v0.7.1)
 >
+> **RELEASE v0.7.1 PUBLICADA (2026-11-21)** y **confirmada en producción**: Benjamin
+> instaló, reimportó la tarifa de un proveedor real (*Forjados La Azucena*, 24 materiales)
+> y **los 24 salieron como "Actualizar", ninguno como "Crear"** — que es justo lo contrario
+> de lo que pasaba antes. Entre ellos, el que había acortado a mano:
+> `LADRILLO D. 30X15X7` reconocido contra `LADRILLO DOBLE 30X15X7` **al 67 %**, por encima
+> del umbral de 65 %. Veredicto suyo: *"todo de lujo"*.
+>
+> **Comprobado antes de publicar**: gate de secretos (1.564 ficheros, sin credenciales), las
+> 8 migraciones dentro, y que viaja el código nuevo — el endpoint `match-import`, el
+> grupo-como-producto, los números en el emparejamiento y **la llamada nueva en el frontend
+> compilado**, que es lo que confirma que la pantalla de importar ya usa el backend y no su
+> copia vieja.
+>
+> **Conviene saber, de leer el código al responder a Benjamin**: "Actualizar" en la pantalla
+> de importar significa *enlazar con el material que ya existe*, no *cambiarlo*. El NOMBRE
+> del catálogo no se pisa nunca con el del proveedor, y si el precio no ha cambiado **no se
+> escribe nada** (la fila cuenta como actualizada pero no toca la BD). La descripción del
+> proveedor sí se refresca, así que la próxima importación de ese texto ya es coincidencia
+> exacta: se va afinando solo.
+>
+> **REL-CLEAN**: borrado el `.msi` local de 0.6.0; quedan 0.7.0 (anterior) y 0.7.1 (actual).
+> Los publicados en GitHub, intactos. ⚠️ Quedan **17 `.wixpdb`** (208 MB) de builds desde la
+> 0.3.4: son intermedios de WiX, se pueden borrar sin perder nada.
+>
 > ### Reapertura breve: los materiales de proveedores (2026-11-21)
 >
 > Benjamin, ya en producción: *"en proveedores, comparativa de precios… lo que no está
